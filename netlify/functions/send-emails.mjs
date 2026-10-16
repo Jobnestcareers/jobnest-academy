@@ -1,4 +1,4 @@
-// Sends queued admissions emails every minute.
+// Every minute: expires unpaid offers, queues reminders, then sends queued admissions emails.
 // Needs these Netlify environment variables (Site configuration → Environment variables):
 //   RESEND_API_KEY        secret key from resend.com
 //   SUPABASE_SECRET_KEY   Supabase secret key (sb_secret_...) — never put this in the code
@@ -15,6 +15,10 @@ export async function sendQueued({ fetchFn = fetch, env = process.env, limit = 2
   const db = (path, init = {}) => fetchFn(`${env.SUPABASE_URL || SUPABASE_URL}/rest/v1/${path}`, {
     ...init, headers: { apikey: key, "Content-Type": "application/json", Prefer: "return=minimal", ...(init.headers || {}) },
   });
+  // Expire unpaid offers and queue reminders first, so those emails go out in this run.
+  let jobs = null;
+  try { const t = await db("rpc/jobs_tick", { method: "POST", body: "{}", headers: { Prefer: "return=representation" } }); jobs = t.ok ? await t.json().catch(() => null) : `jobs ${t.status}`; }
+  catch (e) { jobs = String(e.message || e); }
   const res = await db(`outbox?select=id,to_email,subject,body,link,cta,attempts&sent_at=is.null&attempts=lt.${MAX_ATTEMPTS}&order=created_at.asc&limit=${limit}`);
   if (!res.ok) return { error: `Could not read the outbox: ${res.status} ${await res.text()}` };
   const rows = await res.json();
@@ -38,7 +42,7 @@ export async function sendQueued({ fetchFn = fetch, env = process.env, limit = 2
     await db(`outbox?id=eq.${m.id}`, { method: "PATCH", body: JSON.stringify(patch) });
     error ? failed++ : sent++;
   }
-  return { checked: rows.length, sent, failed };
+  return { jobs, checked: rows.length, sent, failed };
 }
 
 export default async () => {

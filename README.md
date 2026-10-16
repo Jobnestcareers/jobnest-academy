@@ -53,18 +53,35 @@ Environment variables**, add:
 
 Then redeploy. Existing databases also need `supabase/04_email_sending.sql` run once.
 
+## Payments (Paystack)
+An applicant with an offer chooses **full payment** or **2 parts** and pays on Paystack's own page.
+`netlify/functions/pay.mjs` starts the payment, `pay-return.mjs` checks it with Paystack when they come back,
+and `paystack-webhook.mjs` is Paystack's backup confirmation. The first successful payment admits them,
+gives a matric number (e.g. `GEP/27A/001`) and opens the printable admission letter. Every minute the
+email function also expires unpaid offers and sends payment reminders.
+
+| Name | Value |
+| --- | --- |
+| `PAYSTACK_SECRET_KEY` | Paystack → Settings → API Keys & Webhooks → **Secret key** (`sk_test_...` while testing, `sk_live_...` when activated) |
+
+In Paystack, set the **Webhook URL** to `https://academy.jobnestcareers.com/.netlify/functions/paystack-webhook`.
+Existing databases need `supabase/05_payments.sql` run once. Staff see everything under **Payments**,
+and can record a bank transfer made outside Paystack or give someone more time to pay.
+
 ## Testing locally
 Needs Postgres 16 and Python 3 with Playwright.
 ```
 bash dev/reset_db.sh            # fresh local database with the real SQL
 python3 dev/emulator.py 8787 &  # local stand-in for Supabase on http://localhost:8787
+node dev/functions_server.mjs & # payment functions with a fake Paystack on :8788
 bash dev/test_sql.sh            # database-level checks
-python3 dev/e2e.py 1280         # full journey in a browser (use 375 for phone)
+bash dev/test_pay.sh            # payments, matric numbers, expiry and reminders
+python3 dev/e2e.py 1280         # full journey in a browser, including paying (use 390 for phone)
 ```
 
 ## Build phases
 1. Foundations and admissions ✅ (this version)
 2. Automatic emails ✅ (Resend, sent every minute by `netlify/functions/send-emails.mjs`)
-3. Paystack payment, admission letter and matric numbers
+3. Paystack payment, admission letter and matric numbers ✅
 4. Student portal and learning
 5. Projects, internships, coaching and certificates

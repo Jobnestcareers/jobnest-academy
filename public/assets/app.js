@@ -13,6 +13,8 @@ const fmtTime = (d) => fmt(d, { hour: "2-digit", minute: "2-digit", hour12: fals
 const fmtAt = (d) => `${fmtDay(d)}, ${fmtTime(d)}`;
 const fmtDate = (d) => fmt(d, { day: "numeric", month: "long", year: "numeric" });
 const naira = (n) => "₦" + Math.round(n).toLocaleString("en-NG");
+const fmtDateD = (iso) => fmt(iso + "T12:00:00Z", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const balanceOf = (a) => a.plan && a.fees ? Math.max(0, (a.fees.plan_total || 0) - (a.paid_total || 0)) : 0;
 const MY_APP = "jn.myapp";
 
 const LOGO = `<svg width="30" height="30" viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" rx="10" fill="#0F7B6C"/><path d="M8 20c1.5 6 18.5 6 20 0" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="18" cy="14" r="4.2" fill="#F4B740"/></svg>`;
@@ -20,8 +22,8 @@ const ROUTE_STOPS = [["Week 1", "Orientation"], ["Weeks 2–3", "The Fundamental
   ["Weeks 10–13", "Internship"], ["Week 14", "CV, LinkedIn & Portfolio"], ["Week 15", "Discovery Call 2"], ["Weeks 16–17", "Job Search & Personal Pitch"]];
 const STAGES_APP = ["Submitted", "Assessment", "Discovery Call", "Offer", "Payment", "Admitted"];
 const APP_STAGE = { "Assessment pending": 1, "Assessment failed": 1, "Call to book": 2, "Call booked": 2, "Closed: no matching track": 2, "Under review": 3,
-  "Offer sent": 3, "Waitlisted": 3, "Not selected": 3, "Offer expired": 3, "Deferred": 3, "Admitted": 5 };
-const BAD_ST = ["Assessment failed", "Not selected", "Offer expired", "Closed: no matching track"];
+  "Offer sent": 3, "Waitlisted": 3, "Not selected": 3, "Offer expired": 3, "Offer declined": 3, "Deferred": 3, "Admitted": 5 };
+const BAD_ST = ["Assessment failed", "Not selected", "Offer expired", "Offer declined", "Closed: no matching track"];
 const GROUPS = [
   ["needs", "In progress", "Calls and decisions under way", (a) => ["Call booked", "Under review"].includes(a.status)],
   ["waiting", "Waiting on applicant", "Assessment, booking or payment", (a) => ["Assessment pending", "Call to book", "Offer sent", "Waitlisted"].includes(a.status)],
@@ -175,6 +177,10 @@ function pageCheck() {
       <div class="field"><label for="f-email">Email</label><input id="f-email" type="email"></div></div><p class="err" id="f-err" role="alert"></p><div><button class="btn" type="submit">Find my application</button></div></form></div></section>` + pubFoot();
 }
 
+function pagePayCheck() {
+  app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="card verify"><h1>We're checking your payment</h1><p>We couldn't confirm your payment straight away. If money left your account, it will show on your application within a few minutes and you'll get an email.</p><p class="note">Still not showing after an hour? Reply to your offer email with your payment receipt and Admissions will help.</p><div><a class="btn" href="#/check">Open my application</a></div></div></section>` + pubFoot();
+}
+
 /* ---------- applicant area ---------- */
 function tracker(a) {
   const stg = a.status === "Admitted" ? 5 : a.status === "Offer sent" ? 4 : APP_STAGE[a.status] ?? 0;
@@ -195,12 +201,71 @@ function statusCard(a, base) {
   if (a.status === "Not selected") card = `<p>Thank you for applying. We're not able to offer you a place this time. You're welcome to apply for the next batch.</p>`;
   if (a.status === "Closed: no matching track") card = `<p>Thank you for your time on the call. You're interested in <b>${esc(a.wanted)}</b>, and the programme doesn't offer that track yet.</p><p>This isn't a judgement of you. We've noted your interest and will invite you first if we launch it. No payment was taken.</p>${communityNote()}`;
   if (a.status === "Deferred") card = `<p>Your application has been moved to the <b>next batch</b>. We'll contact you when admissions open.</p>`;
-  if (a.status === "Offer expired") card = `<p>Your offer expired because payment wasn't made by the deadline. Contact Admissions if you'd still like a place.</p>`;
-  if (a.status === "Offer sent") card = `<div class="offer"><span class="eyebrow">Offer of admission</span><h2>Congratulations, ${esc(a.first_name)}! You've been offered a place.</h2><p>${tr} track · ${esc(a.cohort)}</p>
-    <p class="deadline">⏳ Accept and pay by <b>${fmtLong(a.offer_deadline)}</b>, or your seat goes to the waitlist.</p></div>
-    <div class="notice">Online payment opens here shortly. Admissions will email you the payment details before your deadline.</div>`;
-  if (a.status === "Admitted") card = `<p>You're admitted! Welcome to Jobnest Academy.</p>`;
+  if (a.status === "Offer expired") card = `<p>Your offer expired because payment wasn't made by the deadline. If you'd still like a place, reply to your offer email and Admissions will let you know your options.</p>`;
+  if (a.status === "Offer declined") card = `<p>You declined your offer, and your seat has gone to someone on the waitlist. If your plans change, you're welcome to apply for the next batch.</p>`;
+  if (a.status === "Offer sent") card = offerCard(a, base);
+  if (a.status === "Admitted") card = admittedCard(a, base);
   return card;
+}
+
+function offerCard(a, base) {
+  const f = a.fees, tok = base.split("/").pop();
+  return `<div class="offer"><span class="eyebrow">Offer of admission</span><h2>Congratulations, ${esc(a.first_name)}! You've been offered a place.</h2><p>${esc(a.track || "")} track · ${esc(a.cohort)}</p>
+    <p class="deadline">⏳ Accept and pay by <b>${fmtLong(a.offer_deadline)}, ${fmtTime(a.offer_deadline)} WAT</b>, or your seat goes to the waitlist.</p></div>
+    <fieldset class="pay-choose"><legend class="lbl">How would you like to pay?</legend><div class="plans">
+      <label class="plan"><input type="radio" name="plan" value="full" data-amount="${f.fee}" checked><span class="eyebrow">Pay in full</span><span class="mono">${naira(f.fee)}</span><span class="note">One payment. The lowest total.</span></label>
+      <label class="plan"><input type="radio" name="plan" value="two" data-amount="${f.part1}"><span class="eyebrow">Pay in 2 parts</span><span class="mono">${naira(f.part1)} now</span><span class="note">Then ${naira(f.part2)} by ${fmtDateD(f.due_date)}. ${naira(f.two_total)} in total.</span></label></div></fieldset>
+    <div class="actions"><button class="btn gold" id="pay-btn" data-act="pay" data-ref="${esc(a.ref)}" data-token="${esc(tok)}">Accept and pay ${naira(f.fee)}</button></div>
+    <p class="note">🔒 Secure payment by Paystack: card, bank transfer or USSD. Your matric number and admission letter are ready as soon as you pay.</p>
+    <p class="note"><button class="link sm" data-act="decline-offer" data-ref="${esc(a.ref)}" data-token="${esc(tok)}">I don't want this place</button></p>`;
+}
+function admittedCard(a, base) {
+  const bal = balanceOf(a), f = a.fees, tok = base.split("/").pop();
+  return `<div class="idcard solo"><div><small>Matric number</small><div class="num">${esc(a.matric)}</div><span>${esc(a.track || "")} · ${esc(a.cohort)}</span></div></div>
+    <p>Welcome to Jobnest Academy, ${esc(a.first_name)}! The programme starts on <b>${fmtDateD(a.start_date)}</b>. We'll email your student portal sign-in to ${esc(a.email)} before then.</p>
+    ${bal > 0 ? `<div class="notice bal"><span>Paid <b>${naira(a.paid_total)}</b> of ${naira(f.plan_total)}. Second instalment <b>${naira(bal)}</b> due by ${fmtDateD(f.due_date)}.</span><button class="btn sm gold" data-act="pay" data-ref="${esc(a.ref)}" data-token="${esc(tok)}">Pay ${naira(bal)} now</button></div>`
+      : `<p class="note">✓ Fees paid in full (${naira(a.paid_total)}).</p>`}
+    <div class="actions"><a class="btn" href="${base}/letter">View admission letter</a></div>`;
+}
+
+function pageLetter(a, base) {
+  const bal = balanceOf(a), f = a.fees;
+  const fees = bal > 0 ? `${naira(a.paid_total)} paid of ${naira(f.plan_total)} (2 instalments). Balance of ${naira(bal)} due by ${fmtDateD(f.due_date)}.` : `${naira(a.paid_total)}, paid in full.`;
+  app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap letter-wrap">
+    <div class="letter-bar no-print"><a class="link" href="${base}">← Back to your application</a><button class="btn" data-act="print">Save as PDF or print</button></div>
+    <article class="letter" aria-label="Letter of admission">
+      <header class="lh">${LOGO}<div><b>Jobnest Academy</b><span>Lagos, Nigeria · academy.jobnestcareers.com</span></div></header>
+      <p class="lh-date">${fmtDate(a.admitted_at)}</p>
+      <p class="lh-to"><b>${esc(a.first_name)} ${esc(a.surname)}</b><br>Matric number: <b class="mono">${esc(a.matric)}</b><br>Application ${esc(a.ref)}</p>
+      <h1>Letter of Admission</h1>
+      <p>Dear ${esc(a.first_name)},</p>
+      <p>We are pleased to confirm your admission to the <b>${esc(a.programme)}</b> at Jobnest Academy, on the <b>${esc(a.track || "")}</b> track, ${esc(a.cohort)}.</p>
+      <dl class="letter-kv">
+        <div><dt>Programme</dt><dd>${esc(a.programme)}</dd></div><div><dt>Track</dt><dd>${esc(a.track || "")}</dd></div>
+        <div><dt>Cohort</dt><dd>${esc(a.cohort)}</dd></div><div><dt>Matric number</dt><dd class="mono">${esc(a.matric)}</dd></div>
+        <div><dt>Start date</dt><dd>${fmtDateD(a.start_date)} (Week 1: Orientation)</dd></div><div><dt>Duration</dt><dd>${a.weeks} weeks online, about 15 hours a week</dd></div>
+        <div class="wide"><dt>Fees</dt><dd>${fees}</dd></div></dl>
+      <p>Over the ${a.weeks} weeks you will build the core skills for your track, deliver a client project, complete an internship, and be coached through your job search.</p>
+      <h2>Before you start</h2>
+      <ul><li>We'll email your student portal sign-in before the start date. You'll sign in with your matric number.</li>
+        <li>Make sure you have a laptop and reliable internet for about 15 hours a week.</li>
+        ${bal > 0 ? `<li>Pay your second instalment of ${naira(bal)} by ${fmtDateD(f.due_date)} from your application page.</li>` : ""}</ul>
+      <p>Congratulations, and welcome. We can't wait to see you build a career you're proud of.</p>
+      <div class="sign"><span class="sig-line" aria-hidden="true"></span>${a.signer_name ? `<b>${esc(a.signer_name)}</b>` : ""}<span>${esc(a.signer_title || "Programme Director")}, Jobnest Academy</span></div>
+      <footer class="lf">Issued online by Jobnest Academy. To confirm this letter, contact Admissions with matric number ${esc(a.matric)}.</footer>
+    </article></section>`;
+}
+
+async function startPay(btn) {
+  const plan = $('input[name="plan"]:checked')?.value || null;
+  await busy(btn, async () => {
+    const r = await fetch("/.netlify/functions/pay", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ref: btn.dataset.ref, token: btn.dataset.token, plan }) });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.url) throw new Error(d.message || "We couldn't start the payment. Please try again.");
+    btn.textContent = "Opening Paystack…";
+    location.href = d.url;
+    await new Promise(() => {});   // keep the button busy while the page changes
+  });
 }
 
 async function pageApplicant(ref, token, view) {
@@ -215,9 +280,11 @@ async function pageApplicant(ref, token, view) {
   const base = `#/a/${encodeURIComponent(a.ref)}/${encodeURIComponent(token)}`;
   if (view === "assess" && a.status === "Assessment pending") return pageAssess(a, token, base);
   if (view === "book" && a.status === "Call to book") return pageBook(a, token, base);
+  if (view === "letter" && a.status === "Admitted") return pageLetter(a, base);
+  if (view === "paid" || view === "payfail" || view === "paycheck") history.replaceState(null, "", base);
   app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="status-wrap">
     <div class="card"><div class="ch"><div><span class="eyebrow">Application ${esc(a.ref)}</span><h2 style="margin-top:.3rem">${esc(a.first_name)} ${esc(a.surname)}${a.track ? ` · ${esc(a.track)}` : ""}</h2>${a.track || a.wanted ? "" : `<span class="note">Track: agreed on Discovery Call 1</span>`}</div>${pill(a.status)}</div>
-      ${tracker(a)}<div class="status-body">${statusCard(a, base)}</div></div>
+      ${tracker(a)}<div class="status-body">${view === "paid" && a.status === "Admitted" ? `<div class="notice ok-n">✓ Payment received. Thank you! A receipt and your admission email are on their way.</div>` : ""}${view === "payfail" ? `<div class="notice warn">Your payment wasn't completed, so you haven't been charged. You can try again below.</div>` : ""}${view === "paycheck" ? `<div class="notice warn">We couldn't confirm your payment automatically. If you were charged, Admissions will sort it out: reply to your offer email with your payment receipt.</div>` : ""}${statusCard(a, base)}</div></div>
     <div class="card"><h3>Keep this link</h3><p class="note">This private link opens your application on any device. Don't share it.</p>
       <div class="verify-f"><input readonly id="my-link" value="${esc(location.origin + location.pathname + base)}"><button class="btn sm ghost" data-act="copy-link">Copy</button></div></div>
   </div></section>`;
@@ -305,7 +372,7 @@ const pwOk = (a, b, err) => {
 function staffNav(role) {
   const adm = [{ g: "Admissions" }];
   if (["adm_officer", "super"].includes(role)) adm.push({ k: "home", l: "Home" }, { k: "calls", l: "Calls" }, { k: "times", l: "Call times" });
-  if (["adm_admin", "super"].includes(role)) adm.push({ k: "decide", l: "Decisions" });
+  if (["adm_admin", "super"].includes(role)) adm.push({ k: "decide", l: "Decisions" }, { k: "pay", l: "Payments" });
   adm.push({ k: "apps", l: "Applications" });
   if (["adm_admin", "super"].includes(role)) adm.push({ g: "Setup" }, { k: "emails", l: "Emails" }, { k: "settings", l: "Settings" });
   if (role === "super") return [{ g: "Jobnest" }, { k: "staff", l: "Staff accounts" }, { k: "audit", l: "Activity log" }, ...adm];
@@ -335,7 +402,7 @@ async function pagePortal(tab) {
   }
   const items = staffNav(ME.role).filter((x) => x.k);
   if (!items.some((x) => x.k === tab)) tab = items[0].k;
-  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, apps: tabApps, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
+  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
   try { await pages[tab](); }
   catch (e) { shell(tab, "Something went wrong", "", `<div class="notice">${esc(e.message)}</div>`); }
 }
@@ -348,7 +415,7 @@ function tabSoon() {
 const nextStep = (a) => ({ "Assessment pending": "Waiting for the assessment", "Call to book": "Waiting for them to book a call",
   "Call booked": a.dc1_at ? `Call · ${fmtAt(a.dc1_at)} · ${a.officer_name || ""}` : "Complete call", "Under review": "Decide: offer, waitlist or decline",
   "Offer sent": a.offer_deadline ? `Waiting for payment · by ${fmtDay(a.offer_deadline)}` : "Waiting for payment", "Waitlisted": "On the waitlist",
-  "Admitted": "Admitted", "Assessment failed": `Scored ${a.score}% on the assessment`, "Not selected": "Not selected", "Offer expired": "Didn't pay in time",
+  "Admitted": `Admitted · ${a.matric || ""}`, "Offer declined": "Declined the offer", "Assessment failed": `Scored ${a.score}% on the assessment`, "Not selected": "Not selected", "Offer expired": "Didn't pay in time",
   "Deferred": "Moved to the next batch", "Closed: no matching track": `Interested in ${a.wanted || ""}` }[a.status] || a.status);
 const details = (a) => `<dl class="kv app-kv"><div><dt>Contact</dt><dd>${esc(a.email)} · ${esc(a.phone)} · ${esc(a.city)}</dd></div>
   <div><dt>Background</dt><dd>${esc(a.edu)} · NYSC: ${esc(a.nysc)} · ${esc(a.situation)}</dd></div>
@@ -357,7 +424,8 @@ const details = (a) => `<dl class="kv app-kv"><div><dt>Contact</dt><dd>${esc(a.e
   <div><dt>Zuri summary</dt><dd>${a.zuri_summary ? esc(a.zuri_summary) : `<span class="note">None. Explore options on the call.</span>`}</dd></div>
   ${a.wanted ? `<div><dt>Interested in</dt><dd><b>${esc(a.wanted)}</b> · no matching track</dd></div>` : ""}
   ${a.dc1_at ? `<div><dt>Discovery Call 1</dt><dd>${fmtAt(a.dc1_at)} with ${esc(a.officer_name || "")}${a.dc1_note ? ` · “${esc(a.dc1_note)}”` : ""}</dd></div>` : ""}
-  ${a.offer_deadline && a.status === "Offer sent" ? `<div><dt>Offer deadline</dt><dd>${fmtLong(a.offer_deadline)}</dd></div>` : ""}</dl>`;
+  ${a.offer_deadline && a.status === "Offer sent" ? `<div><dt>Offer deadline</dt><dd>${fmtLong(a.offer_deadline)}</dd></div>` : ""}
+  ${a.matric ? `<div><dt>Matric number</dt><dd><b class="mono">${esc(a.matric)}</b> · paid ${naira(a.paid_total)}${a.plan === "two" ? " (2 instalments)" : " in full"}</dd></div>` : ""}</dl>`;
 const recCard = (a) => a.rec ? `<div class="rec rec-${a.rec.d}"><span class="eyebrow">Admissions Officer's recommendation · ${esc(a.rec.by)}</span><b>${REC_L[a.rec.d]}</b><span class="note">“${esc(a.rec.why)}”</span></div>` : "";
 const decCard = (a) => a.decided_by ? `<p class="note">Decided by ${esc(a.decided_by)} · ${fmtAt(a.decided_at)}${a.rec ? (REC_X[a.rec.d] === a.decision ? " · followed the recommendation" : " · <b>different from the recommendation</b>") : ""}</p>` : "";
 const decideButtons = (a) => `<div class="actions">${a.rec && a.status === "Under review" ? `<button class="btn sm gold" data-act="decide" data-x="${REC_X[a.rec.d]}" data-k="${a.id}">Approve: ${REC_L[a.rec.d]}</button>` : ""}
@@ -464,6 +532,30 @@ function filterRows() {
   if (em) { em.hidden = n > 0; em.textContent = ui.q ? "No applications match that search." : ui.admG === "needs" ? "Nothing needs action right now. 🎉" : "No applications here."; }
 }
 
+async function tabPay() {
+  const d = await rpc("adm_payments");
+  const P = d.people, ok = d.payments.filter((y) => y.status === "success");
+  const admitted = P.filter((a) => a.status === "Admitted"), owing = admitted.filter((a) => balanceOf(a) > 0), waiting = P.filter((a) => a.status === "Offer sent");
+  const line = (a) => a.status === "Admitted" ? (balanceOf(a) ? `Owes ${naira(balanceOf(a))} · due ${fmtDay(a.fees.due_date + "T12:00:00Z")}` : `Paid in full · ${naira(a.paid_total)}`)
+    : a.status === "Offer sent" ? `Offer · pay by ${fmtAt(a.offer_deadline)}` : "Offer expired";
+  const ypill = (s) => `<span class="pill ${s === "success" ? "ok" : s === "pending" ? "now" : "bad"}">${{ success: "Paid", pending: "Started", failed: "Failed", abandoned: "Not completed", reversed: "Reversed" }[s] || s}</span>`;
+  const PART = { full: "Full fee", part1: "Instalment 1", part2: "Instalment 2" };
+  const row = (a) => {
+    const mine = d.payments.filter((y) => y.app_ref === a.ref && y.status === "success");
+    const canRec = ["Offer sent", "Offer expired"].includes(a.status) || balanceOf(a) > 0;
+    return `<details class="arow" data-id="${a.id}" ${ui.open === a.id ? "open" : ""}><summary><span class="aav">${esc(((a.first_name[0] || "") + (a.surname[0] || "")).toUpperCase())}</span><span class="an"><b>${esc(a.first_name)} ${esc(a.surname)}</b><span class="note">${esc(a.matric || a.ref)} · ${esc(a.track_name || "")}</span></span><span class="anext">${esc(line(a))}</span>${pill(a.status)}</summary>
+      <div class="abody"><dl class="kv app-kv"><div><dt>Contact</dt><dd>${esc(a.email)} · ${esc(a.phone)}</dd></div>
+        <div><dt>Payments</dt><dd>${mine.length ? mine.map((y) => `${naira(y.amount_paid ?? y.amount)} · ${PART[y.part]} · ${fmtAt(y.paid_at)} · ${y.channel === "manual" ? `recorded by staff (${esc(y.note || "")})` : esc(y.channel || "")}`).join("<br>") : "None yet"}</dd></div></dl>
+        <div class="staff-act">${canRec ? `<form class="form recpay-form" data-k="${a.id}" novalidate><p class="eyebrow">Record a payment made outside Paystack</p><div class="grid2"><div class="field"><label for="ra-${a.id}">Amount received (₦)</label><input id="ra-${a.id}" type="number" min="1" step="500" inputmode="numeric" value="${a.status === "Admitted" ? balanceOf(a) : a.fees.fee}"></div><div class="field"><label for="rn-${a.id}">Note</label><input id="rn-${a.id}" placeholder="e.g. GTBank transfer, ref 0091"></div></div><div class="actions"><button class="btn sm" type="submit">Record payment</button></div></form>` : ""}
+          ${["Offer sent", "Offer expired"].includes(a.status) ? `<div class="actions"><span class="note">Give more time to pay:</span><button class="btn sm ghost" data-act="extend" data-days="3" data-k="${a.id}">+3 days</button><button class="btn sm ghost" data-act="extend" data-days="7" data-k="${a.id}">+7 days</button></div>` : ""}</div></div></details>`;
+  };
+  shell("pay", "Payments", "Payments through Paystack are recorded automatically. The first payment admits the applicant and gives them a matric number.",
+    `<div class="kpis">${[["Admitted", admitted.length], ["Collected", naira(ok.reduce((t, y) => t + (y.amount_paid ?? y.amount), 0))], ["Still owed", naira(owing.reduce((t, a) => t + balanceOf(a), 0))], ["Offers awaiting payment", waiting.length]].map(([l, v]) => `<div class="kpi card"><span class="eyebrow">${l}</span><b class="mono">${v}</b></div>`).join("")}</div>
+    <div class="card" style="margin-top:1rem"><h3>Offers and students</h3>${P.length ? `<div class="arows">${P.map(row).join("")}</div>` : empty("No offers yet.")}</div>
+    <div class="card" style="margin-top:1rem"><h3>Every payment attempt</h3><p class="note">Including payments people started but didn't finish.</p>${d.payments.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>When</th><th>Who</th><th>For</th><th>Amount</th><th>Result</th></tr></thead><tbody>
+      ${d.payments.map((y) => `<tr><td data-label="When">${fmtAt(y.paid_at || y.at)}</td><td data-label="Who"><b>${esc(y.name)}</b><span class="note" style="display:block">${esc(y.reference)}</span></td><td data-label="For">${PART[y.part]}</td><td data-label="Amount" class="mono">${naira(y.amount_paid ?? y.amount)}</td><td data-label="Result">${ypill(y.status)}${y.note ? `<span class="note" style="display:block">${esc(y.note)}</span>` : ""}</td></tr>`).join("")}</tbody></table></div>` : empty("No payments yet.")}</div>`);
+}
+
 async function tabEmails() {
   const L = await rpc("admin_outbox");
   const failed = L.filter((m) => !m.sent_at && m.error).length, waiting = L.filter((m) => !m.sent_at && !m.error).length;
@@ -489,6 +581,7 @@ async function tabSettings() {
       <div class="card"><h3>Fee</h3><div class="grid2">${f("st-fee", "Full fee (₦)", p.fee, 'type="number" min="0" step="1000"')}${f("st-pct", "Extra for 2 instalments (%)", p.inst_pct, 'type="number" min="0" max="50"')}</div><p class="note">2 instalments total: ${naira(p.inst_total)}</p></div>
       <div class="card"><h3>Seats by track</h3>${s.tracks.map((t) => `<div class="grid2" style="align-items:end"><div class="field"><label for="seat-${t.code}">${esc(t.name)}</label><input id="seat-${t.code}" type="number" min="0" value="${t.seats}" data-track="${t.code}"></div><label class="consent"><input type="checkbox" id="pause-${t.code}" ${t.paused ? "checked" : ""}> Paused</label></div>`).join("")}</div>
       <div class="card"><h3>Links</h3>${f("st-site", "Academy address", s.site.site_url, 'type="url"')}${f("st-web", "Jobnest website", s.site.website_url, 'type="url"')}${f("st-zuri", "Zuri chat link", s.site.zuri_url, 'type="url"')}</div>
+      <div class="card"><h3>Admission letter</h3><p class="note">Printed at the bottom of every admission letter.</p>${f("st-sname", "Signed by (full name)", s.site.signer_name)}${f("st-stitle", "Their title", s.site.signer_title)}</div>
     </div><p class="err" id="st-err" role="alert"></p><div class="actions" style="margin-top:1rem"><button class="btn" type="submit">Save settings</button></div></form>`);
 }
 
@@ -542,6 +635,14 @@ document.addEventListener("click", async (e) => {
   if (a === "copy-mail") { const txt = $("#mail-" + k).textContent; try { await navigator.clipboard.writeText(txt); toast("Email copied"); } catch { toast("Select the text and copy it"); } return; }
   if (a === "retry-mail") { await busy(t, () => rpc("admin_retry_email", { p_id: +k })); toast("Will try again within a minute"); return route(); }
   if (a === "mark-sent") { await busy(t, () => rpc("admin_mark_sent", { p_id: +k })); toast("Marked as sent"); return route(); }
+  if (a === "pay") { try { await startPay(t); } catch { /* shown */ } return; }
+  if (a === "print") return window.print();
+  if (a === "decline-offer") {
+    if (!confirm("Decline your place? Your seat will go to someone on the waitlist, and this can't be undone.")) return;
+    try { await busy(t, () => rpc("applicant_decline", { p_ref: t.dataset.ref, p_token: t.dataset.token })); toast("Offer declined"); route(); } catch { /* shown */ }
+    return;
+  }
+  if (a === "extend") { try { await busy(t, () => rpc("admin_extend_offer", { p_id: k, p_days: +t.dataset.days })); toast(`Offer extended by ${t.dataset.days} days. We've emailed them.`); ui.open = k; route(); } catch { /* shown */ } return; }
   if (a === "edit-staff") { $("#sf-email").value = t.dataset.email; $("#sf-name").value = t.dataset.name; $("#sf-role").value = t.dataset.role; $("#sf-active").checked = t.dataset.active === "true"; $("#sf-name").focus(); return; }
 });
 
@@ -573,6 +674,7 @@ document.addEventListener("change", (e) => {
   const el = e.target, k = el.dataset.k;
   if (el.dataset.actChange === "track") { const none = el.value === "NONE"; $("#wi-" + k).hidden = !none; $("#ri-" + k).hidden = none; }
   if (el.dataset.actChange === "interest") { $("#wo-" + k).hidden = el.value !== "Other"; }
+  if (el.name === "plan" && $("#pay-btn")) $("#pay-btn").textContent = `Accept and pay ${naira(+el.dataset.amount)}`;
 });
 
 document.addEventListener("submit", async (e) => {
@@ -642,8 +744,15 @@ document.addEventListener("submit", async (e) => {
     const v = (id) => $("#" + id).value;
     const p = { cohort: { name: v("st-name"), start_date: v("st-start"), year2: v("st-year"), batch: v("st-batch"), applications_open: $("#st-open").checked, pass_mark: +v("st-pass"), ready_n: +v("st-n"), offer_days: +v("st-days"), inst_due_week: +v("st-due") },
       programme: { fee: +v("st-fee"), inst_pct: +v("st-pct") }, tracks: $$("[data-track]").map((i) => ({ code: i.dataset.track, seats: +i.value, paused: $("#pause-" + i.dataset.track).checked })),
-      site: { site_url: v("st-site"), website_url: v("st-web"), zuri_url: v("st-zuri") } };
+      site: { site_url: v("st-site"), website_url: v("st-web"), zuri_url: v("st-zuri"), signer_name: v("st-sname"), signer_title: v("st-stitle") } };
     try { await busy(f.querySelector("button[type=submit]"), () => rpc("admin_save_settings", { p })); INFO = null; toast("Settings saved"); route(); } catch (x) { $("#st-err").textContent = x.message; }
+    return;
+  }
+  if (f.classList.contains("recpay-form")) {
+    const k = f.dataset.k, amt = +$("#ra-" + k).value, note = $("#rn-" + k).value.trim();
+    if (!amt || !note) return toast("Add the amount and a note");
+    if (!confirm(`Record ${naira(amt)} as received? This can't be undone.`)) return;
+    try { const r = await busy(f.querySelector("button"), () => rpc("admin_record_payment", { p_id: k, p_amount: amt, p_note: note })); toast(r.matric ? `Recorded · matric number ${r.matric}` : "Payment recorded"); ui.open = k; route(); } catch { /* shown */ }
     return;
   }
   if (f.id === "staff-form") {
@@ -676,6 +785,7 @@ async function route() {
     if (p0 === "start") return pageStart();
     if (p0 === "apply") return pageApply();
     if (p0 === "check") return pageCheck();
+    if (p0 === "paycheck") return pagePayCheck();
     return pageHome();
   } catch (e) {
     app.innerHTML = `<section class="wrap pub-wrap"><div class="card verify"><h1>We can't load this page</h1><p>${esc(e.message)}</p><p class="note">Check your internet connection and try again.</p><div><a class="btn" href="">Try again</a></div></div></section>`;

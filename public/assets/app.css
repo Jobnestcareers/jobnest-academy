@@ -19,3 +19,37 @@
 .tbl td{border:0!important;padding:.3rem 0!important}}
 a.btn{text-decoration:none}a.btn.ghost{color:var(--ink)}
 .mailrow>summary{display:flex!important;justify-content:space-between;align-items:center;gap:.8rem;grid-template-columns:none!important}.mailrow .an{flex:1;min-width:0;display:grid}.mailrow .pill{flex:none;white-space:nowrap}
+
+/* payments */
+.pay-choose{border:0;padding:0;margin:.4rem 0 0;display:grid;gap:.5rem}
+.pay-choose legend{margin-bottom:.5rem;font-weight:600}
+.notice.ok-n{border-style:solid;border-color:var(--ok);background:var(--ok-soft)}
+.idcard.solo{grid-template-columns:1fr}.idcard.solo span{opacity:.85;font-size:.9rem}
+
+/* admission letter */
+.letter-wrap{max-width:820px}
+.letter-bar{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+.letter{background:#fff;color:#1b2430;border:1px solid var(--line);border-radius:14px;padding:clamp(1.4rem,5vw,3.2rem);display:grid;gap:.9rem;line-height:1.6;font-size:.98rem}
+.letter h1{font-size:clamp(1.5rem,4vw,2rem);margin:.6rem 0 .2rem;color:#0F7B6C}
+.letter h2{font-size:1.05rem;margin-top:.4rem}
+.letter ul{margin:0;padding-left:1.2rem;display:grid;gap:.3rem}
+.lh{display:flex;gap:.8rem;align-items:center;border-bottom:3px solid #F4B740;padding-bottom:1rem}
+.lh b{display:block;font-size:1.2rem}.lh span{font-size:.8rem;color:#5b6675}
+.lh-date{text-align:right;color:#5b6675;margin:0}.lh-to{margin:0}
+.letter-kv{display:grid;grid-template-columns:1fr 1fr;gap:.6rem 1.4rem;margin:.2rem 0;padding:1rem 1.1rem;background:#f5f8f7;border-radius:10px}
+.letter-kv .wide{grid-column:1/-1}
+.letter-kv dt{font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:#5b6675;font-weight:600}.letter-kv dd{margin:.1rem 0 0;font-weight:600}
+.sign{display:grid;gap:.15rem;margin-top:1.2rem;max-width:280px}
+.sig-line{display:block;height:2.6rem;border-bottom:1px solid #1b2430;margin-bottom:.4rem}
+.sign span{color:#5b6675;font-size:.88rem}
+.lf{border-top:1px solid #e3e8ee;padding-top:.8rem;margin-top:.6rem;font-size:.78rem;color:#5b6675}
+@media (max-width:560px){.letter-kv{grid-template-columns:1fr}}
+@media print{
+  @page{margin:14mm}
+  body{background:#fff!important}
+  .pub-top,.no-print,.lp-foot,#toast{display:none!important}
+  .pub-wrap,.letter-wrap{padding:0!important;margin:0!important;max-width:none}
+  .letter{border:0;border-radius:0;padding:0;font-size:11pt}
+  .letter-kv{background:#f5f8f7;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .lh svg{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}

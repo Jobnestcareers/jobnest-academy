@@ -1,7 +1,7 @@
 """Local stand-in for Supabase (database functions + sign-in), for testing the app
 without internet. Serves public/ and answers /rest/v1/rpc/* and /auth/v1/* by
 calling the real SQL functions in a local Postgres. Not used in production."""
-import base64, json, subprocess, sys, time, urllib.parse, pathlib
+import base64, json, subprocess, sys, time, urllib.parse, pathlib, http.client
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent / "public"
@@ -33,7 +33,17 @@ class H(SimpleHTTPRequestHandler):
         self.send_response(code); self.send_header("Content-Type", "application/json"); self.send_header("Access-Control-Allow-Origin", "*"); self.end_headers(); self.wfile.write(b)
     def do_OPTIONS(self):
         self.send_response(204); self.send_header("Access-Control-Allow-Origin", "*"); self.send_header("Access-Control-Allow-Headers", "*"); self.send_header("Access-Control-Allow-Methods", "*"); self.end_headers()
+    def proxy(self):
+        n = int(self.headers.get("Content-Length") or 0); data = self.rfile.read(n) if n else None
+        c = http.client.HTTPConnection("127.0.0.1", 8788, timeout=30)
+        c.request(self.command, self.path, body=data, headers={k: v for k, v in self.headers.items() if k.lower() not in ("host",)})
+        r = c.getresponse(); b = r.read()
+        self.send_response(r.status)
+        for k, v in r.getheaders():
+            if k.lower() not in ("transfer-encoding", "connection", "content-length"): self.send_header(k, v)
+        self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     def do_GET(self):
+        if self.path.startswith("/.netlify/functions/"): return self.proxy()
         if self.path.startswith("/assets/config.js"):
             b = f'export const SUPABASE_URL = "http://localhost:{PORT}";\nexport const SUPABASE_ANON_KEY = "anon-key";\n'.encode()
             self.send_response(200); self.send_header("Content-Type", "text/javascript"); self.end_headers(); self.wfile.write(b); return
@@ -42,12 +52,14 @@ class H(SimpleHTTPRequestHandler):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"null") if n else None
     def claims(self):
+        if self.headers.get("apikey") == "sb_secret_local": return "service_role", {}
         tok = (self.headers.get("Authorization") or "").replace("Bearer ", "")
         if tok.startswith("u."):
             return "authenticated", json.loads(base64.urlsafe_b64decode(tok[2:]).decode())
         return "anon", {}
     def do_PUT(self): self.do_POST()
     def do_POST(self):
+        if self.path.startswith("/.netlify/functions/"): return self.proxy()
         u = urllib.parse.urlparse(self.path); q = urllib.parse.parse_qs(u.query); b = self.body() or {}
         if u.path.startswith("/rest/v1/rpc/"):
             fn = u.path.rsplit("/", 1)[1]
