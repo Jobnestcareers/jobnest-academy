@@ -39,6 +39,20 @@ Never put the `service_role` / secret key in this repository.
 Open the site, go to **Staff sign-in → First time? Set up your account**, and use the
 email you put in step 1. Then add your team under **Staff accounts**.
 
+## Automatic emails
+Emails are written by the database into the `outbox` table and sent every minute by the
+Netlify function `netlify/functions/send-emails.mjs` through Resend. In Netlify → **Site configuration →
+Environment variables**, add:
+
+| Name | Value |
+| --- | --- |
+| `RESEND_API_KEY` | API key from resend.com (sending access) |
+| `SUPABASE_SECRET_KEY` | Supabase → Project Settings → API Keys → **Secret** key (`sb_secret_...`) |
+| `EMAIL_FROM` | `Jobnest Academy Admissions <admissions@jobnestcareers.com>` |
+| `EMAIL_REPLY_TO` | `info@jobnestcareers.com` |
+
+Then redeploy. Existing databases also need `supabase/04_email_sending.sql` run once.
+
 ## Testing locally
 Needs Postgres 16 and Python 3 with Playwright.
 ```
@@ -50,7 +64,7 @@ python3 dev/e2e.py 1280         # full journey in a browser (use 375 for phone)
 
 ## Build phases
 1. Foundations and admissions ✅ (this version)
-2. Automatic emails (an email service sends what is now queued in **Emails**)
+2. Automatic emails ✅ (Resend, sent every minute by `netlify/functions/send-emails.mjs`)
 3. Paystack payment, admission letter and matric numbers
 4. Student portal and learning
 5. Projects, internships, coaching and certificates

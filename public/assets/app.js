@@ -466,12 +466,13 @@ function filterRows() {
 
 async function tabEmails() {
   const L = await rpc("admin_outbox");
-  const waiting = L.filter((m) => !m.sent_at).length;
-  shell("emails", "Emails", "Every admissions email is recorded here.",
-    `<div class="notice">Automatic sending is the next step of the build. Until then, emails wait here: open one, copy it into your email, and mark it sent. <b>${waiting}</b> waiting.</div>
-    ${L.length ? `<div class="arows" style="margin-top:1rem">${L.map((m) => `<details class="arow"><summary><span class="an"><b>${esc(m.subject)}</b><span class="note">To ${esc(m.to)} · ${fmtAt(m.at)}</span></span>${m.sent_at ? `<span class="pill ok">Sent</span>` : `<span class="pill now">Waiting</span>`}</summary>
-      <div class="abody"><pre class="mail-pre" id="mail-${m.id}">${esc(m.body)}${m.link ? `\n\n${esc(m.cta || "Open")}: ${esc(m.link)}` : ""}\n\nThe Jobnest Academy Admissions team</pre>
-      <div class="actions"><button class="btn sm ghost" data-act="copy-mail" data-k="${m.id}">Copy email</button>${m.sent_at ? "" : `<button class="btn sm" data-act="mark-sent" data-k="${m.id}">Mark as sent</button>`}</div></div></details>`).join("")}</div>` : `<div class="card" style="margin-top:1rem">${empty("No emails yet.")}</div>`}`);
+  const failed = L.filter((m) => !m.sent_at && m.error).length, waiting = L.filter((m) => !m.sent_at && !m.error).length;
+  const st = (m) => m.sent_at ? `<span class="pill ok">Sent ${fmtAt(m.sent_at)}</span>` : m.error ? `<span class="pill bad">Not sent</span>` : `<span class="pill now">Sending…</span>`;
+  shell("emails", "Emails", "Every admissions email, sent automatically within about a minute.",
+    `${failed ? `<div class="notice"><b>${failed}</b> email${failed === 1 ? "" : "s"} couldn't be sent. Open ${failed === 1 ? "it" : "them"} to see why, then retry or send by hand.</div>` : waiting ? `<div class="notice">${waiting} email${waiting === 1 ? " is" : "s are"} waiting to send. If this doesn't clear within a few minutes, the email service may not be connected yet.</div>` : ""}
+    ${L.length ? `<div class="arows" style="margin-top:1rem">${L.map((m) => `<details class="arow mailrow"><summary><span class="an"><b>${esc(m.subject)}</b><span class="note">To ${esc(m.to)} · ${fmtAt(m.at)}</span></span>${st(m)}</summary>
+      <div class="abody">${m.error ? `<p class="err">Last error: ${esc(m.error)}</p>` : ""}<pre class="mail-pre" id="mail-${m.id}">${esc(m.body)}${m.link ? `\n\n${esc(m.cta || "Open")}: ${esc(m.link)}` : ""}\n\nThe Jobnest Academy Admissions team</pre>
+      <div class="actions"><button class="btn sm ghost" data-act="copy-mail" data-k="${m.id}">Copy email</button>${m.sent_at ? "" : `${m.error ? `<button class="btn sm" data-act="retry-mail" data-k="${m.id}">Try sending again</button>` : ""}<button class="btn sm ghost" data-act="mark-sent" data-k="${m.id}">I sent it by hand</button>`}</div></div></details>`).join("")}</div>` : `<div class="card" style="margin-top:1rem">${empty("No emails yet.")}</div>`}`);
 }
 
 async function tabSettings() {
@@ -539,6 +540,7 @@ document.addEventListener("click", async (e) => {
   }
   if (a === "rm-slot") { try { await busy(t, () => rpc("officer_remove_slot", { p_id: +k })); toast("Time removed"); route(); } catch { /* shown */ } return; }
   if (a === "copy-mail") { const txt = $("#mail-" + k).textContent; try { await navigator.clipboard.writeText(txt); toast("Email copied"); } catch { toast("Select the text and copy it"); } return; }
+  if (a === "retry-mail") { await busy(t, () => rpc("admin_retry_email", { p_id: +k })); toast("Will try again within a minute"); return route(); }
   if (a === "mark-sent") { await busy(t, () => rpc("admin_mark_sent", { p_id: +k })); toast("Marked as sent"); return route(); }
   if (a === "edit-staff") { $("#sf-email").value = t.dataset.email; $("#sf-name").value = t.dataset.name; $("#sf-role").value = t.dataset.role; $("#sf-active").checked = t.dataset.active === "true"; $("#sf-name").focus(); return; }
 });

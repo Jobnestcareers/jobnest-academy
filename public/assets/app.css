@@ -18,3 +18,4 @@
 .tbl tr{border:1px solid var(--line);border-radius:12px;padding:.55rem .85rem;margin:0 0 .6rem;background:var(--surface)}
 .tbl td{border:0!important;padding:.3rem 0!important}}
 a.btn{text-decoration:none}a.btn.ghost{color:var(--ink)}
+.mailrow>summary{display:flex!important;justify-content:space-between;align-items:center;gap:.8rem;grid-template-columns:none!important}.mailrow .an{flex:1;min-width:0;display:grid}.mailrow .pill{flex:none;white-space:nowrap}
