@@ -225,7 +225,7 @@ function admittedCard(a, base) {
     <p>Welcome to Jobnest Academy, ${esc(a.first_name)}! The programme starts on <b>${fmtDateD(a.start_date)}</b>. We'll email your student portal sign-in to ${esc(a.email)} before then.</p>
     ${bal > 0 ? `<div class="notice bal"><span>Paid <b>${naira(a.paid_total)}</b> of ${naira(f.plan_total)}. Second instalment <b>${naira(bal)}</b> due by ${fmtDateD(f.due_date)}.</span><button class="btn sm gold" data-act="pay" data-ref="${esc(a.ref)}" data-token="${esc(tok)}">Pay ${naira(bal)} now</button></div>`
       : `<p class="note">✓ Fees paid in full (${naira(a.paid_total)}).</p>`}
-    <div class="actions"><a class="btn" href="${base}/letter">View admission letter</a></div>`;
+    <div class="actions">${a.account_set ? `<a class="btn gold" href="#/learn">Go to the student portal</a>` : `<a class="btn gold" href="${base}/account">Set up your student account</a>`}<a class="btn ${a.account_set ? "" : "ghost"}" href="${base}/letter">View admission letter</a></div>`;
 }
 
 function pageLetter(a, base) {
@@ -281,6 +281,7 @@ async function pageApplicant(ref, token, view) {
   if (view === "assess" && a.status === "Assessment pending") return pageAssess(a, token, base);
   if (view === "book" && a.status === "Call to book") return pageBook(a, token, base);
   if (view === "letter" && a.status === "Admitted") return pageLetter(a, base);
+  if (view === "account" && a.status === "Admitted") return pageAccount(a, base);
   if (view === "paid" || view === "payfail" || view === "paycheck") history.replaceState(null, "", base);
   app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="status-wrap">
     <div class="card"><div class="ch"><div><span class="eyebrow">Application ${esc(a.ref)}</span><h2 style="margin-top:.3rem">${esc(a.first_name)} ${esc(a.surname)}${a.track ? ` · ${esc(a.track)}` : ""}</h2>${a.track || a.wanted ? "" : `<span class="note">Track: agreed on Discovery Call 1</span>`}</div>${pill(a.status)}</div>
@@ -375,9 +376,14 @@ function staffNav(role) {
   if (["adm_admin", "super"].includes(role)) adm.push({ k: "decide", l: "Decisions" }, { k: "pay", l: "Payments" });
   adm.push({ k: "apps", l: "Applications" });
   if (["adm_admin", "super"].includes(role)) adm.push({ g: "Setup" }, { k: "emails", l: "Emails" }, { k: "settings", l: "Settings" });
-  if (role === "super") return [{ g: "Jobnest" }, { k: "staff", l: "Staff accounts" }, { k: "audit", l: "Activity log" }, ...adm];
-  if (["adm_officer", "adm_admin"].includes(role)) return adm;
-  return [{ k: "soon", l: "Home" }];
+  const ac = [{ g: "Academy" }, { k: "students", l: "Students" }];
+  if (["director", "cohort_manager", "facilitator", "academy_admin", "super"].includes(role)) ac.push({ k: "content", l: "Content" });
+  if (["director", "cohort_manager", "facilitator", "super"].includes(role)) ac.push({ k: "grading", l: "Grading" });
+  ac.push({ k: "sessions", l: "Live sessions" }, { k: "news", l: "Announcements" });
+  if (role === "super") return [{ g: "Jobnest" }, { k: "staff", l: "Staff accounts" }, { k: "audit", l: "Activity log" }, ...adm, ...ac];
+  if (role === "adm_admin") return [...adm, { g: "Academy" }, { k: "students", l: "Students" }];
+  if (role === "adm_officer") return adm;
+  return ac;
 }
 function shell(tab, title, sub, body) {
   const items = staffNav(ME.role);
@@ -394,6 +400,7 @@ function shell(tab, title, sub, body) {
 
 async function pagePortal(tab) {
   if (!auth.session) return go("#/staff");
+  if (isStudent()) return go("#/learn");
   loading();
   try { ME = await rpc("me"); } catch (e) { if (e.status === 401) { await auth.signOut(); return pageStaffSignIn("Your session ended. Please sign in again."); } throw e; }
   if (!ME) {
@@ -402,7 +409,7 @@ async function pagePortal(tab) {
   }
   const items = staffNav(ME.role).filter((x) => x.k);
   if (!items.some((x) => x.k === tab)) tab = items[0].k;
-  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
+  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
   try { await pages[tab](); }
   catch (e) { shell(tab, "Something went wrong", "", `<div class="notice">${esc(e.message)}</div>`); }
 }
@@ -587,22 +594,260 @@ async function tabSettings() {
 
 async function tabStaff() {
   const L = await rpc("super_staff");
+  await info().catch(() => null);
   const opts = Object.entries(ROLE_NAMES).map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
   shell("staff", "Staff accounts", "Add someone here, then they create their password from “First time? Set up your account” on the staff sign-in page.",
     `<div class="grid2"><form class="card form" id="staff-form" novalidate><h3>Add or change a staff member</h3>
       <div class="field"><label for="sf-email">Work email</label><input id="sf-email" type="email"></div>
       <div class="field"><label for="sf-name">Full name</label><input id="sf-name"></div>
       <div class="field"><label for="sf-role">Role</label><select id="sf-role">${opts}</select></div>
+      <div class="field"><label for="sf-track">Track (facilitators)</label><select id="sf-track"><option value="">All tracks</option>${(INFO?.tracks || []).map((t) => `<option value="${t.code}">${esc(t.name)}</option>`).join("")}</select><span class="note">A facilitator with a track only sees and marks that track.</span></div>
       <label class="consent"><input type="checkbox" id="sf-active" checked> Active (can sign in)</label>
       <p class="err" id="sf-err" role="alert"></p><div><button class="btn" type="submit">Save</button></div></form>
     <div class="card"><h3>Everyone</h3><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Person</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>
-      ${L.map((s) => `<tr><td><b>${esc(s.full_name)}</b><span class="note" style="display:block">${esc(s.email)}</span></td><td>${ROLE_NAMES[s.role] || s.role}</td><td>${s.active ? `<span class="pill ok">Active</span>` : `<span class="pill bad">Suspended</span>`}</td>
-        <td><button class="link sm" data-act="edit-staff" data-email="${esc(s.email)}" data-name="${esc(s.full_name)}" data-role="${s.role}" data-active="${s.active}">Edit</button></td></tr>`).join("")}</tbody></table></div></div></div>`);
+      ${L.map((s) => `<tr><td><b>${esc(s.full_name)}</b><span class="note" style="display:block">${esc(s.email)}</span></td><td>${ROLE_NAMES[s.role] || s.role}${s.track_code ? `<span class="note" style="display:block">${esc(s.track_code)}</span>` : ""}</td><td>${s.active ? `<span class="pill ok">Active</span>` : `<span class="pill bad">Suspended</span>`}</td>
+        <td><button class="link sm" data-act="edit-staff" data-email="${esc(s.email)}" data-name="${esc(s.full_name)}" data-role="${s.role}" data-active="${s.active}" data-track="${s.track_code || ""}">Edit</button></td></tr>`).join("")}</tbody></table></div></div></div>`);
 }
 
 async function tabAudit() {
   const L = await rpc("super_audit");
   shell("audit", "Activity log", "Changes made by staff.", `<div class="card">${L.length ? `<ul class="hist">${L.map((l) => `<li><span class="mono note">${fmtAt(l.at)}</span><span><b>${esc(l.actor)}</b> ${esc(l.text)}</span></li>`).join("")}</ul>` : empty("Nothing yet.")}</div>`);
+}
+
+/* ---------- student portal ---------- */
+const STUDENT_DOMAIN = "@students.jobnestcareers.com";
+const loginOf = (m) => m.trim().toLowerCase().replace(/\//g, "-") + STUDENT_DOMAIN;
+const isStudent = () => !!auth.session?.email?.endsWith(STUDENT_DOMAIN);
+const KIND_I = { lesson: "📘", video: "▶️", reading: "📄", file: "📎", link: "🔗" };
+const KIND_L = { lesson: "Lesson", video: "Video", reading: "Reading", file: "File", link: "Link" };
+const stageOf = (w) => { const s = [[1, 1, 0], [2, 3, 1], [4, 7, 2], [8, 9, 3], [10, 13, 4], [14, 14, 5], [15, 15, 6], [16, 17, 7]].find(([a, b]) => w >= a && w <= b); return s ? ROUTE_STOPS[s[2]][1] : ""; };
+const watParts = (d) => { const p = fmt(d, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).split(", "); return { date: p[0].split("/").reverse().join("-"), time: p[1] }; };
+const lines = (t) => esc(t || "").replace(/\n/g, "<br>");
+const ago = (d) => { const m = (Date.now() - new Date(d)) / 6e4; return m < 60 ? `${Math.max(1, Math.round(m))} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : fmtDay(d); };
+let CAMPUS = null;
+
+function pageAccount(a, base) {
+  const tok = base.split("/").pop();
+  app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="card verify"><span class="eyebrow">Jobnest Academy · Student portal</span>
+    <h1>${a.account_set ? "Choose a new password" : "Set up your student account"}</h1>
+    <p>Hi ${esc(a.first_name)}. You'll sign in with your matric number and the password you choose here.</p>
+    <form id="account-form" class="form" data-ref="${esc(a.ref)}" data-token="${esc(tok)}" data-matric="${esc(a.matric)}" novalidate>
+      <div class="field"><label for="ac-m">Matric number</label><input id="ac-m" value="${esc(a.matric)}" readonly autocomplete="username"></div>
+      <div class="field"><label for="ac-p">Password</label><input id="ac-p" type="password" autocomplete="new-password"><span class="note">At least 8 characters, including a number.</span></div>
+      <div class="field"><label for="ac-p2">Confirm password</label><input id="ac-p2" type="password" autocomplete="new-password"></div>
+      <p class="err" id="ac-err" role="alert"></p><div><button class="btn gold" type="submit">Save and open the portal</button></div></form>
+    <p class="note"><a class="link" href="${base}">← Back to your application</a></p></div></section>`;
+}
+
+const learnCard = (h) => pubHeader("admissions").replace("Jobnest Admissions", "Jobnest Academy") + `<section class="wrap pub-wrap"><div class="card verify">${h}</div></section>` + pubFoot();
+function pageLearnSignIn(msg = "") {
+  app.innerHTML = learnCard(`<span class="eyebrow">Student portal</span><h1>Sign in</h1>${msg ? `<div class="notice">${msg}</div>` : ""}
+    <form id="lsignin-form" class="form" novalidate><div class="field"><label for="ls-m">Matric number</label><input id="ls-m" placeholder="GEP/27A/001" autocomplete="username" autocapitalize="characters"></div>
+    <div class="field"><label for="ls-p">Password</label><input id="ls-p" type="password" autocomplete="current-password"></div>
+    <p class="err" id="ls-err" role="alert"></p><div><button class="btn" type="submit">Sign in</button></div></form>
+    <p class="note"><a class="link" href="#/learn/forgot">Forgot your password?</a> · First time? Use <b>Set up my account</b> in your email, or open your application page.</p>`);
+}
+function pageLearnForgot() {
+  app.innerHTML = learnCard(`<span class="eyebrow">Student portal</span><h1>Reset your password</h1><p class="note">We'll email a link to the address you applied with.</p>
+    <form id="lforgot-form" class="form" novalidate><div class="field"><label for="lf-m">Matric number</label><input id="lf-m" placeholder="GEP/27A/001" autocapitalize="characters"></div>
+    <p class="err" id="lf-err" role="alert"></p><div><button class="btn" type="submit">Email me a link</button></div></form>
+    <p class="note"><a class="link" href="#/learn/signin">Back to sign in</a></p>`);
+}
+
+function campusShell(tab, title, sub, body) {
+  const me = CAMPUS.me;
+  const items = [["home", "Home"], ["weeks", "Weeks"], ["tasks", "Tasks"], ["sessions", "Live sessions"], ["news", "Announcements"]];
+  const todo = CAMPUS.tasks.filter((t) => !t.sub || t.sub.status === "redo").length;
+  const nav = items.map(([k, l]) => `<a class="snav-i" href="#/learn/${k}" aria-current="${k === tab ? "page" : "false"}"><span>${l}</span>${k === "tasks" && todo ? `<b class="cnt-b mono">${todo}</b>` : ""}</a>`).join("");
+  app.innerHTML = `<header class="adm-top role-top"><div class="shell-top"><div class="logo">${LOGO}Jobnest Academy · Student</div>
+    <div class="shell-tr"><span class="note" style="color:#C9D6E2">${esc(me.first_name)} · <span class="mono">${esc(me.matric)}</span></span><button class="btn sm ghost" data-act="signout-learn">Sign out</button></div></div></header>
+    <div class="shell"><aside class="snav" aria-label="Menu"><p class="snav-g">${esc(me.track || "")}</p>${nav}</aside>
+    <main class="shell-main"><details class="snav-m"><summary><span>Menu</span><b>${(items.find((x) => x[0] === tab) || [])[1] || ""}</b></summary><nav class="snav-m-list">${nav}</nav></details>
+    <div class="wrap greet"><div><p class="eyebrow">${esc(CAMPUS.cohort.programme)} · ${esc(me.track || "")}</p><h1 style="margin-top:.5rem">${title}</h1>${sub ? `<p class="note" style="font-size:.95rem;margin-top:.4rem;max-width:62ch">${sub}</p>` : ""}</div></div>
+    <section class="wrap pagebody">${body}</section></main></div>`;
+}
+
+const lessonItem = (l) => `<li class="lesson"><span class="lk" aria-hidden="true">${KIND_I[l.kind] || "📘"}</span><div><b>${esc(l.title)}</b><span class="note"> · ${KIND_L[l.kind] || "Lesson"}</span>${l.body ? `<p class="note">${lines(l.body)}</p>` : ""}</div>${l.url ? `<a class="btn sm ghost" href="${esc(l.url)}" target="_blank" rel="noopener">Open ↗</a>` : ""}</li>`;
+const subPill = (t) => !t.sub ? (new Date(t.due_at) < new Date() ? `<span class="pill bad">Overdue</span>` : `<span class="pill now">To do</span>`)
+  : t.sub.status === "passed" ? `<span class="pill ok">Passed${t.sub.score != null ? ` · ${t.sub.score}%` : ""}</span>` : t.sub.status === "redo" ? `<span class="pill bad">Try again</span>` : `<span class="pill">Waiting for marking</span>`;
+function taskCard(t, open = false) {
+  const s = t.sub;
+  return `<details class="arow noav task" ${open ? "open" : ""}><summary><span class="an"><b>${esc(t.title)}</b><span class="note">Week ${t.week} · due ${fmtAt(t.due_at)} WAT</span></span>${subPill(t)}</summary>
+    <div class="abody">${t.brief ? `<p>${lines(t.brief)}</p>` : ""}${t.url ? `<p><a class="link" href="${esc(t.url)}" target="_blank" rel="noopener">Task materials ↗</a></p>` : ""}
+      ${s ? `<div class="rec ${s.status === "passed" ? "rec-offer" : s.status === "redo" ? "rec-decline" : ""}"><span class="eyebrow">Your work · sent ${fmtAt(s.submitted_at)}</span><a class="link" href="${esc(s.link)}" target="_blank" rel="noopener">${esc(s.link)}</a>${s.feedback ? `<span><b>Feedback:</b> ${lines(s.feedback)}</span>` : ""}</div>` : ""}
+      ${s?.status === "passed" ? "" : `<form class="form sub-form" data-k="${t.id}" novalidate><div class="field"><label for="sl-${t.id}">Link to your work</label><input id="sl-${t.id}" type="url" placeholder="https://docs.google.com/…" value="${s?.status === "redo" ? esc(s.link) : ""}"><span class="note">Set sharing to “Anyone with the link can view”.</span></div>
+        <div class="field"><label for="sn-${t.id}">Note for your facilitator (optional)</label><input id="sn-${t.id}"></div>
+        <div class="actions"><button class="btn sm" type="submit">${s ? "Send again" : "Submit"}</button></div></form>`}</div></details>`;
+}
+function sessionRow(x) {
+  const st = new Date(x.starts_at), end = new Date(st.getTime() + x.minutes * 6e4), now = new Date();
+  const live = now >= new Date(st - 30 * 6e4) && now <= end, past = now > end;
+  const att = { present: "Present", late: "Late", absent: "Absent", excused: "Excused", joined: "Joined" }[x.att];
+  return `<li class="sess ${live ? "live" : ""}"><div class="date"><b>${fmt(st, { day: "numeric" })}</b><small>${fmt(st, { month: "short" })}</small></div>
+    <div><b>${esc(x.title)}</b><span class="note" style="display:block">${fmt(st, { weekday: "long" })}, ${fmtTime(st)}–${fmtTime(end)} WAT${x.host ? ` · ${esc(x.host)}` : ""}</span></div>
+    ${past ? (att ? `<span class="pill ${["present", "late", "joined"].includes(x.att) ? "ok" : "bad"}">${att}</span>` : `<span class="note">Ended</span>`)
+      : x.link ? `<button class="btn sm ${live ? "gold" : "ghost"}" data-act="join" data-k="${x.id}">${live ? "Join now" : "Join link"}</button>` : `<span class="note">Link coming</span>`}</li>`;
+}
+
+async function pageLearn(tab) {
+  if (!auth.session) return pageLearnSignIn();
+  if (!isStudent()) { app.innerHTML = learnCard(`<h1>You're signed in as staff</h1><p>Sign out first to use the student portal.</p><div class="actions"><a class="btn" href="#/portal">Go to the staff portal</a><button class="btn ghost" data-act="signout-learn">Sign out</button></div>`); return; }
+  loading();
+  try { CAMPUS = await rpc("student_campus"); }
+  catch (e) { if (e.status === 401 || /sign in/i.test(e.message)) { await auth.signOut(); return pageLearnSignIn("Please sign in again."); } throw e; }
+  const C = CAMPUS, w = C.week, weeks = C.cohort.weeks;
+  const tab_ = ["home", "weeks", "tasks", "sessions", "news"].includes(tab) ? tab : "home";
+  const upcoming = C.sessions.filter((x) => new Date(x.starts_at).getTime() + x.minutes * 6e4 > Date.now());
+  const todo = C.tasks.filter((t) => !t.sub || t.sub.status === "redo");
+  const bal = C.me.balance > 0 ? `<div class="notice bal"><span>Your second instalment of <b>${naira(C.me.balance)}</b> is due by ${fmtDateD(C.me.due_date)}.</span><a class="btn sm gold" href="#/a/${esc(C.me.ref)}/${esc(C.me.token)}">Pay now</a></div>` : "";
+  if (tab_ === "home") {
+    const days = Math.ceil((new Date(C.cohort.start_date + "T00:00:00+01:00") - Date.now()) / 864e5);
+    const thisWeek = Math.min(Math.max(w, 1), weeks);
+    const L = C.lessons.filter((l) => l.week === thisWeek);
+    const head = w < 1 ? `<div class="card hero-c"><span class="eyebrow">Before you start</span><h2>${days} day${days === 1 ? "" : "s"} to go</h2><p>${esc(C.cohort.name)} starts on <b>${fmtDateD(C.cohort.start_date)}</b> with Week 1: Orientation. Week 1 opens here on the Saturday before.</p></div>`
+      : w > weeks ? `<div class="card hero-c"><span class="eyebrow">Programme complete</span><h2>You made it 🎉</h2><p>Your lessons and work stay here for you to look back on.</p></div>`
+      : `<div class="card hero-c"><span class="eyebrow">Week ${w} of ${weeks}</span><h2>${esc(stageOf(w))}</h2><div class="wbar" aria-label="Progress"><i style="width:${(w / weeks) * 100}%"></i></div></div>`;
+    campusShell("home", `Hi ${esc(C.me.first_name)}`, "", `${bal}${head}<div class="grid2" style="margin-top:1rem">
+      <div class="card"><div class="ch"><h3>This week's lessons</h3><a class="link sm" href="#/learn/weeks">All weeks →</a></div>${L.length ? `<ul class="lessons">${L.map(lessonItem).join("")}</ul>` : empty(C.open_weeks ? "Lessons for this week will appear here." : "Week 1 opens on the Saturday before the start date.")}</div>
+      <div class="stack"><div class="card"><div class="ch"><h3>Next live session</h3><a class="link sm" href="#/learn/sessions">All →</a></div>${upcoming.length ? `<ul class="sess-list">${sessionRow(upcoming[0])}</ul>` : empty("No sessions scheduled yet.")}</div>
+        <div class="card"><div class="ch"><h3>Tasks to do</h3><a class="link sm" href="#/learn/tasks">All →</a></div>${todo.length ? `<ul class="lessons">${todo.slice(0, 4).map((t) => `<li class="lesson"><span class="lk" aria-hidden="true">📝</span><div><a class="link" href="#/learn/tasks"><b>${esc(t.title)}</b></a><span class="note" style="display:block">Due ${fmtAt(t.due_at)} WAT</span></div>${subPill(t)}</li>`).join("")}</ul>` : empty("Nothing to hand in right now.")}</div>
+        ${C.news[0] ? `<div class="card"><div class="ch"><h3>Latest announcement</h3><a class="link sm" href="#/learn/news">All →</a></div><p><b>${esc(C.news[0].title)}</b></p><p class="note">${lines(C.news[0].body).slice(0, 400)}</p></div>` : ""}</div></div>`);
+  }
+  if (tab_ === "weeks") {
+    const rows = [...Array(weeks)].map((_, i) => {
+      const n = i + 1, open = n <= C.open_weeks, L = C.lessons.filter((l) => l.week === n), T = C.tasks.filter((t) => t.week === n);
+      const opens = new Date(new Date(C.cohort.start_date + "T12:00:00Z").getTime() + ((n - 1) * 7 - 2) * 864e5);
+      return `<details class="arow wk ${open ? "" : "locked"}" ${n === Math.max(w, 1) && open ? "open" : ""} ${open ? "" : 'data-locked="1"'}><summary><span class="aav mono">${n}</span><span class="an"><b>Week ${n}</b><span class="note">${esc(stageOf(n))}</span></span><span class="anext">${open ? `${L.length} item${L.length === 1 ? "" : "s"}${T.length ? ` · ${T.length} task${T.length === 1 ? "" : "s"}` : ""}` : `🔒 Opens ${fmtDay(opens)}`}</span>${n === w ? `<span class="pill now">This week</span>` : n < w ? `<span class="pill ok">Done</span>` : ""}</summary>
+        ${open ? `<div class="abody">${L.length ? `<ul class="lessons">${L.map(lessonItem).join("")}</ul>` : empty("Nothing posted for this week yet.")}${T.length ? `<p class="eyebrow" style="margin-top:.6rem">Tasks</p>${T.map((t) => `<p><a class="link" href="#/learn/tasks">${esc(t.title)}</a> ${subPill(t)}</p>`).join("")}` : ""}</div>` : ""}</details>`;
+    }).join("");
+    campusShell("weeks", "Weeks", `${weeks} weeks. Each week opens on the Saturday before it starts.`, `<div class="arows">${rows}</div>`);
+  }
+  if (tab_ === "tasks") {
+    const passed = C.tasks.filter((t) => t.sub?.status === "passed").length;
+    campusShell("tasks", "Tasks", `Hand in each task by sharing a link to your work. You've passed <b>${passed}</b> of ${C.tasks.length}.`,
+      C.tasks.length ? `<div class="arows">${C.tasks.slice().sort((a, b) => (a.sub?.status === "passed") - (b.sub?.status === "passed") || new Date(a.due_at) - new Date(b.due_at)).map((t, i) => taskCard(t, i === 0 && t.sub?.status !== "passed")).join("")}</div>` : `<div class="card">${empty("No tasks yet. They'll appear here as each week opens.")}</div>`);
+  }
+  if (tab_ === "sessions") {
+    const past = C.sessions.filter((x) => !upcoming.includes(x)).reverse();
+    campusShell("sessions", "Live sessions", "Join from here so your attendance is recorded. Times are in WAT.",
+      `<div class="card"><h3>Coming up</h3>${upcoming.length ? `<ul class="sess-list">${upcoming.map(sessionRow).join("")}</ul>` : empty("No sessions scheduled yet.")}</div>
+      ${past.length ? `<div class="card" style="margin-top:1rem"><h3>Past sessions</h3><ul class="sess-list">${past.map(sessionRow).join("")}</ul></div>` : ""}`);
+  }
+  if (tab_ === "news") {
+    campusShell("news", "Announcements", "", C.news.length ? `<div class="stack">${C.news.map((n) => `<article class="card"><span class="eyebrow">${fmtAt(n.at)} · ${esc(n.by)}</span><h3 style="margin:.4rem 0">${esc(n.title)}</h3><p>${lines(n.body)}</p></article>`).join("")}</div>` : `<div class="card">${empty("No announcements yet.")}</div>`);
+  }
+}
+
+/* ---------- staff: academy ---------- */
+const trackOpts = (tracks, mine, val) => (mine ? tracks.filter((t) => t.code === mine) : [{ code: "", name: "All tracks" }, ...tracks]).map((t) => `<option value="${t.code}" ${t.code === (val ?? "") ? "selected" : ""}>${esc(t.name)}</option>`).join("");
+const tName = (tracks, c) => c ? (tracks.find((t) => t.code === c)?.name || c) : "All tracks";
+
+async function tabStudents() {
+  const d = await rpc("acad_students");
+  const S = d.students, set = S.filter((s) => s.account).length;
+  const att = S.filter((s) => s.sessions_past).map((s) => s.sessions_attended / s.sessions_past);
+  const canInvite = ["cohort_manager", "academy_admin", "adm_admin", "super"].includes(ME.role);
+  shell("students", "Students", `${esc(d.cohort.name)} · ${d.week < 1 ? `starts ${fmtDateD(d.cohort.start_date)}` : `week ${d.week}`}${d.my_track ? ` · ${esc(tName(d.tracks, d.my_track))} only` : ""}`,
+    `<div class="kpis">${[["Students", S.length], ["Accounts set up", `${set}/${S.length}`], ["Waiting for marking", S.reduce((t, s) => t + s.tasks_waiting, 0)], ["Average attendance", att.length ? Math.round((att.reduce((a, b) => a + b, 0) / att.length) * 100) + "%" : "–"]].map(([l, v]) => `<div class="kpi card"><span class="eyebrow">${l}</span><b class="mono">${v}</b></div>`).join("")}</div>
+    ${canInvite && S.length > set ? `<div class="notice" style="margin-top:1rem"><span>${S.length - set} student${S.length - set === 1 ? " hasn't" : "s haven't"} set up their portal account yet.</span><button class="btn sm" data-act="invite">Email them a set-up link</button></div>` : ""}
+    <div class="card" style="margin-top:1rem">${S.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Student</th><th>Track</th><th>Portal</th><th>Tasks passed</th><th>Attendance</th><th>Fees</th></tr></thead><tbody>
+      ${S.map((s) => `<tr><td data-label="Student"><b>${esc(s.first_name)} ${esc(s.surname)}</b><span class="note" style="display:block"><span class="mono">${esc(s.matric)}</span> · ${esc(s.phone)}</span></td><td data-label="Track">${esc(s.track || "")}</td>
+        <td data-label="Portal">${s.account ? `<span class="pill ok">Set up</span>` : `<span class="pill">${s.invited_at ? `Invited ${fmtDay(s.invited_at)}` : "Not yet"}</span>`}</td>
+        <td data-label="Tasks passed" class="mono">${s.tasks_passed}/${s.tasks_due}${s.tasks_waiting ? ` <span class="note">(+${s.tasks_waiting} to mark)</span>` : ""}</td>
+        <td data-label="Attendance" class="mono">${s.sessions_past ? `${s.sessions_attended}/${s.sessions_past}` : "–"}</td><td data-label="Fees">${s.balance ? `<span class="pill bad">Owes ${naira(s.balance)}</span>` : `<span class="pill ok">Paid</span>`}</td></tr>`).join("")}</tbody></table></div>` : empty("No admitted students yet.")}</div>`);
+}
+
+async function tabContent() {
+  const d = await rpc("acad_content");
+  const canEdit = ["cohort_manager", "facilitator", "academy_admin", "super"].includes(ME.role);
+  if (!ui.week) ui.week = Math.min(Math.max(d.week, 1), d.weeks);
+  const wk = ui.week, L = d.lessons.filter((l) => l.week === wk), T = d.tasks.filter((t) => t.week === wk);
+  const mine = (x) => !d.my_track || x.track_code === d.my_track;
+  const e = ui.edit || {};
+  const defDue = watParts(new Date(new Date(d.cohort.start_date + "T12:00:00Z").getTime() + ((wk - 1) * 7 + 6) * 864e5));
+  shell("content", "Content", "Add each week's lessons, links and tasks. Students see a week from the Saturday before it starts.",
+    `<div class="chips-row wk-chips">${[...Array(d.weeks)].map((_, i) => { const n = i + 1, c = d.lessons.filter((l) => l.week === n).length + d.tasks.filter((t) => t.week === n).length; return `<button class="chip-w ${n === wk ? "on" : ""}" data-act="week" data-k="${n}" aria-pressed="${n === wk}">W${n}${c ? `<small>${c}</small>` : ""}</button>`; }).join("")}</div>
+    <div class="grid2" style="margin-top:1rem"><div class="stack"><div class="card"><div class="ch"><div><h3>Week ${wk}: ${esc(stageOf(wk))}</h3><span class="note">${d.week === wk ? "This week" : wk < d.week ? "Already open" : `Opens ${fmtDay(new Date(new Date(d.cohort.start_date + "T12:00:00Z").getTime() + ((wk - 1) * 7 - 2) * 864e5))}`}</span></div></div>
+      ${L.length ? `<ul class="lessons">${L.map((l) => `<li class="lesson ${l.published ? "" : "hid"}"><span class="lk">${KIND_I[l.kind]}</span><div><b>${esc(l.title)}</b><span class="note"> · ${tName(d.tracks, l.track_code)}${l.published ? "" : " · hidden"}</span>${l.url ? `<span class="note" style="display:block;overflow-wrap:anywhere">${esc(l.url)}</span>` : ""}</div>${canEdit && mine(l) ? `<span class="actions"><button class="link sm" data-act="edit-lesson" data-k="${l.id}">Edit</button><button class="link sm danger" data-act="del-lesson" data-k="${l.id}">Delete</button></span>` : ""}</li>`).join("")}</ul>` : empty("No lessons for this week yet.")}</div>
+      <div class="card"><h3>Tasks</h3>${T.length ? `<ul class="lessons">${T.map((t) => `<li class="lesson ${t.published ? "" : "hid"}"><span class="lk">📝</span><div><b>${esc(t.title)}</b><span class="note" style="display:block">${tName(d.tracks, t.track_code)} · due ${fmtAt(t.due_at)} · ${t.submitted} submitted${t.waiting ? `, ${t.waiting} to mark` : ""}${t.published ? "" : " · hidden"}</span></div>${canEdit && mine(t) ? `<span class="actions"><button class="link sm" data-act="edit-task" data-k="${t.id}">Edit</button><button class="link sm danger" data-act="del-task" data-k="${t.id}">Delete</button></span>` : ""}</li>`).join("")}</ul>` : empty("No tasks for this week.")}</div></div>
+    ${canEdit ? `<div class="stack"><form class="card form" id="lesson-form" data-id="${e.type === "lesson" ? e.id : ""}" novalidate><h3>${e.type === "lesson" ? "Edit item" : "Add a lesson or link"}</h3>
+        <div class="grid2"><div class="field"><label for="le-kind">Type</label><select id="le-kind">${Object.entries(KIND_L).map(([k, l]) => `<option value="${k}" ${e.type === "lesson" && e.kind === k ? "selected" : ""}>${KIND_I[k]} ${l}</option>`).join("")}</select></div>
+        <div class="field"><label for="le-track">For</label><select id="le-track">${trackOpts(d.tracks, d.my_track, e.type === "lesson" ? e.track_code : null)}</select></div></div>
+        <div class="field"><label for="le-title">Title</label><input id="le-title" value="${e.type === "lesson" ? esc(e.title) : ""}"></div>
+        <div class="field"><label for="le-url">Link (YouTube, Google Drive, …)</label><input id="le-url" type="url" placeholder="https://" value="${e.type === "lesson" ? esc(e.url || "") : ""}"></div>
+        <div class="field"><label for="le-body">Notes for students (optional)</label><textarea id="le-body" rows="3">${e.type === "lesson" ? esc(e.body || "") : ""}</textarea></div>
+        <label class="consent"><input type="checkbox" id="le-pub" ${e.type === "lesson" && !e.published ? "" : "checked"}> Visible to students</label>
+        <div class="actions"><button class="btn sm" type="submit">${e.type === "lesson" ? "Save changes" : `Add to week ${wk}`}</button>${e.type === "lesson" ? `<button class="btn sm ghost" type="button" data-act="cancel-edit">Cancel</button>` : ""}</div></form>
+      <form class="card form" id="task-form" data-id="${e.type === "task" ? e.id : ""}" novalidate><h3>${e.type === "task" ? "Edit task" : "Add a task"}</h3>
+        <div class="field"><label for="tk-title">Title</label><input id="tk-title" value="${e.type === "task" ? esc(e.title) : ""}"></div>
+        <div class="field"><label for="tk-brief">What should they do and hand in?</label><textarea id="tk-brief" rows="3">${e.type === "task" ? esc(e.brief || "") : ""}</textarea></div>
+        <div class="field"><label for="tk-url">Materials link (optional)</label><input id="tk-url" type="url" placeholder="https://" value="${e.type === "task" ? esc(e.url || "") : ""}"></div>
+        <div class="grid2"><div class="field"><label for="tk-date">Due date</label><input id="tk-date" type="date" value="${e.type === "task" ? watParts(e.due_at).date : defDue.date}"></div><div class="field"><label for="tk-time">Time (WAT)</label><input id="tk-time" type="time" value="${e.type === "task" ? watParts(e.due_at).time : "23:59"}"></div></div>
+        <div class="field"><label for="tk-track">For</label><select id="tk-track">${trackOpts(d.tracks, d.my_track, e.type === "task" ? e.track_code : null)}</select></div>
+        <label class="consent"><input type="checkbox" id="tk-pub" ${e.type === "task" && !e.published ? "" : "checked"}> Visible to students</label>
+        <div class="actions"><button class="btn sm" type="submit">${e.type === "task" ? "Save task" : `Add task to week ${wk}`}</button>${e.type === "task" ? `<button class="btn sm ghost" type="button" data-act="cancel-edit">Cancel</button>` : ""}</div></form></div>` : ""}</div>`);
+  ui.content = d;
+}
+
+async function tabGrading() {
+  const L = await rpc("acad_submissions");
+  const wait = L.filter((x) => x.status === "submitted"), done = L.filter((x) => x.status !== "submitted");
+  const canGrade = ["cohort_manager", "facilitator", "super"].includes(ME.role);
+  const row = (x) => `<details class="arow noav" data-id="g${x.id}" ${ui.open === "g" + x.id ? "open" : ""}><summary><span class="an"><b>${esc(x.student)}</b><span class="note">${esc(x.matric)} · ${esc(x.task)} · week ${x.week}</span></span><span class="anext">${x.status === "submitted" ? `Sent ${ago(x.submitted_at)}${new Date(x.submitted_at) > new Date(x.due_at) ? " · late" : ""}` : `${x.status === "passed" ? "Passed" : "Asked to redo"} · ${esc(x.graded_by || "")}`}</span>${x.status === "submitted" ? `<span class="pill now">To mark</span>` : x.status === "passed" ? `<span class="pill ok">Passed</span>` : `<span class="pill bad">Redo</span>`}</summary>
+    <div class="abody"><p><a class="btn sm ghost" href="${esc(x.link)}" target="_blank" rel="noopener">Open their work ↗</a></p>${x.note ? `<p class="note">“${esc(x.note)}”</p>` : ""}${x.brief ? `<p class="note"><b>Task:</b> ${lines(x.brief)}</p>` : ""}${x.feedback && x.status !== "submitted" ? `<p class="note"><b>Your feedback:</b> ${lines(x.feedback)}</p>` : ""}
+      ${canGrade && x.status === "submitted" ? `<form class="form grade-form" data-k="${x.id}" novalidate><div class="rate"><label><input type="radio" name="gr-${x.id}" value="passed"><span>Passed</span></label><label><input type="radio" name="gr-${x.id}" value="redo"><span>Needs another try</span></label></div>
+        <div class="grid2"><div class="field"><label for="gs-${x.id}">Score % (optional)</label><input id="gs-${x.id}" type="number" min="0" max="100" inputmode="numeric"></div></div>
+        <div class="field"><label for="gf-${x.id}">Feedback (required for “another try”)</label><textarea id="gf-${x.id}" rows="2"></textarea></div><div class="actions"><button class="btn sm" type="submit">Send result</button></div></form>` : ""}</div></details>`;
+  shell("grading", "Grading", "Students get an email with your result and feedback.",
+    `<div class="card"><div class="ch"><h3>To mark</h3><span class="note">${wait.length}</span></div>${wait.length ? `<div class="arows">${wait.map(row).join("")}</div>` : empty("Nothing waiting. 🎉")}</div>
+    <div class="card" style="margin-top:1rem"><h3>Marked in the last 30 days</h3>${done.length ? `<div class="arows">${done.map(row).join("")}</div>` : empty("Nothing yet.")}</div>`);
+}
+
+async function tabSessions() {
+  const d = await rpc("acad_sessions");
+  const canEdit = ["cohort_manager", "facilitator", "academy_admin", "super"].includes(ME.role);
+  const canMark = ["cohort_manager", "facilitator", "super"].includes(ME.role);
+  const now = Date.now(), up = d.sessions.filter((x) => new Date(x.starts_at).getTime() + x.minutes * 6e4 > now), past = d.sessions.filter((x) => !up.includes(x)).reverse();
+  const e = ui.edit?.type === "session" ? ui.edit : null;
+  const row = (x) => `<details class="arow noav" data-id="s${x.id}" ${ui.open === "s" + x.id ? "open" : ""} data-act-toggle="att" data-k="${x.id}"><summary><span class="an"><b>${esc(x.title)}</b><span class="note">${fmtAt(x.starts_at)} WAT · ${x.minutes} min · ${esc(x.track || "All tracks")}${x.host ? ` · ${esc(x.host)}` : ""}</span></span><span class="anext">${x.joined} joined${x.marked ? ` · ${x.marked} marked` : ""}</span>${x.link ? "" : `<span class="pill bad">No link</span>`}</summary>
+    <div class="abody">${x.link ? `<p><a class="link" href="${esc(x.link)}" target="_blank" rel="noopener">${esc(x.link)}</a></p>` : ""}${canEdit && (!d.my_track || x.track_code === d.my_track) ? `<div class="actions"><button class="link sm" data-act="edit-session" data-k="${x.id}">Edit</button><button class="link sm danger" data-act="del-session" data-k="${x.id}">Delete</button></div>` : ""}
+      <div class="att-body" data-k="${x.id}" data-mark="${canMark ? 1 : ""}"><p class="note">Open to load attendance…</p></div></div></details>`;
+  const dv = e ? watParts(e.starts_at) : { date: "", time: "10:00" };
+  shell("sessions", "Live sessions", "Students join from their portal, which records who joined. Confirm attendance after each session.",
+    `<div class="grid2"><div class="stack"><div class="card"><h3>Coming up</h3>${up.length ? `<div class="arows">${up.map(row).join("")}</div>` : empty("Nothing scheduled.")}</div>
+      <div class="card"><h3>Past</h3>${past.length ? `<div class="arows">${past.map(row).join("")}</div>` : empty("No past sessions.")}</div></div>
+    ${canEdit ? `<form class="card form" id="session-form" data-id="${e ? e.id : ""}" novalidate><h3>${e ? "Edit session" : "Schedule a session"}</h3>
+      <div class="field"><label for="se-title">Title</label><input id="se-title" placeholder="e.g. Week 3 live class" value="${e ? esc(e.title) : ""}"></div>
+      <div class="grid2"><div class="field"><label for="se-kind">Type</label><select id="se-kind">${[["class", "Class"], ["clinic", "Clinic / office hours"], ["orientation", "Orientation"], ["other", "Other"]].map(([k, l]) => `<option value="${k}" ${e?.kind === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
+      <div class="field"><label for="se-track">For</label><select id="se-track">${trackOpts(d.tracks, d.my_track, e?.track_code)}</select></div></div>
+      <div class="grid2"><div class="field"><label for="se-date">Date</label><input id="se-date" type="date" value="${dv.date}"></div><div class="field"><label for="se-time">Start (WAT)</label><input id="se-time" type="time" value="${dv.time}"></div></div>
+      <div class="grid2"><div class="field"><label for="se-min">Minutes</label><input id="se-min" type="number" min="10" max="480" value="${e ? e.minutes : 60}"></div><div class="field"><label for="se-host">Host</label><input id="se-host" value="${e ? esc(e.host || "") : esc(ME.name)}"></div></div>
+      <div class="field"><label for="se-link">Meeting link (Google Meet, Zoom…)</label><input id="se-link" type="url" placeholder="https://" value="${e ? esc(e.link || "") : ""}"></div>
+      <div class="actions"><button class="btn sm" type="submit">${e ? "Save changes" : "Add session"}</button>${e ? `<button class="btn sm ghost" type="button" data-act="cancel-edit">Cancel</button>` : ""}</div></form>` : ""}</div>`);
+  ui.sessions = d;
+}
+
+async function loadAttendance(box) {
+  const k = box.dataset.k;
+  try {
+    const d = await rpc("acad_attendance", { p_session: +k });
+    const ST = [["present", "Present"], ["late", "Late"], ["absent", "Absent"], ["excused", "Excused"]];
+    box.innerHTML = d.students.length ? `<form class="form att-form" data-k="${k}"><ul class="att-list">${d.students.map((s) => { const v = s.status || (s.joined_at ? "present" : "absent"); return `<li><span><b>${esc(s.name)}</b><span class="note" style="display:block">${esc(s.matric)}${s.joined_at ? ` · joined ${fmtTime(s.joined_at)}` : ""}</span></span>${box.dataset.mark ? `<select data-sid="${s.id}" aria-label="Attendance for ${esc(s.name)}">${ST.map(([a, l]) => `<option value="${a}" ${a === v ? "selected" : ""}>${l}</option>`).join("")}</select>` : `<span class="pill">${s.status || (s.joined_at ? "joined" : "–")}</span>`}</li>`; }).join("")}</ul>
+      ${box.dataset.mark ? `<div class="actions"><button class="btn sm" type="submit">Save attendance</button><span class="note">Pre-filled from who joined through the portal.</span></div>` : ""}</form>` : empty("No students in this session's track.");
+  } catch (err) { box.innerHTML = `<p class="err">${esc(err.message)}</p>`; }
+}
+
+async function tabNews() {
+  const d = await rpc("acad_news");
+  const canPost = ["director", "cohort_manager", "facilitator", "academy_admin", "super"].includes(ME.role);
+  shell("news", "Announcements", "Shown on every student's portal, and emailed if you choose.",
+    `<div class="grid2">${canPost ? `<form class="card form" id="news-form" novalidate><h3>New announcement</h3>
+      <div class="field"><label for="nw-title">Title</label><input id="nw-title"></div>
+      <div class="field"><label for="nw-body">Message</label><textarea id="nw-body" rows="5"></textarea></div>
+      <div class="field"><label for="nw-track">Send to</label><select id="nw-track">${trackOpts(d.tracks, d.my_track, null)}</select></div>
+      <label class="consent"><input type="checkbox" id="nw-email" checked> Also email it to them</label>
+      <p class="err" id="nw-err" role="alert"></p><div><button class="btn" type="submit">Post</button></div></form>` : ""}
+    <div class="stack">${d.news.length ? d.news.map((n) => `<article class="card"><span class="eyebrow">${fmtAt(n.created_at)} · ${esc(n.by || "")} · ${esc(n.track || "All tracks")}${n.emailed ? " · emailed" : ""}</span><h3 style="margin:.4rem 0">${esc(n.title)}</h3><p>${lines(n.body)}</p></article>`).join("") : `<div class="card">${empty("No announcements yet.")}</div>`}</div></div>`);
 }
 
 /* ---------- events ---------- */
@@ -636,6 +881,24 @@ document.addEventListener("click", async (e) => {
   if (a === "retry-mail") { await busy(t, () => rpc("admin_retry_email", { p_id: +k })); toast("Will try again within a minute"); return route(); }
   if (a === "mark-sent") { await busy(t, () => rpc("admin_mark_sent", { p_id: +k })); toast("Marked as sent"); return route(); }
   if (a === "pay") { try { await startPay(t); } catch { /* shown */ } return; }
+  if (a === "signout-learn") { await auth.signOut(); CAMPUS = null; return go("#/learn/signin"); }
+  if (a === "join") {
+    const w = window.open("", "_blank");
+    try { const link = await rpc("student_join", { p_session: +k }); if (w) w.location = link; else location.href = link; } catch (err) { if (w) w.close(); toast(err.message); }
+    return;
+  }
+  if (a === "invite") { try { const n = await busy(t, () => rpc("acad_invite")); toast(n ? `Set-up links sent to ${n} student${n === 1 ? "" : "s"}` : "Everyone was invited in the last 2 days"); route(); } catch { /* shown */ } return; }
+  if (a === "week") { ui.week = +k; ui.edit = null; return route(); }
+  if (a === "cancel-edit") { ui.edit = null; return route(); }
+  if (a === "edit-lesson") { ui.edit = { type: "lesson", ...ui.content.lessons.find((x) => x.id === +k) }; route(); return; }
+  if (a === "edit-task") { ui.edit = { type: "task", ...ui.content.tasks.find((x) => x.id === +k) }; route(); return; }
+  if (a === "edit-session") { ui.edit = { type: "session", ...ui.sessions.sessions.find((x) => x.id === +k) }; route(); return; }
+  if (a === "del-lesson" || a === "del-task" || a === "del-session") {
+    if (!confirm("Delete this? Students will no longer see it.")) return;
+    const fn = { "del-lesson": "acad_delete_lesson", "del-task": "acad_delete_task", "del-session": "acad_delete_session" }[a];
+    try { await busy(t, () => rpc(fn, { p_id: +k })); toast("Deleted"); ui.edit = null; route(); } catch { /* shown */ }
+    return;
+  }
   if (a === "print") return window.print();
   if (a === "decline-offer") {
     if (!confirm("Decline your place? Your seat will go to someone on the waitlist, and this can't be undone.")) return;
@@ -643,12 +906,13 @@ document.addEventListener("click", async (e) => {
     return;
   }
   if (a === "extend") { try { await busy(t, () => rpc("admin_extend_offer", { p_id: k, p_days: +t.dataset.days })); toast(`Offer extended by ${t.dataset.days} days. We've emailed them.`); ui.open = k; route(); } catch { /* shown */ } return; }
-  if (a === "edit-staff") { $("#sf-email").value = t.dataset.email; $("#sf-name").value = t.dataset.name; $("#sf-role").value = t.dataset.role; $("#sf-active").checked = t.dataset.active === "true"; $("#sf-name").focus(); return; }
+  if (a === "edit-staff") { $("#sf-email").value = t.dataset.email; $("#sf-name").value = t.dataset.name; $("#sf-role").value = t.dataset.role; $("#sf-active").checked = t.dataset.active === "true"; $("#sf-track").value = t.dataset.track || ""; $("#sf-name").focus(); return; }
 });
 
 document.addEventListener("toggle", async (e) => {
   const d = e.target;
   if (d.matches?.("details.arow[data-id]") && d.open) ui.open = d.dataset.id;
+  if (d.matches?.('details[data-act-toggle="att"]') && d.open) { const box = $(".att-body", d); if (box && !box.dataset.loaded) { box.dataset.loaded = 1; loadAttendance(box); } }
   if (d.matches?.("details.atl") && d.open) {
     const box = $(".tl-body", d);
     try {
@@ -755,8 +1019,75 @@ document.addEventListener("submit", async (e) => {
     try { const r = await busy(f.querySelector("button"), () => rpc("admin_record_payment", { p_id: k, p_amount: amt, p_note: note })); toast(r.matric ? `Recorded · matric number ${r.matric}` : "Payment recorded"); ui.open = k; route(); } catch { /* shown */ }
     return;
   }
+  if (f.id === "account-form") {
+    const p1 = $("#ac-p").value, p2 = $("#ac-p2").value, err = $("#ac-err");
+    if (!pwOk(p1, p2, err)) return;
+    try {
+      await busy(f.querySelector("button"), async () => {
+        const r = await fetch("/.netlify/functions/student-account", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ref: f.dataset.ref, token: f.dataset.token, password: p1 }) });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.message || "Something went wrong. Please try again.");
+        await auth.signOut(); await auth.signIn(d.login, p1);
+      });
+      toast("Password saved. Welcome!"); go("#/learn");
+    } catch (x) { err.textContent = x.message; }
+    return;
+  }
+  if (f.id === "lsignin-form") {
+    const m = $("#ls-m").value.trim(), pw = $("#ls-p").value, err = $("#ls-err");
+    if (!/^[A-Za-z]+\/\d{2}[A-Za-z]\/\d{3}$/.test(m)) { err.textContent = "Enter your matric number like GEP/27A/001."; return; }
+    try { await busy(f.querySelector("button"), () => auth.signIn(loginOf(m), pw)); go("#/learn"); }
+    catch (x) { err.textContent = /invalid/i.test(x.message) ? "That matric number and password don't match. New here? Use the set-up link in your email." : x.message; }
+    return;
+  }
+  if (f.id === "lforgot-form") {
+    const m = $("#lf-m").value.trim();
+    if (!m) { $("#lf-err").textContent = "Enter your matric number."; return; }
+    try { await busy(f.querySelector("button"), () => rpc("student_reset_request", { p_matric: m })); } catch { /* same message either way */ }
+    app.innerHTML = learnCard(`<h1>Check your email</h1><p>If <b>${esc(m.toUpperCase())}</b> is a valid matric number, we've emailed a link to the address you applied with. It can take a couple of minutes.</p><div><a class="btn" href="#/learn/signin">Back to sign in</a></div>`);
+    return;
+  }
+  if (f.classList.contains("sub-form")) {
+    const k = f.dataset.k, link = $("#sl-" + k).value.trim();
+    if (!/^https?:\/\//i.test(link)) return toast("Paste the full link, starting with https://");
+    try { await busy(f.querySelector("button"), () => rpc("student_submit", { p_task: +k, p_link: link, p_note: $("#sn-" + k).value.trim() || null })); toast("Submitted. Your facilitator will mark it."); route(); } catch { /* shown */ }
+    return;
+  }
+  if (f.id === "lesson-form" || f.id === "task-form") {
+    const L = f.id === "lesson-form", v = (id) => $("#" + id).value;
+    const p = L ? { week: ui.week, kind: v("le-kind"), track_code: v("le-track") || null, title: v("le-title"), url: v("le-url"), body: v("le-body"), published: $("#le-pub").checked }
+      : { week: ui.week, track_code: v("tk-track") || null, title: v("tk-title"), brief: v("tk-brief"), url: v("tk-url"), due_at: v("tk-date") ? `${v("tk-date")}T${v("tk-time") || "23:59"}:00+01:00` : null, published: $("#tk-pub").checked };
+    if (f.dataset.id) { p.id = +f.dataset.id; if (ui.edit) p.week = ui.edit.week; }
+    try { await busy(f.querySelector("button[type=submit]"), () => rpc(L ? "acad_save_lesson" : "acad_save_task", { p })); toast(f.dataset.id ? "Saved" : "Added"); ui.edit = null; route(); } catch { /* shown */ }
+    return;
+  }
+  if (f.classList.contains("grade-form")) {
+    const k = f.dataset.k, st = $(`input[name="gr-${k}"]:checked`)?.value, sc = $("#gs-" + k).value;
+    if (!st) return toast("Choose Passed or Needs another try");
+    try { await busy(f.querySelector("button"), () => rpc("acad_grade", { p_id: +k, p_status: st, p_score: sc === "" ? null : +sc, p_feedback: $("#gf-" + k).value })); toast("Result sent"); ui.open = null; route(); } catch { /* shown */ }
+    return;
+  }
+  if (f.id === "session-form") {
+    const v = (id) => $("#" + id).value;
+    if (!v("se-date") || !v("se-time")) return toast("Add a date and start time");
+    const p = { title: v("se-title"), kind: v("se-kind"), track_code: v("se-track") || null, starts_at: `${v("se-date")}T${v("se-time")}:00+01:00`, minutes: +v("se-min") || 60, host: v("se-host"), link: v("se-link") };
+    if (f.dataset.id) p.id = +f.dataset.id;
+    try { await busy(f.querySelector("button[type=submit]"), () => rpc("acad_save_session", { p })); toast(p.id ? "Saved" : "Session added"); ui.edit = null; route(); } catch { /* shown */ }
+    return;
+  }
+  if (f.classList.contains("att-form")) {
+    const marks = $$("select[data-sid]", f).map((x) => ({ id: x.dataset.sid, status: x.value }));
+    try { const n = await busy(f.querySelector("button"), () => rpc("acad_mark_attendance", { p_session: +f.dataset.k, p_marks: marks })); toast(`Attendance saved for ${n}`); } catch { /* shown */ }
+    return;
+  }
+  if (f.id === "news-form") {
+    const t = $("#nw-title").value.trim(), b = $("#nw-body").value.trim();
+    if (!t || !b) { $("#nw-err").textContent = "Add a title and a message."; return; }
+    try { const n = await busy(f.querySelector("button"), () => rpc("acad_announce", { p_title: t, p_body: b, p_track: $("#nw-track").value || null, p_email: $("#nw-email").checked })); toast(n ? `Posted and emailed to ${n}` : "Posted"); route(); } catch (x) { $("#nw-err").textContent = x.message; }
+    return;
+  }
   if (f.id === "staff-form") {
-    try { await busy(f.querySelector("button"), () => rpc("super_save_staff", { p_email: $("#sf-email").value, p_name: $("#sf-name").value, p_role: $("#sf-role").value, p_active: $("#sf-active").checked })); toast("Saved"); route(); }
+    try { await busy(f.querySelector("button"), () => rpc("super_save_staff", { p_email: $("#sf-email").value, p_name: $("#sf-name").value, p_role: $("#sf-role").value, p_active: $("#sf-active").checked, p_track: $("#sf-track").value || null })); toast("Saved"); route(); }
     catch (x) { $("#sf-err").textContent = x.message; }
   }
 });
@@ -779,6 +1110,11 @@ async function route() {
       return auth.session ? go("#/portal") : pageStaffSignIn();
     }
     if (p0 === "portal") return pagePortal(p1 || "");
+    if (p0 === "learn") {
+      if (p1 === "signin") return auth.session && isStudent() ? go("#/learn") : pageLearnSignIn();
+      if (p1 === "forgot") return pageLearnForgot();
+      return pageLearn(p1 || "home");
+    }
     await info();
     if (p0 === "a" && p1 && p2) return pageApplicant(p1, p2, p3 || "");
     if (p0 === "gep") return pageGep();

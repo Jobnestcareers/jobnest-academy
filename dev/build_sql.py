@@ -46,6 +46,6 @@ for k, t in tpl.items():
 out.append(",\n".join(trows))
 out.append("on conflict (key) do nothing;")
 (root / 'supabase/03_seed.sql').write_text("\n".join(out) + "\n")
-parts = [(root / f'supabase/{n}').read_text() for n in ['01_schema.sql', '02_functions.sql', '03_seed.sql', '04_email_sending.sql', '05_payments.sql']]
+parts = [(root / f'supabase/{n}').read_text() for n in ['01_schema.sql', '02_functions.sql', '03_seed.sql', '04_email_sending.sql', '05_payments.sql', '06_portal.sql']]
 (root / 'supabase/setup.sql').write_text("-- Jobnest Academy: full database setup. Paste into Supabase → SQL Editor → Run.\n\n" + "\n\n".join(parts))
 print('rows', len(rows), 'templates', len(trows))

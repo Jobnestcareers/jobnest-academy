@@ -68,6 +68,16 @@ In Paystack, set the **Webhook URL** to `https://academy.jobnestcareers.com/.net
 Existing databases need `supabase/05_payments.sql` run once. Staff see everything under **Payments**,
 and can record a bank transfer made outside Paystack or give someone more time to pay.
 
+## Student portal
+Admitted students set a password from their application page (or the set-up email staff send from
+**Academy → Students**), then sign in at `/#/learn/signin` with their matric number. Behind the scenes their
+login is a private address made from the matric number (`gep-27a-001@students.jobnestcareers.com`),
+created by `netlify/functions/student-account.mjs` with the Supabase secret key, so Supabase never has to
+send them email. Staff add lessons, links and tasks under **Content**, mark work under **Grading**,
+schedule classes and take attendance under **Live sessions**, and post **Announcements**. A facilitator
+given a track under **Staff accounts** only sees and marks that track.
+Existing databases need `supabase/06_portal.sql` run once.
+
 ## Testing locally
 Needs Postgres 16 and Python 3 with Playwright.
 ```
@@ -76,6 +86,7 @@ python3 dev/emulator.py 8787 &  # local stand-in for Supabase on http://localhos
 node dev/functions_server.mjs & # payment functions with a fake Paystack on :8788
 bash dev/test_sql.sh            # database-level checks
 bash dev/test_pay.sh            # payments, matric numbers, expiry and reminders
+bash dev/test_portal.sh         # student portal, grading, attendance and track permissions
 python3 dev/e2e.py 1280         # full journey in a browser, including paying (use 390 for phone)
 ```
 
@@ -83,5 +94,5 @@ python3 dev/e2e.py 1280         # full journey in a browser, including paying (u
 1. Foundations and admissions ✅ (this version)
 2. Automatic emails ✅ (Resend, sent every minute by `netlify/functions/send-emails.mjs`)
 3. Paystack payment, admission letter and matric numbers ✅
-4. Student portal and learning
+4. Student portal and learning ✅
 5. Projects, internships, coaching and certificates

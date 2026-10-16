@@ -7,6 +7,7 @@ from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 ROOT = pathlib.Path(__file__).resolve().parent.parent / "public"
 PSQL = ["psql", "-h", "/var/tmp/jnpg", "-p", "5433", "-U", "postgres", "-d", "jn", "-qAt", "-v", "ON_ERROR_STOP=1"]
 USERS = {}  # email -> password
+IDS = {}  # admin-created user id -> email
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8787
 
 def lit(v):
@@ -44,6 +45,11 @@ class H(SimpleHTTPRequestHandler):
         self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b)
     def do_GET(self):
         if self.path.startswith("/.netlify/functions/"): return self.proxy()
+        if self.path.startswith("/auth/v1/admin/users"):
+            if self.claims()[0] != "service_role": return self.send_json(401, {"msg": "not allowed"})
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query); page = int(q.get("page", ["1"])[0])
+            allu = [{"id": i, "email": e} for i, e in IDS.items()]
+            return self.send_json(200, {"users": allu[(page - 1) * 200: page * 200]})
         if self.path.startswith("/assets/config.js"):
             b = f'export const SUPABASE_URL = "http://localhost:{PORT}";\nexport const SUPABASE_ANON_KEY = "anon-key";\n'.encode()
             self.send_response(200); self.send_header("Content-Type", "text/javascript"); self.end_headers(); self.wfile.write(b); return
@@ -92,6 +98,17 @@ class H(SimpleHTTPRequestHandler):
             USERS[b["email"].lower()] = b["password"]
             e = b["email"].lower()
             return self.send_json(200, {"access_token": token_for(e), "refresh_token": token_for(e), "expires_in": 3600, "user": {"email": e}})
+        if u.path == "/auth/v1/admin/users":
+            if self.claims()[0] != "service_role": return self.send_json(401, {"msg": "not allowed"})
+            e = b["email"].lower()
+            if e in USERS: return self.send_json(422, {"msg": "A user with this email address has already been registered"})
+            USERS[e] = b["password"]; uid = "00000000-0000-4000-8000-" + format(len(USERS), "012d"); IDS[uid] = e
+            return self.send_json(200, {"id": uid, "email": e})
+        if u.path.startswith("/auth/v1/admin/users/"):
+            if self.claims()[0] != "service_role": return self.send_json(401, {"msg": "not allowed"})
+            uid = u.path.rsplit("/", 1)[1]
+            if uid not in IDS: return self.send_json(404, {"msg": "User not found"})
+            USERS[IDS[uid]] = b["password"]; return self.send_json(200, {"id": uid})
         if u.path == "/auth/v1/recover": return self.send_json(200, {})
         if u.path == "/auth/v1/logout": return self.send_json(204, None)
         if u.path == "/auth/v1/user":

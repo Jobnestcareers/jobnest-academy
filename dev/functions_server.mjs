@@ -4,6 +4,7 @@ import http from "node:http";
 import { handlePay } from "../netlify/functions/pay.mjs";
 import { handleReturn } from "../netlify/functions/pay-return.mjs";
 import { handleWebhook } from "../netlify/functions/paystack-webhook.mjs";
+import { handleAccount } from "../netlify/functions/student-account.mjs";
 
 const SITE = process.env.SITE || "http://localhost:8787";
 const env = { SUPABASE_URL: SITE, SUPABASE_SECRET_KEY: "sb_secret_local", PAYSTACK_SECRET_KEY: "sk_test_local" };
@@ -33,6 +34,7 @@ http.createServer(async (req, res) => {
   if (name === "pay") out = await handlePay(request, d);
   else if (name === "pay-return") out = await handleReturn(request, d);
   else if (name === "paystack-webhook") out = await handleWebhook(request, d);
+  else if (name === "student-account") out = await handleAccount(request, d);
   else if (name === "fake-checkout") {
     const ref = url.searchParams.get("reference"), t = tx[ref], act = url.searchParams.get("do");
     if (act) { t.status = act === "pay" ? "success" : "abandoned"; out = new Response(null, { status: 302, headers: { Location: t.back } }); }
