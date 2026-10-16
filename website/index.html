@@ -38,7 +38,7 @@ a.card.t-recruit{background:color-mix(in srgb,var(--c-recruit) 5%,#fff);border-c
 .sec-dark{background:var(--navy);color:#fff}.sec-dark .lead{color:#C9D6E2}.sec-dark .eyebrow{color:var(--gold)}
 .sec-dark :focus-visible{outline-color:var(--gold)}
 .eyebrow{font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--brand-d);margin-bottom:14px;display:block}
-.h1{font-size:clamp(38px,5.2vw,66px)}.h2{font-size:clamp(30px,3.6vw,44px)}.h3{font-size:clamp(22px,2vw,26px)}
+.h1{font-size:clamp(38px,5.2vw,66px)}.hero.hero-sm{padding:40px 0 28px!important}.hero-sm .h1{font-size:clamp(28px,3.4vw,40px);max-width:none}.hero-sm .lead{margin-top:10px;font-size:18px}.hero-sm .eyebrow{margin-bottom:10px}.h2{font-size:clamp(30px,3.6vw,44px)}.h3{font-size:clamp(22px,2vw,26px)}
 .lead{font-size:clamp(18px,1.6vw,21px);color:var(--mut);max-width:62ch}
 .sec-head{display:flex;flex-direction:column;gap:14px;margin-bottom:44px;max-width:760px}
 .mut{color:var(--mut)}
@@ -342,6 +342,7 @@ function pHero(o) {
     '<div class="hero-art" role="img" aria-label="' + o.alt + '" style="background:' + (o.icon === 'academy' ? 'var(--c-academy)' : o.icon === 'community' ? 'var(--c-community)' : o.icon === 'careers' ? 'var(--c-careers)' : o.icon === 'recruit' ? 'var(--c-recruit)' : o.icon === 'business' ? 'var(--c-business)' : 'var(--brand)') + '">' + svg(ICON[o.icon], 'big') + '<span class="v">' + o.v + '</span><span class="s">' + o.s + '</span></div></div></header>';
 }
 function pageHead(o) {
+  if (o.compact) return '<header class="hero hero-sm"><div class="wrap"><span class="eyebrow">' + o.eyebrow + '</span><h1 class="h1">' + o.h1 + '</h1>' + (o.lead ? '<p class="lead">' + o.lead + '</p>' : '') + '</div></header>';
   return '<header class="hero"' + (o.bg ? ' style="background:' + o.bg + ';' + (o.pb ? 'padding-bottom:' + o.pb : '') + '"' : (o.pb ? ' style="padding-bottom:' + o.pb + '"' : '')) + '><div class="wrap">' + crumbs(o.crumbs) +
     '<span class="eyebrow"' + (o.color ? ' style="color:' + o.color + '"' : '') + '>' + o.eyebrow + '</span><h1 class="h1"' + (o.w ? ' style="max-width:' + o.w + '"' : '') + '>' + o.h1 + '</h1>' + (o.lead ? '<p class="lead" style="margin-top:22px">' + o.lead + '</p>' : '') + '</div></header>';
 }
@@ -576,8 +577,8 @@ function explore() {
     wrapSec('<div class="two" style="align-items:center"><div><h2 class="h2">Not sure where to start?</h2></div><div class="btn-row">' + btn('Get Started', 'start') + btn('Contact Us', 'contact', 'btn-s') + '</div></div>', 'sec-soft');
 }
 function start() {
-  return pageHead({ crumbs: [['Home', 'home'], ['Get Started']], eyebrow: 'Get Started', h1: 'Where would you like to start?', w: '18ch', lead: "Pick one and we'll take you there.", pb: '56px' }) +
-    '<section class="sec" style="padding-top:48px"><div class="wrap" style="max-width:860px"><ul style="display:flex;flex-direction:column;gap:14px">' + P.map(function (p) {
+  return pageHead({ crumbs: [['Home', 'home'], ['Get Started']], eyebrow: 'Get Started', h1: 'Where would you like to start?', lead: "Pick one and we'll take you there.", compact: 1 }) +
+    '<section class="sec" style="padding-top:28px"><div class="wrap" style="max-width:860px"><ul style="display:flex;flex-direction:column;gap:14px">' + P.map(function (p) {
       return '<li><a class="card t-' + p.k + '" href="' + (p.k === 'academy' ? ACAD_URL : '#' + p.k) + '" style="flex-direction:row;align-items:center;gap:20px;padding:22px 26px">' + ico(p.k) + '<span style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-family:\'Bricolage Grotesque\',sans-serif;font-weight:700;font-size:24px;line-height:1.2;color:#10263D">' + SAY[p.k] + '</span><span class="mut">' + p.n + ' · ' + p.v + '</span></span><span class="linkbtn" aria-hidden="true">' + svg('M5 12h14M13 6l6 6-6 6') + '</span></a></li>';
     }).join('') + '</ul><p class="mut" style="margin-top:28px">Still not sure? <a href="#contact" style="color:var(--brand-d);font-weight:600">Contact us</a>.</p></div></section>';
 }
