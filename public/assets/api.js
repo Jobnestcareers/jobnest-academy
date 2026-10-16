@@ -16,11 +16,8 @@ const site = () => location.origin + location.pathname;
 async function call(path, { method = "POST", body, token, query = "" } = {}) {
   const res = await fetch(`${SUPABASE_URL}${path}${query}`, {
     method,
-    headers: {
-      apikey: SUPABASE_ANON_KEY,
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token || SUPABASE_ANON_KEY}`,
-    },
+    // The public key goes in "apikey" only; "Authorization" carries a signed-in staff member's session.
+    headers: { apikey: SUPABASE_ANON_KEY, "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const text = await res.text();
