@@ -578,7 +578,7 @@ function explore() {
 function start() {
   return pageHead({ crumbs: [['Home', 'home'], ['Get Started']], eyebrow: 'Get Started', h1: 'Where would you like to start?', w: '18ch', lead: "Pick one and we'll take you there.", pb: '56px' }) +
     '<section class="sec" style="padding-top:48px"><div class="wrap" style="max-width:860px"><ul style="display:flex;flex-direction:column;gap:14px">' + P.map(function (p) {
-      return '<li><a class="card t-' + p.k + '" href="#' + p.k + '" style="flex-direction:row;align-items:center;gap:20px;padding:22px 26px">' + ico(p.k) + '<span style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-family:\'Bricolage Grotesque\',sans-serif;font-weight:700;font-size:24px;line-height:1.2;color:#10263D">' + SAY[p.k] + '</span><span class="mut">' + p.n + ' · ' + p.v + '</span></span><span class="linkbtn" aria-hidden="true">' + svg('M5 12h14M13 6l6 6-6 6') + '</span></a></li>';
+      return '<li><a class="card t-' + p.k + '" href="' + (p.k === 'academy' ? ACAD_URL : '#' + p.k) + '" style="flex-direction:row;align-items:center;gap:20px;padding:22px 26px">' + ico(p.k) + '<span style="flex:1;display:flex;flex-direction:column;gap:2px"><span style="font-family:\'Bricolage Grotesque\',sans-serif;font-weight:700;font-size:24px;line-height:1.2;color:#10263D">' + SAY[p.k] + '</span><span class="mut">' + p.n + ' · ' + p.v + '</span></span><span class="linkbtn" aria-hidden="true">' + svg('M5 12h14M13 6l6 6-6 6') + '</span></a></li>';
     }).join('') + '</ul><p class="mut" style="margin-top:28px">Still not sure? <a href="#contact" style="color:var(--brand-d);font-weight:600">Contact us</a>.</p></div></section>';
 }
 function acadBand() {
