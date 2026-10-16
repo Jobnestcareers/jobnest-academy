@@ -1,0 +1,122 @@
+{
+ "received": {
+  "g": "Application",
+  "n": "Application received",
+  "s": "We've received your application ({ref})",
+  "b": "Hi {first},\n\nThank you for applying to the {programme}. Your application reference is {ref}.\n\nYour next step is a 10-minute readiness assessment on basic digital skills and communication. You can take it now or any time in the next 3 days."
+ },
+ "passed": {
+  "g": "Application",
+  "n": "Assessment passed",
+  "s": "You passed! Book your Discovery Call",
+  "b": "Hi {first},\n\nWell done: you scored {score}% on the readiness assessment.\n\nNext, book a 15-minute Discovery Call with Admissions. We'll talk about what you want to do and agree the track that fits you."
+ },
+ "failed": {
+  "g": "Application",
+  "n": "Assessment not passed",
+  "s": "Your readiness assessment result",
+  "b": "Hi {first},\n\nThank you for taking the readiness assessment. You scored {score}%, and the pass mark is {pass}%, so we can't move your application forward this time.\n\nYou're welcome to apply again for the next batch. Meanwhile, you can join the Jobnest Community waitlist on jobnestcareers.com. It opens soon, with resources and people building careers like you."
+ },
+ "times": {
+  "g": "Application",
+  "n": "New call times",
+  "s": "New Discovery Call times are available",
+  "b": "Hi {first},\n\nAdmissions has opened new times for Discovery Call 1. Pick the one that suits you; it takes 15 minutes."
+ },
+ "booked": {
+  "g": "Discovery Call",
+  "n": "Call booked",
+  "s": "Your Discovery Call is booked: {date}, {time} WAT",
+  "b": "Hi {first},\n\nYour 15-minute Discovery Call with {manager} is booked for {longdate} at {time} WAT.\n\nThe video link will be sent 30 minutes before the call. Come ready to talk about what you enjoy and what you want to do. This is where we agree your track together."
+ },
+ "callthanks": {
+  "g": "Discovery Call",
+  "n": "After the call",
+  "s": "Thanks for your Discovery Call",
+  "b": "Hi {first},\n\nThank you for the call. You agreed on the {track} track.\n\nAdmissions is now reviewing your application. You'll hear from us within 3 working days."
+ },
+ "notrack": {
+  "g": "Discovery Call",
+  "n": "No matching track",
+  "s": "Thank you for your Discovery Call",
+  "b": "Hi {first},\n\nThank you for your time on the call. You're interested in {interest}, and the {programme} doesn't offer that track yet.\n\nThis isn't a judgement of you. We've noted your interest and will invite you first if we launch it. No payment was taken.\n\nMeanwhile, you can join the Jobnest Community waitlist on jobnestcareers.com. It opens soon, with resources and people building careers like you."
+ },
+ "offer": {
+  "g": "Decision",
+  "n": "Offer of admission",
+  "s": "Your offer of admission: {track}",
+  "b": "Hi {first},\n\nCongratulations! You've been offered a place on the {track} track of the {programme}, {cohort}.\n\nTo accept, pay in full or the first of 2 instalments by {deadline}. After that the seat goes to the waitlist."
+ },
+ "waitlist_full": {
+  "g": "Decision",
+  "n": "Waitlisted (track full)",
+  "s": "You're on the waitlist",
+  "b": "Hi {first},\n\nThe {track} track is full right now, so you're on the waitlist. If a seat opens, we'll email you an offer straight away."
+ },
+ "waitlist": {
+  "g": "Decision",
+  "n": "Waitlisted",
+  "s": "You're on the waitlist",
+  "b": "Hi {first},\n\nThank you for your patience. You're on the waitlist for the {track} track, and we'll email you if a seat opens."
+ },
+ "notselected": {
+  "g": "Decision",
+  "n": "Not selected",
+  "s": "An update on your application",
+  "b": "Hi {first},\n\nThank you for applying. We're not able to offer you a place this time.\n\nYou're welcome to apply for the next batch."
+ },
+ "deferred": {
+  "g": "Decision",
+  "n": "Deferred",
+  "s": "Your application has moved to the next batch",
+  "b": "Hi {first},\n\nYour application has been moved to batch {batch}. We'll contact you when admissions for that batch open."
+ },
+ "reminder": {
+  "g": "Payment",
+  "n": "Payment reminder",
+  "s": "Reminder: your offer expires in {days}",
+  "b": "Hi {first},\n\nJust a reminder that your offer for the {track} track expires on {deadline}.\n\nYou can pay in full or in 2 instalments, and discount codes are applied at payment."
+ },
+ "expired": {
+  "g": "Payment",
+  "n": "Offer expired",
+  "s": "Your offer has expired",
+  "b": "Hi {first},\n\nYour offer for the {track} track has expired because payment wasn't made by {deadline}, so the seat has gone to someone on the waitlist.\n\nIf you'd still like a place, reply to this email and Admissions will let you know your options."
+ },
+ "declined": {
+  "g": "Payment",
+  "n": "Offer declined",
+  "s": "You've declined your offer",
+  "b": "Hi {first},\n\nWe've recorded that you declined your offer. Your seat will go to someone on the waitlist.\n\nIf your plans change, you're welcome to apply for the next batch."
+ },
+ "admitted": {
+  "g": "Payment",
+  "n": "Admitted",
+  "s": "Welcome to Jobnest Academy! Your matric number is {matric}",
+  "b": "Hi {first},\n\nPayment received: {amount}. You are now admitted into the {track} track of the {programme}, {cohort}.\n\nYour matric number is {matric}. Use the button below to set your password, then sign in to the student portal with your matric number and that password."
+ },
+ "invite": {
+  "g": "Waitlist & invites",
+  "n": "New track invite",
+  "s": "Good news: a {interest} track is opening",
+  "b": "Hi {first},\n\nWhen we spoke, you told us you're interested in {interest}. Jobnest Academy is opening a {interest} track, and you're one of the first people we're inviting.\n\nYour Zuri summary and call notes are saved, so applying takes about 5 minutes."
+ },
+ "apps_open": {
+  "g": "Waitlist & invites",
+  "n": "Applications open",
+  "s": "Applications for the {programme} are open",
+  "b": "Hi {first},\n\nYou asked us to tell you when applications open. They're open now.\n\nStart with a short chat with Zuri if you're not sure what you want to do yet, then apply in about 5 minutes."
+ },
+ "letter_admit": {
+  "g": "Letters",
+  "n": "Admission letter (after payment)",
+  "s": "Offer of Admission accepted",
+  "b": "Congratulations! You are now admitted into the {track} track of the Jobnest Academy {programme}, {cohort}.\n\nWe can't wait to see you build a career you're proud of."
+ },
+ "letter_offer": {
+  "g": "Letters",
+  "n": "Offer heading (application page)",
+  "s": "Congratulations, {first}! You've been offered a place.",
+  "b": "{track} track · {cohort}"
+ }
+}

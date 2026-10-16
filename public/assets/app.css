@@ -1,0 +1,20 @@
+/* Additions for the live app (on top of the prototype styles) */
+#app{min-height:100vh}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.8rem}
+.kpi{display:grid;gap:.3rem}.kpi b{font-size:1.6rem}
+.chips-row{display:flex;flex-wrap:wrap;gap:.45rem}
+.chip-cb{position:relative}
+.chip-cb input{position:absolute;opacity:0;pointer-events:none}
+.chip-cb span{display:inline-block;border:1.5px solid var(--line);border-radius:999px;padding:.4rem .8rem;font-size:.85rem;cursor:pointer;background:var(--surface)}
+.chip-cb input:checked+span{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.chip-cb input:focus-visible+span{outline:3px solid var(--accent);outline-offset:2px}
+.slot-list{list-style:none;margin:.6rem 0 0;padding:0;display:grid}
+.slot-list li{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.5rem 0;border-bottom:1px solid var(--line)}
+.mail-pre{white-space:pre-wrap;font:inherit;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:.9rem;margin:0 0 .6rem;max-height:420px;overflow:auto}
+.snav a.snav-i,.snav-m-list a.snav-i{text-decoration:none;color:inherit}
+.verify-f input[readonly]{font-family:var(--f-mono);font-size:.8rem}
+@media(max-width:600px){.shell-top .logo{white-space:normal;min-width:0;flex:1 1 200px;font-size:1rem;line-height:1.25}.choose2{grid-template-columns:1fr}}
+@media(max-width:640px){.tbl{min-width:0!important}.tbl thead{display:none}.tbl,.tbl tbody,.tbl tr,.tbl td{display:block;width:100%}
+.tbl tr{border:1px solid var(--line);border-radius:12px;padding:.55rem .85rem;margin:0 0 .6rem;background:var(--surface)}
+.tbl td{border:0!important;padding:.3rem 0!important}}
+a.btn{text-decoration:none}a.btn.ghost{color:var(--ink)}
