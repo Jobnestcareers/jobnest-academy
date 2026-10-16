@@ -1,0 +1,22 @@
+# Jobnest website (jobnestcareers.com). In Netlify, set Base directory to "website".
+[build]
+  publish = "."
+
+[[redirects]]
+  from = "/academy"
+  to = "https://academy.jobnestcareers.com"
+  status = 301
+
+[[redirects]]
+  from = "/programmes"
+  to = "https://academy.jobnestcareers.com"
+  status = 301
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+    Strict-Transport-Security = "max-age=31536000"
