@@ -78,3 +78,28 @@ a.btn{text-decoration:none}a.btn.ghost{color:var(--ink)}
 .arow.task>summary{grid-template-columns:minmax(0,1fr) auto}
 @media (max-width:600px){.arow.noav>summary{grid-template-columns:minmax(0,1fr) auto}.arow.noav .anext{grid-column:1/-1;grid-row:2}}
 .rec a,.abody a.link{overflow-wrap:anywhere}.arows>.arow{min-width:0;max-width:100%}
+
+/* show / hide password */
+.pw-wrap{position:relative;display:block}.pw-wrap input{width:100%;padding-right:2.9rem}
+.pw-eye{position:absolute;right:.35rem;top:50%;transform:translateY(-50%);width:2.4rem;height:2.4rem;border:0;background:none;color:var(--muted);border-radius:8px;display:grid;place-items:center;cursor:pointer}
+.pw-eye:hover,.pw-eye:focus-visible{background:var(--surface-2);color:var(--ink)}
+
+/* assessment timer */
+.timer-bar{position:sticky;top:0;z-index:20;background:var(--ink);color:#fff}
+.timer-bar .wrap{display:flex;align-items:center;gap:1rem;padding-block:.55rem;flex-wrap:wrap}
+.timer-bar b{font-size:1.35rem;letter-spacing:.04em;background:rgba(255,255,255,.12);border-radius:8px;padding:.1rem .6rem}
+.timer-bar .note{color:#C9D6E2;margin-left:auto}.timer-bar.warn{background:var(--danger)}
+.ticks{margin:0;padding-left:1.2rem;display:grid;gap:.45rem}
+
+/* loading */
+.skel{display:grid;gap:.8rem;padding:3rem 0}.skel i{display:block;height:1.1rem;border-radius:8px;background:linear-gradient(90deg,var(--surface-2),var(--line),var(--surface-2));background-size:200% 100%;animation:skel 1.2s linear infinite}
+.skel i:nth-child(1){width:40%;height:2rem}.skel i:nth-child(2){width:85%}.skel i:nth-child(3){width:65%}
+@keyframes skel{to{background-position:-200% 0}}
+.shell-main.is-loading{position:relative}.shell-main.is-loading::before{content:"";position:fixed;top:0;left:0;height:3px;width:40%;background:var(--accent);z-index:50;animation:bar 1s ease-in-out infinite}
+.shell-main.is-loading .pagebody{opacity:.55;pointer-events:none;transition:opacity .15s}
+@keyframes bar{0%{left:-40%}100%{left:100%}}
+button.snav-i{font:inherit}
+
+/* tour highlight */
+.snav.spot,.snav-m.spot{position:relative;z-index:31}
+@media (prefers-reduced-motion:reduce){.skel i,.shell-main.is-loading::before{animation:none}}

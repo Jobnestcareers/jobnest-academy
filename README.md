@@ -76,7 +76,9 @@ created by `netlify/functions/student-account.mjs` with the Supabase secret key,
 send them email. Staff add lessons, links and tasks under **Content**, mark work under **Grading**,
 schedule classes and take attendance under **Live sessions**, and post **Announcements**. A facilitator
 given a track under **Staff accounts** only sees and marks that track.
-Existing databases need `supabase/06_portal.sql` run once.
+Existing databases need `supabase/06_portal.sql` and then `supabase/07_timer_tour.sql` run once.
+The readiness assessment is timed (10 minutes by default, changeable in Settings): answers save as the
+applicant goes, and the every-minute job submits any assessment left open after time runs out.
 
 ## Testing locally
 Needs Postgres 16 and Python 3 with Playwright.
@@ -87,6 +89,7 @@ node dev/functions_server.mjs & # payment functions with a fake Paystack on :878
 bash dev/test_sql.sh            # database-level checks
 bash dev/test_pay.sh            # payments, matric numbers, expiry and reminders
 bash dev/test_portal.sh         # student portal, grading, attendance and track permissions
+bash dev/test_timer.sh          # timed assessment: saving, time-outs and auto-submit
 python3 dev/e2e.py 1280         # full journey in a browser, including paying (use 390 for phone)
 ```
 

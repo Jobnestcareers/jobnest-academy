@@ -53,7 +53,11 @@ function toast(msg) {
 const empty = (t) => `<p class="empty">${t}</p>`;
 const pill = (s) => `<span class="pill ${s === "Admitted" ? "ok" : BAD_ST.includes(s) ? "bad" : s === "Deferred" ? "" : "now"}">${esc(s)}</span>`;
 const go = (h) => { if (location.hash === h) route(); else location.hash = h; };
-const loading = () => { app.innerHTML = `<div class="wrap pub-wrap"><p class="note" style="padding:3rem 0">Loading…</p></div>`; };
+const loading = () => {
+  const main = $(".shell-main");
+  if (main) { main.classList.add("is-loading"); return; }
+  app.innerHTML = `<div class="wrap pub-wrap"><div class="skel" aria-label="Loading"><i></i><i></i><i></i></div></div>`;
+};
 async function busy(btn, fn) {
   if (ui.busy) return;
   ui.busy = true;
@@ -68,6 +72,18 @@ function myApp() { try { return JSON.parse(localStorage.getItem(MY_APP)); } catc
 async function info() { if (!INFO) INFO = await rpc("academy_info"); return INFO; }
 const prog = () => (INFO.programmes || []).find((p) => p.code === INFO.cohort?.programme_code) || INFO.programmes?.[0] || {};
 const appsOpen = () => !!INFO.cohort?.applications_open;
+
+/* ---------- show / hide passwords ---------- */
+const EYE = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>`;
+const EYE_OFF = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 3l18 18M10.6 5.1A9.9 9.9 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.8 0 3.4-.5 4.8-1.3M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>`;
+function addEyes() {
+  $$("input[type=password]:not([data-eye])").forEach((i) => {
+    i.dataset.eye = "1";
+    const w = document.createElement("span"); w.className = "pw-wrap"; i.parentNode.insertBefore(w, i); w.appendChild(i);
+    const b = document.createElement("button"); b.type = "button"; b.className = "pw-eye"; b.dataset.act = "eye"; b.setAttribute("aria-label", "Show password"); b.innerHTML = EYE; w.appendChild(b);
+  });
+}
+new MutationObserver(addEyes).observe(document.body, { childList: true, subtree: true });
 
 /* ---------- public site ---------- */
 function pubHeader(kind = "academy") {
@@ -192,7 +208,7 @@ const communityNote = () => `<p class="note">Meanwhile, you can join the Jobnest
 function statusCard(a, base) {
   let card = "";
   const tr = esc(a.track || "");
-  if (a.status === "Assessment pending") card = `<p>Your application is in. Next, take the 10-minute readiness assessment.</p><div><a class="btn gold" href="${base}/assess">${a.assessment_started ? "Continue assessment" : "Start assessment"}</a></div>`;
+  if (a.status === "Assessment pending") card = `<p>Your application is in. Next, take the ${INFO.cohort?.assess_minutes || 10}-minute readiness assessment.</p><div><a class="btn gold" href="${base}/assess">${a.assessment_started ? "Continue assessment" : "Go to the assessment"}</a></div>`;
   if (a.status === "Assessment failed") card = `<p>Thank you for applying. Your assessment score was <b>${a.score}%</b>, and the pass mark is ${a.pass_mark}%. You can apply again for the next batch.</p>${communityNote()}`;
   if (a.status === "Call to book") card = `<p>You passed the assessment with <b>${a.score}%</b>. Book your 15-minute Discovery Call.</p><div><a class="btn gold" href="${base}/book">Book Discovery Call 1</a></div>`;
   if (a.status === "Call booked") card = `<p>Your Discovery Call is booked for <b>${fmtLong(a.dc1_at)} at ${fmtTime(a.dc1_at)} WAT</b>${a.officer ? ` with ${esc(a.officer)}` : ""}. The video link will be sent to ${esc(a.email)}. This is where we agree your track together.</p>`;
@@ -271,14 +287,14 @@ async function startPay(btn) {
 async function pageApplicant(ref, token, view) {
   loading();
   let a;
-  try { a = await rpc("applicant_view", { p_ref: ref, p_token: token }); }
+  try { [a] = await Promise.all([rpc("applicant_view", { p_ref: ref, p_token: token }), info()]); }
   catch (e) {
     app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="card verify"><h1>We couldn't open that application</h1><p>${esc(e.message)}</p><div><a class="btn" href="#/check">Check an application</a></div></div></section>`;
     return;
   }
   saveMyApp(a.ref, token);
   const base = `#/a/${encodeURIComponent(a.ref)}/${encodeURIComponent(token)}`;
-  if (view === "assess" && a.status === "Assessment pending") return pageAssess(a, token, base);
+  if (view === "assess" && a.status === "Assessment pending") return a.assessment_started ? pageAssess(a, token, base) : pageAssessIntro(a, token, base);
   if (view === "book" && a.status === "Call to book") return pageBook(a, token, base);
   if (view === "letter" && a.status === "Admitted") return pageLetter(a, base);
   if (view === "account" && a.status === "Admitted") return pageAccount(a, base);
@@ -291,25 +307,64 @@ async function pageApplicant(ref, token, view) {
   </div></section>`;
 }
 
-async function pageAssess(a, token, base) {
-  let qs;
-  try { qs = await rpc("assessment_start", { p_ref: a.ref, p_token: token }); }
-  catch (e) { toast(e.message); return go(base); }
-  app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><form class="card form app-form" id="ready-form" data-ref="${esc(a.ref)}" data-token="${esc(token)}" novalidate>
-    <span class="eyebrow">Step 2 of 6 · Readiness assessment · about 10 minutes</span><h1>Readiness assessment</h1>
-    <p>Hi ${esc(a.first_name)}, this checks two things you'll use every day on the programme: <b>basic digital skills</b> and <b>clear communication</b>. There are ${qs.length} questions and you need ${a.pass_mark}% to continue. You get one attempt.</p>
-    <p class="note">Every applicant gets a different set of questions.</p>
-    ${qs.map((q, qi) => `<fieldset class="q"><legend>${qi + 1}. ${esc(q.q)}</legend>${q.o.map((o, oi) => `<label class="opt"><input type="radio" name="rq${qi}" value="${oi}"> ${esc(o)}</label>`).join("")}</fieldset>`).join("")}
-    <p class="err" id="rq-err" role="alert"></p><div><button class="btn gold" type="submit">Submit assessment</button></div></form></section>`;
+function pageAssessIntro(a, token, base) {
+  const m = INFO.cohort?.assess_minutes || 10, n = INFO.cohort?.questions || 10;
+  app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="card form app-form">
+    <span class="eyebrow">Step 2 of 6 · Readiness assessment</span><h1>Before you start</h1>
+    <p>Hi ${esc(a.first_name)}, this checks two things you'll use every day on the programme: <b>basic digital skills</b> and <b>clear communication</b>.</p>
+    <ul class="ticks"><li><b>${n} questions</b>, multiple choice. You need <b>${a.pass_mark}%</b> to continue.</li>
+      <li>You have <b>${m} minutes</b>. The timer starts when you press Start and keeps running if you leave the page.</li>
+      <li>Your answers are saved as you go. When time runs out, what you've answered is submitted automatically.</li>
+      <li>You get <b>one attempt</b>, so find a quiet spot with good internet first.</li></ul>
+    <div class="actions"><button class="btn gold" data-act="start-assess" data-ref="${esc(a.ref)}" data-token="${esc(token)}">Start the ${m}-minute assessment</button><a class="btn ghost" href="${base}">Not now</a></div></div></section>`;
 }
 
-async function submitAssess(form) {
+const AS = { timer: null, save: null };
+async function pageAssess(a, token, base) {
+  let d;
+  try { d = await rpc("assessment_start", { p_ref: a.ref, p_token: token }); }
+  catch (e) { toast(e.message); return go(base); }
+  if (d.finished) { toast(`Time ran out. You scored ${d.finished.score}%.`); return go(`${base}/${d.finished.passed ? "book" : "status"}`); }
+  const qs = d.questions, key = `jn.ans.${a.ref}`;
+  let saved = d.answers || [];
+  try { const loc = JSON.parse(localStorage.getItem(key) || "null"); if (loc && loc.filter((x) => x != null).length > saved.filter((x) => x != null).length) saved = loc; } catch { /* ignore */ }
+  const skew = Date.now() - new Date(d.now).getTime(), deadline = new Date(d.deadline).getTime() + skew;
+  app.innerHTML = pubHeader("admissions") + `<div class="timer-bar" id="timer-bar" role="timer" aria-live="off"><div class="wrap"><span>Readiness assessment</span><b class="mono" id="timer-left">--:--</b><span class="note" id="timer-ans"></span></div></div>
+    <section class="wrap pub-wrap"><form class="card form app-form" id="ready-form" data-ref="${esc(a.ref)}" data-token="${esc(token)}" novalidate>
+    <span class="eyebrow">Step 2 of 6 · Readiness assessment · ${d.minutes} minutes</span><h1>Readiness assessment</h1>
+    <p class="note">Every applicant gets a different set of questions. Your answers save automatically.</p>
+    ${qs.map((q, qi) => `<fieldset class="q"><legend>${qi + 1}. ${esc(q.q)}</legend>${q.o.map((o, oi) => `<label class="opt"><input type="radio" name="rq${qi}" value="${oi}" ${saved[qi] === oi ? "checked" : ""}> ${esc(o)}</label>`).join("")}</fieldset>`).join("")}
+    <p class="err" id="rq-err" role="alert"></p><div><button class="btn gold" type="submit">Submit assessment</button></div></form></section>`;
+  const form = $("#ready-form");
+  const answers = () => qs.map((_, i) => { const v = $(`input[name="rq${i}"]:checked`, form)?.value; return v == null ? null : +v; });
+  const count = () => { const n = answers().filter((x) => x != null).length; $("#timer-ans").textContent = `${n} of ${qs.length} answered`; };
+  form.addEventListener("change", () => {
+    const ans = answers(); count();
+    try { localStorage.setItem(key, JSON.stringify(ans)); } catch { /* ignore */ }
+    clearTimeout(AS.save); AS.save = setTimeout(() => rpc("assessment_save", { p_ref: a.ref, p_token: token, p_answers: ans }).catch(() => {}), 800);
+  });
+  count();
+  clearInterval(AS.timer);
+  const tick = async () => {
+    if (!document.body.contains(form)) return clearInterval(AS.timer);
+    const left = Math.max(0, Math.round((deadline - Date.now()) / 1000));
+    $("#timer-left").textContent = `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
+    $("#timer-bar").classList.toggle("warn", left <= 60);
+    if (left === 60) toast("1 minute left");
+    if (left <= 0) { clearInterval(AS.timer); toast("Time's up. Submitting your answers…"); await submitAssess(form, true).catch(() => {}); }
+  };
+  tick(); AS.timer = setInterval(tick, 1000);
+}
+
+async function submitAssess(form, timeUp = false) {
   const n = $$("fieldset.q", form).length;
-  const ans = [...Array(n)].map((_, i) => $(`input[name="rq${i}"]:checked`, form)?.value);
+  const ans = [...Array(n)].map((_, i) => { const v = $(`input[name="rq${i}"]:checked`, form)?.value; return v == null ? null : +v; });
   const left = ans.filter((x) => x == null).length;
-  if (left) { $("#rq-err").textContent = `Answer every question (${left} left).`; return; }
+  if (left && !timeUp) { $("#rq-err").textContent = `Answer every question (${left} left).`; return; }
   const ref = form.dataset.ref, token = form.dataset.token;
-  const res = await busy(form.querySelector("button[type=submit]"), () => rpc("assessment_submit", { p_ref: ref, p_token: token, p_answers: ans.map(Number) }));
+  clearInterval(AS.timer); clearTimeout(AS.save);
+  const res = await busy(form.querySelector("button[type=submit]"), () => rpc("assessment_submit", { p_ref: ref, p_token: token, p_answers: ans }));
+  try { localStorage.removeItem(`jn.ans.${ref}`); } catch { /* ignore */ }
   toast(res.passed ? `You passed with ${res.score}%. Book your call next.` : `You scored ${res.score}%.`);
   go(`#/a/${ref}/${token}/${res.passed ? "book" : "status"}`);
 }
@@ -388,7 +443,8 @@ function staffNav(role) {
 function shell(tab, title, sub, body) {
   const items = staffNav(ME.role);
   const cur = items.find((x) => x.k === tab);
-  const nav = items.map((x) => x.g ? `<p class="snav-g">${x.g}</p>` : `<a class="snav-i" href="#/portal/${x.k}" aria-current="${x.k === tab ? "page" : "false"}"><span>${x.l}</span></a>`).join("");
+  const nav = items.map((x) => x.g ? `<p class="snav-g">${x.g}</p>` : `<a class="snav-i" href="#/portal/${x.k}" aria-current="${x.k === tab ? "page" : "false"}"><span>${x.l}</span></a>`).join("")
+    + `<p class="snav-g">${esc(ME.name)}</p><button class="snav-i" data-act="signout"><span>Sign out</span></button>`;
   const brand = ["adm_officer", "adm_admin"].includes(ME.role) ? "Jobnest Admissions" : ME.role === "super" ? "Jobnest" : "Jobnest Academy";
   app.innerHTML = `<header class="adm-top role-top"><div class="shell-top"><div class="logo">${LOGO}${brand} · ${ROLE_NAMES[ME.role]}</div>
     <div class="shell-tr"><span class="note" style="color:#C9D6E2">${esc(ME.name)}</span><button class="btn sm ghost" data-act="signout">Sign out</button></div></div></header>
@@ -402,7 +458,7 @@ async function pagePortal(tab) {
   if (!auth.session) return go("#/staff");
   if (isStudent()) return go("#/learn");
   loading();
-  try { ME = await rpc("me"); } catch (e) { if (e.status === 401) { await auth.signOut(); return pageStaffSignIn("Your session ended. Please sign in again."); } throw e; }
+  try { if (!ME || ME.email !== auth.session.email) ME = await rpc("me"); } catch (e) { if (e.status === 401) { await auth.signOut(); return pageStaffSignIn("Your session ended. Please sign in again."); } throw e; }
   if (!ME) {
     app.innerHTML = staffCard(`<h1>No staff access yet</h1><p>You're signed in as <b>${esc(auth.session?.email || "")}</b>, but this email hasn't been added as staff. Ask the Super Admin to add you, then sign in again.</p><div class="actions"><button class="btn ghost" data-act="signout">Sign out</button></div>`);
     return;
@@ -645,10 +701,11 @@ function pageLearnSignIn(msg = "") {
     <form id="lsignin-form" class="form" novalidate><div class="field"><label for="ls-m">Matric number</label><input id="ls-m" placeholder="GEP/27A/001" autocomplete="username" autocapitalize="characters"></div>
     <div class="field"><label for="ls-p">Password</label><input id="ls-p" type="password" autocomplete="current-password"></div>
     <p class="err" id="ls-err" role="alert"></p><div><button class="btn" type="submit">Sign in</button></div></form>
-    <p class="note"><a class="link" href="#/learn/forgot">Forgot your password?</a> · First time? Use <b>Set up my account</b> in your email, or open your application page.</p>`);
+    <div class="notice"><span><b>First time here, or forgot your password?</b> We'll email you a link to set it.</span><a class="btn sm ghost" href="#/learn/forgot">Get a link</a></div>
+    <p class="note">Your matric number is in your admission email, and looks like GEP/27A/001.</p>`);
 }
 function pageLearnForgot() {
-  app.innerHTML = learnCard(`<span class="eyebrow">Student portal</span><h1>Reset your password</h1><p class="note">We'll email a link to the address you applied with.</p>
+  app.innerHTML = learnCard(`<span class="eyebrow">Student portal</span><h1>Set your password</h1><p class="note">First time, or forgot your password? Enter your matric number and we'll email a link to the address you applied with.</p>
     <form id="lforgot-form" class="form" novalidate><div class="field"><label for="lf-m">Matric number</label><input id="lf-m" placeholder="GEP/27A/001" autocapitalize="characters"></div>
     <p class="err" id="lf-err" role="alert"></p><div><button class="btn" type="submit">Email me a link</button></div></form>
     <p class="note"><a class="link" href="#/learn/signin">Back to sign in</a></p>`);
@@ -658,7 +715,8 @@ function campusShell(tab, title, sub, body) {
   const me = CAMPUS.me;
   const items = [["home", "Home"], ["weeks", "Weeks"], ["tasks", "Tasks"], ["sessions", "Live sessions"], ["news", "Announcements"]];
   const todo = CAMPUS.tasks.filter((t) => !t.sub || t.sub.status === "redo").length;
-  const nav = items.map(([k, l]) => `<a class="snav-i" href="#/learn/${k}" aria-current="${k === tab ? "page" : "false"}"><span>${l}</span>${k === "tasks" && todo ? `<b class="cnt-b mono">${todo}</b>` : ""}</a>`).join("");
+  const nav = items.map(([k, l]) => `<a class="snav-i" href="#/learn/${k}" aria-current="${k === tab ? "page" : "false"}"><span>${l}</span>${k === "tasks" && todo ? `<b class="cnt-b mono">${todo}</b>` : ""}</a>`).join("")
+    + `<p class="snav-g">${esc(me.matric)}</p><button class="snav-i" data-act="tour"><span>Take the tour again</span></button><button class="snav-i" data-act="signout-learn"><span>Sign out</span></button>`;
   app.innerHTML = `<header class="adm-top role-top"><div class="shell-top"><div class="logo">${LOGO}Jobnest Academy · Student</div>
     <div class="shell-tr"><span class="note" style="color:#C9D6E2">${esc(me.first_name)} · <span class="mono">${esc(me.matric)}</span></span><button class="btn sm ghost" data-act="signout-learn">Sign out</button></div></div></header>
     <div class="shell"><aside class="snav" aria-label="Menu"><p class="snav-g">${esc(me.track || "")}</p>${nav}</aside>
@@ -693,7 +751,8 @@ async function pageLearn(tab) {
   if (!auth.session) return pageLearnSignIn();
   if (!isStudent()) { app.innerHTML = learnCard(`<h1>You're signed in as staff</h1><p>Sign out first to use the student portal.</p><div class="actions"><a class="btn" href="#/portal">Go to the staff portal</a><button class="btn ghost" data-act="signout-learn">Sign out</button></div>`); return; }
   loading();
-  try { CAMPUS = await rpc("student_campus"); }
+  let extra = {};
+  try { [CAMPUS, extra] = await Promise.all([rpc("student_campus"), rpc("student_campus_extra").catch(() => ({}))]); }
   catch (e) { if (e.status === 401 || /sign in/i.test(e.message)) { await auth.signOut(); return pageLearnSignIn("Please sign in again."); } throw e; }
   const C = CAMPUS, w = C.week, weeks = C.cohort.weeks;
   const tab_ = ["home", "weeks", "tasks", "sessions", "news"].includes(tab) ? tab : "home";
@@ -704,13 +763,14 @@ async function pageLearn(tab) {
     const days = Math.ceil((new Date(C.cohort.start_date + "T00:00:00+01:00") - Date.now()) / 864e5);
     const thisWeek = Math.min(Math.max(w, 1), weeks);
     const L = C.lessons.filter((l) => l.week === thisWeek);
-    const head = w < 1 ? `<div class="card hero-c"><span class="eyebrow">Before you start</span><h2>${days} day${days === 1 ? "" : "s"} to go</h2><p>${esc(C.cohort.name)} starts on <b>${fmtDateD(C.cohort.start_date)}</b> with Week 1: Orientation. Week 1 opens here on the Saturday before.</p></div>`
-      : w > weeks ? `<div class="card hero-c"><span class="eyebrow">Programme complete</span><h2>You made it 🎉</h2><p>Your lessons and work stay here for you to look back on.</p></div>`
-      : `<div class="card hero-c"><span class="eyebrow">Week ${w} of ${weeks}</span><h2>${esc(stageOf(w))}</h2><div class="wbar" aria-label="Progress"><i style="width:${(w / weeks) * 100}%"></i></div></div>`;
+    const head = w < 1 ? `<div class="card hero-c" id="t-week"><span class="eyebrow">Before you start</span><h2>${days} day${days === 1 ? "" : "s"} to go</h2><p>${esc(C.cohort.name)} starts on <b>${fmtDateD(C.cohort.start_date)}</b> with Week 1: Orientation. Week 1 opens here on the Saturday before.</p></div>`
+      : w > weeks ? `<div class="card hero-c" id="t-week"><span class="eyebrow">Programme complete</span><h2>You made it 🎉</h2><p>Your lessons and work stay here for you to look back on.</p></div>`
+      : `<div class="card hero-c" id="t-week"><span class="eyebrow">Week ${w} of ${weeks}</span><h2>${esc(stageOf(w))}</h2><div class="wbar" aria-label="Progress"><i style="width:${(w / weeks) * 100}%"></i></div></div>`;
+    setTimeout(() => { let seen = false; try { seen = localStorage.getItem("jn.tour." + C.me.matric) === "1"; } catch { /* ignore */ } if ((ui.wantTour || (!extra.tour_done && !seen)) && TOUR_I == null) { ui.wantTour = false; startTour(); } }, 50);
     campusShell("home", `Hi ${esc(C.me.first_name)}`, "", `${bal}${head}<div class="grid2" style="margin-top:1rem">
-      <div class="card"><div class="ch"><h3>This week's lessons</h3><a class="link sm" href="#/learn/weeks">All weeks →</a></div>${L.length ? `<ul class="lessons">${L.map(lessonItem).join("")}</ul>` : empty(C.open_weeks ? "Lessons for this week will appear here." : "Week 1 opens on the Saturday before the start date.")}</div>
-      <div class="stack"><div class="card"><div class="ch"><h3>Next live session</h3><a class="link sm" href="#/learn/sessions">All →</a></div>${upcoming.length ? `<ul class="sess-list">${sessionRow(upcoming[0])}</ul>` : empty("No sessions scheduled yet.")}</div>
-        <div class="card"><div class="ch"><h3>Tasks to do</h3><a class="link sm" href="#/learn/tasks">All →</a></div>${todo.length ? `<ul class="lessons">${todo.slice(0, 4).map((t) => `<li class="lesson"><span class="lk" aria-hidden="true">📝</span><div><a class="link" href="#/learn/tasks"><b>${esc(t.title)}</b></a><span class="note" style="display:block">Due ${fmtAt(t.due_at)} WAT</span></div>${subPill(t)}</li>`).join("")}</ul>` : empty("Nothing to hand in right now.")}</div>
+      <div class="card" id="t-lessons"><div class="ch"><h3>This week's lessons</h3><a class="link sm" href="#/learn/weeks">All weeks →</a></div>${L.length ? `<ul class="lessons">${L.map(lessonItem).join("")}</ul>` : empty(C.open_weeks ? "Lessons for this week will appear here." : "Week 1 opens on the Saturday before the start date.")}</div>
+      <div class="stack"><div class="card" id="t-session"><div class="ch"><h3>Next live session</h3><a class="link sm" href="#/learn/sessions">All →</a></div>${upcoming.length ? `<ul class="sess-list">${sessionRow(upcoming[0])}</ul>` : empty("No sessions scheduled yet.")}</div>
+        <div class="card" id="t-tasks"><div class="ch"><h3>Tasks to do</h3><a class="link sm" href="#/learn/tasks">All →</a></div>${todo.length ? `<ul class="lessons">${todo.slice(0, 4).map((t) => `<li class="lesson"><span class="lk" aria-hidden="true">📝</span><div><a class="link" href="#/learn/tasks"><b>${esc(t.title)}</b></a><span class="note" style="display:block">Due ${fmtAt(t.due_at)} WAT</span></div>${subPill(t)}</li>`).join("")}</ul>` : empty("Nothing to hand in right now.")}</div>
         ${C.news[0] ? `<div class="card"><div class="ch"><h3>Latest announcement</h3><a class="link sm" href="#/learn/news">All →</a></div><p><b>${esc(C.news[0].title)}</b></p><p class="note">${lines(C.news[0].body).slice(0, 400)}</p></div>` : ""}</div></div>`);
   }
   if (tab_ === "weeks") {
@@ -736,6 +796,44 @@ async function pageLearn(tab) {
   if (tab_ === "news") {
     campusShell("news", "Announcements", "", C.news.length ? `<div class="stack">${C.news.map((n) => `<article class="card"><span class="eyebrow">${fmtAt(n.at)} · ${esc(n.by)}</span><h3 style="margin:.4rem 0">${esc(n.title)}</h3><p>${lines(n.body)}</p></article>`).join("")}</div>` : `<div class="card">${empty("No announcements yet.")}</div>`);
   }
+}
+
+/* ---------- welcome tour (student portal) ---------- */
+const TOUR = [
+  { t: "Welcome to your student portal", b: "Here's a quick look around. It takes less than a minute." },
+  { t: "Where you are", b: "Your week and stage of the programme. Before the start date, this counts down the days.", sel: "#t-week" },
+  { t: "This week's lessons", b: "Videos, readings and links for the week. Tap Open to start one. Each week opens on the Saturday before it starts.", sel: "#t-lessons" },
+  { t: "Live sessions", b: "Join classes from here. Joining through the portal records your attendance.", sel: "#t-session" },
+  { t: "Tasks", b: "Hand in each task by pasting a link to your work. Your facilitator marks it and you'll get an email with feedback.", sel: "#t-tasks" },
+  { t: "Your menu", b: "Weeks, Tasks, Live sessions and Announcements are all here. On a phone, tap Menu at the top.", sel: [".snav", ".snav-m"] },
+  { t: "You're all set", b: "Sign out from the top bar or the menu. You can take this tour again from the menu any time." },
+];
+let TOUR_I = null;
+function clearSpot() { $$(".spot").forEach((x) => x.classList.remove("spot")); }
+function startTour() { if (!$("#t-week")) { ui.wantTour = true; return go("#/learn/home"); } TOUR_I = 0; $("#toast").hidden = true; clearTimeout(toast.t); renderTour(); }
+function renderTour() {
+  clearSpot();
+  let root = $("#tour-root");
+  if (!root) { root = document.createElement("div"); root.id = "tour-root"; document.body.appendChild(root); }
+  if (TOUR_I == null) { root.innerHTML = ""; return; }
+  const i = TOUR_I, st = TOUR[i], last = i === TOUR.length - 1;
+  let low = false;
+  if (st.sel) {
+    const el = [].concat(st.sel).map((x) => $(x)).find((x) => x && x.offsetParent !== null);
+    if (el) { el.classList.add("spot"); el.scrollIntoView({ block: "center", behavior: "smooth" }); low = true; }
+  }
+  root.innerHTML = `<div class="scrim"></div><div class="tour ${low ? "low" : ""}" role="dialog" aria-modal="true" aria-labelledby="tour-t">
+    <div class="hd"><span class="badge">${i + 1} of ${TOUR.length}</span><button class="x" data-act="tour-end" aria-label="Close tour">✕</button></div>
+    <h2 id="tour-t">${st.t}</h2><p>${st.b}</p>
+    <div class="dots" aria-hidden="true">${TOUR.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div>
+    <div class="ft">${i > 0 ? `<button class="skip" data-act="tour-back">Back</button>` : `<button class="skip" data-act="tour-end">Skip tour</button>`}
+    <button class="btn" data-act="${last ? "tour-end" : "tour-next"}" id="tour-next">${last ? "Get started" : "Next →"}</button></div></div>`;
+  $("#tour-next").focus({ preventScroll: true });
+}
+function endTour() {
+  TOUR_I = null; renderTour(); window.scrollTo({ top: 0, behavior: "smooth" });
+  try { localStorage.setItem("jn.tour." + (CAMPUS?.me?.matric || ""), "1"); } catch { /* ignore */ }
+  rpc("student_tour_done").catch(() => {});
 }
 
 /* ---------- staff: academy ---------- */
@@ -855,6 +953,7 @@ document.addEventListener("click", async (e) => {
   const t = e.target.closest("[data-act]");
   if (!t) return;
   const a = t.dataset.act, k = t.dataset.k;
+  if (a === "eye") { const i = t.parentNode.querySelector("input"); const show = i.type === "password"; i.type = show ? "text" : "password"; t.innerHTML = show ? EYE_OFF : EYE; t.setAttribute("aria-label", show ? "Hide password" : "Show password"); return; }
   if (a === "signout") { await auth.signOut(); ME = null; return go("#/staff"); }
   if (a === "copy-link") { const i = $("#my-link"); i.select(); try { await navigator.clipboard.writeText(i.value); } catch { document.execCommand("copy"); } return toast("Link copied"); }
   if (a === "pick-day") { ui.pick = { day: k, slot: null }; return route(); }
@@ -881,7 +980,12 @@ document.addEventListener("click", async (e) => {
   if (a === "retry-mail") { await busy(t, () => rpc("admin_retry_email", { p_id: +k })); toast("Will try again within a minute"); return route(); }
   if (a === "mark-sent") { await busy(t, () => rpc("admin_mark_sent", { p_id: +k })); toast("Marked as sent"); return route(); }
   if (a === "pay") { try { await startPay(t); } catch { /* shown */ } return; }
-  if (a === "signout-learn") { await auth.signOut(); CAMPUS = null; return go("#/learn/signin"); }
+  if (a === "start-assess") { t.disabled = true; t.textContent = "Starting…"; const base = `#/a/${t.dataset.ref}/${t.dataset.token}`; return pageAssess({ ref: t.dataset.ref }, t.dataset.token, base); }
+  if (a === "signout-learn") { TOUR_I = null; renderTour(); await auth.signOut(); CAMPUS = null; return go("#/learn/signin"); }
+  if (a === "tour") { $$("details.snav-m").forEach((d) => (d.open = false)); return startTour(); }
+  if (a === "tour-next") { TOUR_I++; return renderTour(); }
+  if (a === "tour-back") { TOUR_I--; return renderTour(); }
+  if (a === "tour-end") return endTour();
   if (a === "join") {
     const w = window.open("", "_blank");
     try { const link = await rpc("student_join", { p_session: +k }); if (w) w.location = link; else location.href = link; } catch (err) { if (w) w.close(); toast(err.message); }
@@ -1094,6 +1198,7 @@ document.addEventListener("submit", async (e) => {
 
 /* ---------- router ---------- */
 async function route() {
+  if (TOUR_I != null && !location.hash.startsWith("#/learn")) { TOUR_I = null; renderTour(); }
   const back = auth.takeFromUrl();
   if (back) {
     history.replaceState(null, "", location.pathname + (back.type === "recovery" ? "#/staff/new-password" : back.error ? "#/staff" : "#/portal"));
@@ -1115,8 +1220,8 @@ async function route() {
       if (p1 === "forgot") return pageLearnForgot();
       return pageLearn(p1 || "home");
     }
-    await info();
     if (p0 === "a" && p1 && p2) return pageApplicant(p1, p2, p3 || "");
+    await info();
     if (p0 === "gep") return pageGep();
     if (p0 === "start") return pageStart();
     if (p0 === "apply") return pageApply();

@@ -11,7 +11,7 @@ REF=$(echo $R | python3 -c "import json,sys;print(json.load(sys.stdin)['ref'])")
 echo "dup check: $(anon "select submit_application('{\"first_name\":\"Ada\",\"surname\":\"Obi\",\"email\":\"ADA@test.ng\",\"phone\":\"0803\",\"city\":\"Lagos\",\"edu\":\"HND\",\"nysc\":\"Completed\",\"situation\":\"x\",\"hours\":\"Yes\",\"laptop\":\"Yes\",\"internet\":\"Yes\",\"motivation\":\"x\"}')" 2>&1 | tail -1)"
 echo "table blocked: $(anon "select count(*) from applications" 2>&1 | tail -1)"
 echo "find: $(anon "select applicant_find('$REF','ada@test.ng')->>'ref'" | tail -1)"
-Q=$(anon "select assessment_start('$REF','$TOK')" | tail -1); echo "questions: $(echo $Q | python3 -c 'import json,sys;q=json.load(sys.stdin);print(len(q),"keys",sorted(q[0].keys()))')"
+Q=$(anon "select assessment_start('$REF','$TOK')" | tail -1); echo "questions: $(echo $Q | python3 -c 'import json,sys;q=json.load(sys.stdin);qs=q["questions"];print(len(qs),"keys",sorted(qs[0].keys()),"minutes",q["minutes"])')"
 # answer correctly using the stored key (test only)
 ANS=$($P -c "select jsonb_agg((x->>'a')::int) from applications, jsonb_array_elements(qset) x where ref='$REF'")
 echo "submit: $(anon "select assessment_submit('$REF','$TOK','$ANS')" | tail -1)"
