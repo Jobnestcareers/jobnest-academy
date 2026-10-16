@@ -38,7 +38,7 @@ a.card.t-recruit{background:color-mix(in srgb,var(--c-recruit) 5%,#fff);border-c
 .sec-dark{background:var(--navy);color:#fff}.sec-dark .lead{color:#C9D6E2}.sec-dark .eyebrow{color:var(--gold)}
 .sec-dark :focus-visible{outline-color:var(--gold)}
 .eyebrow{font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--brand-d);margin-bottom:14px;display:block}
-.h1{font-size:clamp(38px,5.2vw,66px)}.hero.hero-sm{padding:40px 0 28px!important}.hero-sm .h1{font-size:clamp(28px,3.4vw,40px);max-width:none}.hero-sm .lead{margin-top:10px;font-size:18px}.hero-sm .eyebrow{margin-bottom:10px}.h2{font-size:clamp(30px,3.6vw,44px)}.h3{font-size:clamp(22px,2vw,26px)}
+.h1{font-size:clamp(38px,5.2vw,66px)}.hero.hero-sm{padding:40px 0 28px!important}.hero.hero-md{padding:56px 0 48px!important}.hero-md .h1{font-size:clamp(32px,4.4vw,54px);max-width:20ch}.hero-md .lead{margin-top:14px}.hero-md .eyebrow{margin-bottom:12px}.hero-sm .h1{font-size:clamp(28px,3.4vw,40px);max-width:none}.hero-sm .lead{margin-top:10px;font-size:18px}.hero-sm .eyebrow{margin-bottom:10px}.h2{font-size:clamp(30px,3.6vw,44px)}.h3{font-size:clamp(22px,2vw,26px)}
 .lead{font-size:clamp(18px,1.6vw,21px);color:var(--mut);max-width:62ch}
 .sec-head{display:flex;flex-direction:column;gap:14px;margin-bottom:44px;max-width:760px}
 .mut{color:var(--mut)}
@@ -342,7 +342,7 @@ function pHero(o) {
     '<div class="hero-art" role="img" aria-label="' + o.alt + '" style="background:' + (o.icon === 'academy' ? 'var(--c-academy)' : o.icon === 'community' ? 'var(--c-community)' : o.icon === 'careers' ? 'var(--c-careers)' : o.icon === 'recruit' ? 'var(--c-recruit)' : o.icon === 'business' ? 'var(--c-business)' : 'var(--brand)') + '">' + svg(ICON[o.icon], 'big') + '<span class="v">' + o.v + '</span><span class="s">' + o.s + '</span></div></div></header>';
 }
 function pageHead(o) {
-  if (o.compact) return '<header class="hero hero-sm"><div class="wrap"><span class="eyebrow">' + o.eyebrow + '</span><h1 class="h1">' + o.h1 + '</h1>' + (o.lead ? '<p class="lead">' + o.lead + '</p>' : '') + '</div></header>';
+  if (o.compact) return '<header class="hero ' + (o.compact === 'md' ? 'hero-md' : 'hero-sm') + '"><div class="wrap"><span class="eyebrow">' + o.eyebrow + '</span><h1 class="h1">' + o.h1 + '</h1>' + (o.lead ? '<p class="lead">' + o.lead + '</p>' : '') + '</div></header>';
   return '<header class="hero"' + (o.bg ? ' style="background:' + o.bg + ';' + (o.pb ? 'padding-bottom:' + o.pb : '') + '"' : (o.pb ? ' style="padding-bottom:' + o.pb + '"' : '')) + '><div class="wrap">' + crumbs(o.crumbs) +
     '<span class="eyebrow"' + (o.color ? ' style="color:' + o.color + '"' : '') + '>' + o.eyebrow + '</span><h1 class="h1"' + (o.w ? ' style="max-width:' + o.w + '"' : '') + '>' + o.h1 + '</h1>' + (o.lead ? '<p class="lead" style="margin-top:22px">' + o.lead + '</p>' : '') + '</div></header>';
 }
@@ -570,7 +570,7 @@ function home() {
     wrapSec('<div class="cta-band"><h2 class="h2">Ready for your next step?</h2><div class="btn-row">' + btn('Get Started', 'start', 'btn-g') + btn('Contact Us', 'contact', 'btn-o') + '</div></div>', '', 'padding-top:0');
 }
 function explore() {
-  return pageHead({ crumbs: [['Home', 'home'], ['Explore Jobnest']], eyebrow: 'Explore Jobnest', h1: 'Everything Jobnest offers.', w: '16ch', lead: 'Learning, community, opportunities and hiring, in one place.' }) +
+  return pageHead({ crumbs: [['Home', 'home'], ['Explore Jobnest']], eyebrow: 'Explore Jobnest', h1: 'Everything Jobnest offers.', lead: 'Learning, community, opportunities and hiring, in one place.', compact: 1 }) +
     wrapSec('<h2 class="sr">The five Jobnest pillars</h2><div class="eco" role="group" aria-label="The Jobnest ecosystem"><p class="eco-l eco-l1">For people building careers</p><p class="eco-l eco-l2">For organisations</p>' + P.map(function (p) {
       return '<a class="card t-' + p.k + '" href="#' + p.k + '" style="background:var(--soft);border-color:transparent">' + ico(p.k, 'background:#fff') + '<span class="verb">' + p.v + '</span><h3>' + p.n + '</h3><p>' + p.d + '</p><span class="linkbtn" style="margin-top:auto">' + p.c + AR + '</span></a>';
     }).join('') + '</div><div class="bridge"><div style="max-width:60ch"><h2 class="h3" style="color:#fff">Looking for work, or looking to hire?</h2></div><div class="btn-row">' + btn('Find Opportunities', 'careers', 'btn-g') + btn('Hire Talent', 'recruit', 'btn-o') + '</div></div>', '') +
@@ -660,7 +660,7 @@ function teamHTML() {
   }).join('') + '';
 }
 function about() {
-  return pageHead({ crumbs: [['Home', 'home'], ['About Us']], eyebrow: 'About Us', h1: 'Helping people build careers they are proud of.', w: '18ch' }) +
+  return pageHead({ crumbs: [['Home', 'home'], ['About Us']], eyebrow: 'About Us', h1: 'Helping people build careers they are proud of.', compact: 'md' }) +
     wrapSec('<div class="two"><div><span class="eyebrow">Our story</span><h2 class="h2">Why Jobnest Exists</h2></div><div class="pg"><p class="h3" style="margin-bottom:20px">A degree alone doesn\'t get you hired.</p><p class="mut">Many graduates don\'t know which path fits, or how to show what they can do. Employers struggle to find people who are ready.</p><p><b>Jobnest bridges that gap</b>, with learning, community, opportunities and hiring in one place.</p></div></div>', '', '', 'story') +
     wrapSec('<div class="sec-head"><span class="eyebrow">Our approach</span><h2 class="h2">Learn. Build. Connect. Grow.</h2></div><div class="two" id="appr" style="gap:32px;align-items:stretch">' + apprHTML() + '</div>', 'sec-soft', '', 'approach') +
     wrapSec('<div class="two"><div><span class="eyebrow">Our mission</span><p class="h2" style="font-family:\'Bricolage Grotesque\',sans-serif">To help people become employable and build careers they are proud of.</p></div><div><span class="eyebrow">Our vision</span><p class="h2" style="font-family:\'Bricolage Grotesque\',sans-serif">To build a trusted career ecosystem that helps people develop professionally and connects talent with opportunities.</p></div></div>', 'sec-dark') +
@@ -671,7 +671,7 @@ function about() {
     wrapSec('<div class="cta-band"><span class="eyebrow" style="color:var(--gold);margin:0">Start your journey</span><h2 class="h2">There\'s a place for you at Jobnest.</h2><div class="btn-row">' + btn('Explore Jobnest', 'explore', 'btn-g') + btn('Get Started', 'start', 'btn-o') + '</div></div>', '', 'padding-top:0');
 }
 function contact() {
-  return pageHead({ crumbs: [['Home', 'home'], ['Contact']], eyebrow: 'Contact', h1: "Let's Talk.", lead: "Questions, partnerships or anything else, we'd love to hear from you.", pb: '56px' }) +
+  return pageHead({ crumbs: [['Home', 'home'], ['Contact']], eyebrow: 'Contact', h1: "Let's Talk.", lead: "Questions, partnerships or anything else, we'd love to hear from you.", compact: 1 }) +
     '<section class="sec" style="padding-top:56px"><div class="wrap two" style="grid-template-columns:minmax(0,1.5fr) minmax(0,1fr)">' + '<div class="formcard" style="display:flex;flex-direction:column;gap:16px;align-items:flex-start;justify-content:center"><h2 class="h3">Send us a message</h2><p class="mut">Tell us what you need and we\'ll reply by email.</p>' + fcta('contact', '', 'Send a Message') + '</div>' + '<aside style="display:flex;flex-direction:column;gap:24px"><div class="card"><h2 class="h3">What can we help with?</h2><div class="chips">' + ['Academy', 'Community', 'Careers', 'Recruitment', 'Business', 'Partnership', 'General enquiry'].map(function (t) { return '<span class="chip">' + t + '</span>'; }).join('') + '</div></div><div class="card"><h2 class="h3">Email us directly</h2><p><a href="mailto:info@jobnestcareers.com" style="color:var(--brand-d);font-weight:600;overflow-wrap:anywhere">info@jobnestcareers.com</a></p></div></aside></div></section>';
 }
 
