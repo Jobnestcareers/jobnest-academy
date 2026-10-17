@@ -637,7 +637,7 @@ async function tabEmails() {
 }
 
 async function tabSettings() {
-  const s = await rpc("admin_settings");
+  const [s, unlocked] = await Promise.all([rpc("admin_settings"), rpc("admin_test_unlock", {}).catch(() => false)]);
   const c = s.cohort, p = s.programme;
   const f = (id, label, val, attrs = "") => `<div class="field"><label for="${id}">${label}</label><input id="${id}" value="${esc(val ?? "")}" ${attrs}></div>`;
   shell("settings", "Settings", "Changes apply straight away to the Academy site and admissions.",
@@ -651,6 +651,9 @@ async function tabSettings() {
       <div class="card"><h3>Fee</h3><div class="grid2">${f("st-fee", "Full fee (₦)", p.fee, 'type="number" min="0" step="1000"')}${f("st-pct", "Extra for 2 instalments (%)", p.inst_pct, 'type="number" min="0" max="50"')}</div><p class="note">2 instalments total: ${naira(p.inst_total)}</p></div>
       <div class="card"><h3>Seats by track</h3>${s.tracks.map((t) => `<div class="grid2" style="align-items:end"><div class="field"><label for="seat-${t.code}">${esc(t.name)}</label><input id="seat-${t.code}" type="number" min="0" value="${t.seats}" data-track="${t.code}"></div><label class="consent"><input type="checkbox" id="pause-${t.code}" ${t.paused ? "checked" : ""}> Paused</label></div>`).join("")}</div>
       <div class="card"><h3>Links</h3>${f("st-site", "Academy address", s.site.site_url, 'type="url"')}${f("st-web", "Jobnest website", s.site.website_url, 'type="url"')}${f("st-zuri", "Zuri chat link", s.site.zuri_url, 'type="url"')}</div>
+      <div class="card"><h3>Testing</h3><p class="note">Opens every week of the student portal now, so the team can test lessons and tasks before the start date. Turn it off before launch.</p>
+        <label class="consent"><input type="checkbox" id="st-unlock" ${unlocked ? "checked" : ""}> <span>Open all portal weeks for testing</span></label>
+        <p class="note" id="st-unlock-msg" style="color:var(--danger,#B42318);font-weight:600">${unlocked ? "On: students can see every week right now." : ""}</p></div>
       <div class="card"><h3>Admission letter</h3><p class="note">Printed at the bottom of every admission letter.</p>${f("st-sname", "Signed by (full name)", s.site.signer_name)}${f("st-stitle", "Their title", s.site.signer_title)}</div>
     </div><p class="err" id="st-err" role="alert"></p><div class="actions" style="margin-top:1rem"><button class="btn" type="submit">Save settings</button></div></form>`);
 }
@@ -1050,6 +1053,11 @@ document.addEventListener("change", (e) => {
   const el = e.target, k = el.dataset.k;
   if (el.dataset.actChange === "track") { const none = el.value === "NONE"; $("#wi-" + k).hidden = !none; $("#ri-" + k).hidden = none; }
   if (el.dataset.actChange === "interest") { $("#wo-" + k).hidden = el.value !== "Other"; }
+  if (el.id === "st-unlock") {
+    const on = el.checked; el.disabled = true;
+    rpc("admin_test_unlock", { p_on: on }).then((r) => { el.checked = r; $("#st-unlock-msg").textContent = r ? "On: students can see every week right now." : ""; toast(r ? "All portal weeks are open for testing" : "Portal weeks are back to their dates"); })
+      .catch((x) => { el.checked = !on; toast(x.message); }).finally(() => { el.disabled = false; });
+  }
   if (el.name === "plan" && $("#pay-btn")) $("#pay-btn").textContent = `Accept and pay ${naira(+el.dataset.amount)}`;
 });
 
