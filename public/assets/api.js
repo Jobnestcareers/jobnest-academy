@@ -11,7 +11,7 @@ function keep(s) {
   session = s;
   try { s ? localStorage.setItem(SESSION_KEY, JSON.stringify(s)) : localStorage.removeItem(SESSION_KEY); } catch { /* private mode */ }
 }
-const site = () => location.origin + location.pathname;
+const site = () => location.origin + "/";
 
 async function call(path, { method = "POST", body, token, query = "" } = {}) {
   const res = await fetch(`${SUPABASE_URL}${path}${query}`, {

@@ -88,7 +88,7 @@ with sync_playwright() as p:
     log.append("checkout: " + pg.inner_text("p"))
     pg.click("#fake-pay"); wait_text("Payment received"); shot("status-admitted")
     log.append("admitted: " + sql(f"select status||' '||matric||' '||paid_total from applications where ref='{ref}'"))
-    log.append("url after pay: " + pg.url.split("#")[1].split("/")[-1][:12])
+    log.append("url after pay: " + pg.url.split("/")[-1][:12])
     pg.click("text=View admission letter"); wait_text("Letter of Admission"); shot("letter")
     pg.emulate_media(media="print"); pg.pdf(path="/var/tmp/shots/letter.pdf", format="A4") if False else None; pg.screenshot(path=f"/var/tmp/shots/{TAG}-letter-print.png", full_page=True); pg.emulate_media(media="screen")
     pg.click("text=Back to your application"); wait_text("Matric number")
@@ -197,14 +197,14 @@ with sync_playwright() as p:
     pg.evaluate("localStorage.clear()")
     pg.goto(U + "#/check"); wait_text("Continue your application")
     pg.fill("#f-ref", ref.lower()); pg.fill("#f-sur", "Wrong"); pg.click("#find-form button"); pg.wait_for_timeout(600); log.append("wrong surname: " + pg.inner_text("#f-err"))
-    pg.fill("#f-ref", ref.lower().replace("app-", "")); pg.fill("#f-sur", " eze "); pg.click("#find-form button"); pg.wait_for_function("location.hash.startsWith('#/a/')"); wait_text("Copy")
+    pg.fill("#f-ref", ref.lower().replace("app-", "")); pg.fill("#f-sur", " eze "); pg.click("#find-form button"); pg.wait_for_function("location.pathname.startsWith('/a/')"); wait_text("Copy")
     log.append("find works")
     pg.goto(U + "#/check"); wait_text("Continue your application")
     for i in range(5):
         pg.fill("#f-ref", ref); pg.fill("#f-sur", "Nope")
         try: pg.click("#find-form button", timeout=5000)
         except Exception:
-            pg.screenshot(path="/var/tmp/shots/stuck.png"); log.append("STUCK " + str(pg.locator("#find-form button").evaluate("b=>[b.disabled,b.outerHTML]")) + " " + pg.evaluate("location.hash")); break
+            pg.screenshot(path="/var/tmp/shots/stuck.png"); log.append("STUCK " + str(pg.locator("#find-form button").evaluate("b=>[b.disabled,b.outerHTML]")) + " " + pg.evaluate("location.pathname")); break
         pg.wait_for_timeout(900)
     pg.fill("#f-sur", "Eze"); pg.click("#find-form button"); pg.wait_for_timeout(600); log.append("after 5 wrong: " + pg.inner_text("#f-err"))
     sql("delete from continue_attempts")

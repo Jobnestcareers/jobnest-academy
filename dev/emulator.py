@@ -53,6 +53,8 @@ class H(SimpleHTTPRequestHandler):
         if self.path.startswith("/assets/config.js"):
             b = f'export const SUPABASE_URL = "http://localhost:{PORT}";\nexport const SUPABASE_ANON_KEY = "anon-key";\n'.encode()
             self.send_response(200); self.send_header("Content-Type", "text/javascript"); self.end_headers(); self.wfile.write(b); return
+        u0 = urllib.parse.urlparse(self.path).path
+        if not (ROOT / u0.lstrip("/")).exists() and "." not in u0.rsplit("/", 1)[-1]: self.path = "/index.html"
         return super().do_GET()
     def body(self):
         n = int(self.headers.get("Content-Length") or 0)

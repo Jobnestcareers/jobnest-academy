@@ -9,7 +9,7 @@ const textLinks = (p) => p.replace(LINK, (_, t, u) => /^https?:\/\//i.test(u) ? 
 export function buildEmail(m) {
   const paras = String(m.body || "").split(/\n\s*\n/).map((p) => p.trim()).filter((p) => p && textLinks(p).trim());
   // Applicant emails link to #/a/APP-XXXXXX/...: show the application number and how to come back without the link.
-  const refM = String(m.link || "").match(/#\/a\/(APP-[A-Z0-9]+)\//i);
+  const refM = String(m.link || "").match(/(?:#\/|\.[a-z]+\/)a\/(APP-[A-Z0-9]+)\//i);
   const ref = refM ? refM[1].toUpperCase() : "";
   let site = "academy.jobnestcareers.com";
   try { if (m.link) site = new URL(m.link).host; } catch { /* keep default */ }

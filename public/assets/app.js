@@ -63,7 +63,9 @@ function toast(msg) {
 }
 const empty = (t) => `<p class="empty">${t}</p>`;
 const pill = (s) => `<span class="pill ${s === "Admitted" ? "ok" : BAD_ST.includes(s) ? "bad" : s === "Deferred" ? "" : "now"}">${esc(s)}</span>`;
-const go = (h) => { if (location.hash === h) route(); else location.hash = h; };
+// Clean addresses: "#/learn/x" (old links) and "/learn/x" both become /learn/x.
+const toPath = (h) => "/" + String(h).replace(/^#?\/?/, "");
+const go = (h) => { const p = toPath(h); if (location.pathname === p && !location.hash) route(); else { history.pushState(null, "", p); route(); } };
 const loading = () => {
   const main = $(".shell-main");
   if (main) { main.classList.add("is-loading"); return; }
@@ -380,7 +382,7 @@ async function pageApplicant(ref, token, view) {
   if (view === "letter" && a.status === "Admitted") return pageLetter(a, base);
   if (view === "certificate") { const cid = await rpc("applicant_certificate", { p_ref: ref, p_token: token }).catch(() => null); if (cid) return go(`#/certificate/${cid}`); }
   if (view === "account" && a.status === "Admitted") return pageAccount(a, base);
-  if (view === "paid" || view === "payfail" || view === "paycheck") history.replaceState(null, "", base);
+  if (view === "paid" || view === "payfail" || view === "paycheck") history.replaceState(null, "", toPath(base));
   app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="status-wrap">
     <div class="card"><div class="ch"><div><span class="eyebrow">Application ${esc(a.ref)}</span><h2 style="margin-top:.3rem">${esc(a.first_name)} ${esc(a.surname)}${a.track ? ` · ${esc(a.track)}` : ""}</h2>${a.track || a.wanted ? "" : `<span class="note">Track: agreed on Discovery Call 1</span>`}</div>${pill(a.status)}</div>
       ${tracker(a)}<div class="status-body">${view === "paid" && a.status === "Admitted" ? `<div class="notice ok-n">✓ Payment received. Thank you! A receipt and your admission email are on their way.</div>` : ""}${view === "payfail" ? `<div class="notice warn">Your payment wasn't completed, so you haven't been charged. You can try again below.</div>` : ""}${view === "paycheck" ? `<div class="notice warn">We couldn't confirm your payment automatically. If you were charged, Admissions will sort it out: reply to your offer email with your payment receipt.</div>` : ""}${statusCard(a, base)}</div></div>
@@ -1445,7 +1447,7 @@ async function pageLearn(p1, p2, p3) {
   await lsRender(p1, p2, p3);
   if (!p1 || p1 === "home") setTimeout(() => { let seen = false; try { seen = localStorage.getItem("jn.tour." + LS.C.me.matric) === "1"; } catch { /* ignore */ } if ((ui.wantTour || (!LS.extra.tour_done && !seen)) && TOUR_I == null) { ui.wantTour = false; startTour(); } }, 400);
 }
-const lsParts = () => location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent).slice(1);
+const lsParts = () => location.pathname.replace(/^\/+/, "").split("/").map(decodeURIComponent).slice(1);
 async function lsRender(p1, p2, p3) {
   if (p1 === undefined) [p1, p2, p3] = lsParts();
   const page = p1 || "home", cert = LS.cert;
@@ -1542,7 +1544,7 @@ async function pageHost(token, fresh) {
 async function tabIntern() {
   const L = await rpc("acad_placements"); ui.places = L;
   const can = ["director", "cohort_manager", "academy_admin", "super"].includes(ME.role), base = location.origin + location.pathname;
-  const row3 = (x, i) => { const p = x.placement, link = x.token ? `${base}#/host/${x.token}` : "";
+  const row3 = (x, i) => { const p = x.placement, link = x.token ? `${location.origin}/host/${x.token}` : "";
     return `<details class="arow noav" data-id="pl${i}" ${ui.open === "pl" + i ? "open" : ""}><summary><span class="an"><b>${esc(x.name)}</b><span class="note">${esc(x.matric)} · ${esc(x.track || "")}${p ? ` · ${esc(p.org)}` : ""}</span></span>
       <span class="anext">${p ? `${x.signed}/4 signed${x.to_sign ? ` · ${x.to_sign} waiting` : ""}${x.eval ? " · evaluated" : ""}` : "No placement yet"}</span>${p ? (x.eval ? `<span class="pill ok">Done</span>` : `<span class="pill now">Placed</span>`) : `<span class="pill">To place</span>`}</summary>
       <div class="abody">${link ? `<div class="notice"><span><b>Supervisor's link</b> · share it with ${esc(p.sup_name)} by WhatsApp or email. Anyone with it can sign this logbook.</span>
@@ -2108,7 +2110,7 @@ function certHTML(c) {
     </div>
     <div class="cert-sig"><img src="/assets/signature-pd.png" alt="Signature of ${esc(c.signer_name)}"><span class="cert-line"></span><b>${esc(c.signer_name)}</b><span>${esc(c.signer_title)}, Jobnest Academy</span></div>
     <div class="cert-ribbon"><span class="cert-title">CERTIFICATE<br>OF<br>COMPLETION</span><i></i><div class="cert-seal">${CERT_SEAL}<text x="105" y="140" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#10263D">${esc(c.year || "")}</text></svg></div></div>
-    <div class="cert-verify">Verify at ${esc(location.host)}/#/verify/<b>${esc(c.cert_id)}</b><br>Jobnest Academy confirms this person completed the programme.</div>
+    <div class="cert-verify">Verify at ${esc(location.host)}/verify/<b>${esc(c.cert_id)}</b><br>Jobnest Academy confirms this person completed the programme.</div>
   </div></div>`;
 }
 function fitCert() {
@@ -2116,7 +2118,7 @@ function fitCert() {
     const k = Math.min(1, box.clientWidth / 1123); c.style.transform = `scale(${k})`; box.style.height = `${794 * k}px`; });
 }
 window.addEventListener("resize", fitCert);
-const certUrl = (c) => `${location.origin}/#/verify/${c.cert_id}`;
+const certUrl = (c) => `${location.origin}/verify/${c.cert_id}`;
 function certBlock(c) {
   const d = c.completed_on ? new Date(c.completed_on + "T12:00:00Z") : new Date();
   const li = "https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=" + encodeURIComponent(c.programme) + "&organizationName=" + encodeURIComponent("Jobnest Academy") +
@@ -2196,7 +2198,7 @@ async function certCanvas(c, k = 2) {
   // verify
   x.textAlign = "right"; F('400 13px "DM Sans", sans-serif'); x.fillStyle = "#5B6B7B";
   const vr = ox + iw - 70; F('700 13px "JetBrains Mono", monospace'); const cw = x.measureText(c.cert_id).width; x.fillStyle = "#10263D"; x.fillText(c.cert_id, vr, oy + ih - 62);
-  F('400 13px "DM Sans", sans-serif'); x.fillStyle = "#5B6B7B"; x.fillText(`Verify at ${location.host}/#/verify/`, vr - cw, oy + ih - 62); x.fillText("Jobnest Academy confirms this person completed the programme.", vr, oy + ih - 41);
+  F('400 13px "DM Sans", sans-serif'); x.fillStyle = "#5B6B7B"; x.fillText(`Verify at ${location.host}/verify/`, vr - cw, oy + ih - 62); x.fillText("Jobnest Academy confirms this person completed the programme.", vr, oy + ih - 41);
   x.restore();
   return cv;
 }
@@ -2230,13 +2232,14 @@ async function downloadCertPdf(btn) {
 /* ---------- router ---------- */
 async function route() {
   $("#cert-print")?.remove();
-  if (TOUR_I != null && !location.hash.startsWith("#/learn")) { TOUR_I = null; renderTour(); }
+  if (TOUR_I != null && !/^(#)?\/learn/.test(location.hash || location.pathname)) { TOUR_I = null; renderTour(); }
   const back = auth.takeFromUrl();
   if (back) {
-    history.replaceState(null, "", location.pathname + (back.type === "recovery" ? "#/staff/new-password" : back.error ? "#/staff" : "#/portal"));
+    history.replaceState(null, "", back.type === "recovery" ? "/staff/new-password" : back.error ? "/staff" : "/portal");
     if (back.error) return pageStaffSignIn(esc(back.error));
   }
-  const parts = location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent);
+  if (location.hash.startsWith("#/")) history.replaceState(null, "", toPath(location.hash));
+  const parts = location.pathname.replace(/^\/+/, "").split("/").map(decodeURIComponent);
   const [p0, p1, p2, p3] = parts;
   window.scrollTo(0, 0);
   try {
@@ -2262,7 +2265,7 @@ async function route() {
     if ((p0 === "verify" || p0 === "certificate") && p1) return pageCertificate(p1);
     if (p0 === "start") return go("#/apply");
     if (p0 === "apply") {
-      if (p1 === "zuri" && p2) { try { sessionStorage.setItem("jn_zuri", p2.slice(0, 4000)); } catch (e) {} history.replaceState(null, "", location.pathname + "#/apply"); }
+      if (p1 === "zuri" && p2) { try { sessionStorage.setItem("jn_zuri", p2.slice(0, 4000)); } catch (e) {} history.replaceState(null, "", "/apply"); }
       return pageApply();
     }
     if (p0 === "check") return pageCheck();
@@ -2272,5 +2275,12 @@ async function route() {
     app.innerHTML = `<section class="wrap pub-wrap"><div class="card verify"><h1>We can't load this page</h1><p>${esc(e.message)}</p><p class="note">Check your internet connection and try again.</p><div><a class="btn" href="">Try again</a></div></div></section>`;
   }
 }
-window.addEventListener("hashchange", route);
+window.addEventListener("hashchange", () => { if (location.hash.startsWith("#/") || location.hash.includes("access_token=")) route(); });
+window.addEventListener("popstate", route);
+// In-app links are written as "#/…"; open them as clean addresses without reloading.
+document.addEventListener("click", (e) => {
+  const a = e.target.closest?.('a[href^="#/"]');
+  if (!a || a.target || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || e.button) return;
+  e.preventDefault(); go(a.getAttribute("href"));
+}, true);
 route();

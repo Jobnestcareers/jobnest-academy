@@ -17,3 +17,9 @@
   for = "/assets/*"
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
+
+# Clean addresses: every page is served by the app.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

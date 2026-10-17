@@ -2,7 +2,7 @@
   "name": "Jobnest Academy",
   "short_name": "Jobnest Academy",
   "description": "Your Jobnest Academy student portal.",
-  "start_url": "/#/learn",
+  "start_url": "/learn",
   "scope": "/",
   "display": "standalone",
   "background_color": "#F4F7F6",
