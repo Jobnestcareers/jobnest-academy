@@ -257,6 +257,8 @@ with sync_playwright() as p:
     pg.goto(U + "#/staff"); wait_text("Sign in"); pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Staff accounts")
     pg.goto(U + "#/portal/grading"); wait_text("Project messages"); pg.locator("details[data-id=mg0] summary").click(); pg.fill("#mr-0", "Yes, plus one chart per finding."); pg.click("[data-act=msg-reply]"); pg.wait_for_timeout(800)
     pg.goto(U + "#/portal/dc2"); wait_text("Booked calls"); pg.locator("details.arow summary").first.click(); pg.fill("#dsc-0", "7"); pg.fill("#dno-0", "Strong pitch; slow down."); pg.fill("#dnx-0", "Apply to 5 roles a week\nPractise STAR answers"); pg.click("form.dc2-form button"); pg.wait_for_timeout(800); shot("staff-dc2-done")
+    pg.goto(U + "#/portal/jobs"); wait_text("Weeks 14–17"); pg.locator("details.arow summary").first.click(); pg.wait_for_timeout(400); shot("staff-jobs")
+    log.append("jobs tab: " + pg.inner_text("details.arow .anext").strip())
     log.append("call result: " + sql("select score||' '||array_to_string(next,'/') from call_results"))
     log.append("p2 emails: " + sql("select string_agg(template, ', ' order by id) from outbox where template in ('dc2_booked','dc2_result','message','logbook_changes')"))
     pg.locator("[data-act=signout]:visible").first.click(); wait_text("Sign in")

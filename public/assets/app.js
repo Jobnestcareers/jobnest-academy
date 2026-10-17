@@ -518,6 +518,7 @@ function staffNav(role) {
   if (["director", "cohort_manager", "facilitator", "super"].includes(role)) ac.push({ k: "grading", l: "Grading" });
   if (["director", "cohort_manager", "academy_admin", "coach", "facilitator", "super"].includes(role)) ac.push({ k: "intern", l: "Internships" });
   if (["director", "cohort_manager", "coach", "super"].includes(role)) ac.push({ k: "dc2", l: "Discovery Call 2" });
+  if (["director", "cohort_manager", "academy_admin", "coach", "super"].includes(role)) ac.push({ k: "jobs", l: "Job search" });
   ac.push({ k: "sessions", l: "Live sessions" }, { k: "news", l: "Announcements" });
   if (role === "super") return [{ g: "Jobnest" }, { k: "staff", l: "Staff accounts" }, { k: "audit", l: "Activity log" }, ...adm, ...ac];
   if (role === "adm_admin") return [...adm, { g: "Academy" }, { k: "students", l: "Students" }];
@@ -549,7 +550,7 @@ async function pagePortal(tab) {
   }
   const items = staffNav(ME.role).filter((x) => x.k);
   if (!items.some((x) => x.k === tab)) tab = items[0].k;
-  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, intern: tabIntern, dc2: tabDc2, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
+  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, intern: tabIntern, dc2: tabDc2, jobs: tabJobs, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
   try { await pages[tab](); }
   catch (e) { shell(tab, "Something went wrong", "", `<div class="notice">${esc(e.message)}</div>`); }
 }
@@ -1578,6 +1579,28 @@ async function tabDc2() {
       <div><button class="btn" type="submit">Add these times</button></div></form>` : ""}
     <div class="card"><div class="ch"><h3>Open times</h3><span class="note">${open.length}</span></div>${open.length ? `<ul class="slot-list">${open.map((s) => `<li><span class="mono">${fmtAt(s.at)}</span>${isCoach ? `<button class="link sm" data-act="dc2-rm" data-k="${s.id}">Remove</button>` : `<span class="note">${esc(s.coach)}</span>`}</li>`).join("")}</ul>` : empty("No open times.")}</div></div>
     <div class="card" style="margin-top:1rem"><div class="ch"><h3>Booked calls</h3><span class="note">${booked.length}</span></div>${booked.length ? `<div class="arows">${booked.map((x) => call(x, L.indexOf(x))).join("")}</div>` : empty("No calls booked yet.")}</div>`);
+}
+
+/* ---------- staff: job search (Weeks 14–17) ---------- */
+async function tabJobs() {
+  const L = await rpc("acad_jobsearch");
+  const lk = (x, t, l) => x.links[t] ? `<a class="link sm" href="${esc(x.links[t])}" target="_blank" rel="noopener">${l} ↗</a>` : `<span class="note">${l}: not yet</span>`;
+  const has = (x, t) => x.done.includes(t);
+  const ints = (x) => x.apps.filter((a) => a.st === "Interviewing" || a.st === "Offer").length;
+  const tot = { out: L.reduce((s, x) => s + x.outreach.length, 0), apps: L.reduce((s, x) => s + x.apps.length, 0), ints: L.reduce((s, x) => s + ints(x), 0), offers: L.reduce((s, x) => s + x.apps.filter((a) => a.st === "Offer").length, 0) };
+  const row4 = (x, i) => `<details class="arow noav" data-id="js${i}" ${ui.open === "js" + i ? "open" : ""}><summary><span class="an"><b>${esc(x.name)}</b><span class="note">${esc(x.matric)} · ${esc(x.track || "")}${x.updated ? ` · active ${ago(x.updated)}` : ""}</span></span>
+      <span class="anext">${x.outreach.length}/10 outreach · ${x.apps.length} applications · ${ints(x)} interview${ints(x) === 1 ? "" : "s"}</span>${x.apps.some((a) => a.st === "Offer") ? `<span class="pill ok">Offer</span>` : ints(x) ? `<span class="pill now">Interviewing</span>` : x.apps.length || x.outreach.length ? `<span class="pill info">Searching</span>` : `<span class="pill">Not started</span>`}</summary>
+    <div class="abody">
+      <div class="actions" style="flex-wrap:wrap">${lk(x, "LinkedIn profile makeover", "LinkedIn")}${lk(x, "Publish your portfolio", "Portfolio")}${lk(x, "Record your elevator pitch", "Pitch recording")}${lk(x, "Finalise your Job Search Action Plan", "Action plan")}${x.phone ? `<a class="link sm" href="https://wa.me/${esc(String(x.phone).replace(/\D/g, "").replace(/^0/, "234"))}" target="_blank" rel="noopener">WhatsApp ↗</a>` : ""}</div>
+      <p class="note">${[["ATS-compliant resume", "CV submitted"], ["Weekly job application tracker", "Tracker submitted"], ["Report your first interview invite", "Interview reported"]].map(([t, l]) => `${has(x, t) ? "✓" : "○"} ${l}`).join(" · ")}${x.score ? ` · Discovery Call 2 score ${x.score}/10` : ""}</p>
+      ${x.pitch && (x.pitch.a || x.pitch.b || x.pitch.c) ? `<h4 style="margin:.8rem 0 .3rem">Pitch</h4><p class="note">${esc([x.pitch.a, x.pitch.b, x.pitch.c].filter(Boolean).join(" "))}</p>` : ""}
+      <h4 style="margin:.8rem 0 .3rem">Applications</h4>${x.apps.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Role</th><th>Company</th><th>Status</th><th>Added</th></tr></thead><tbody>${x.apps.map((a) => `<tr><td data-label="Role"><b>${esc(a.role)}</b></td><td data-label="Company">${esc(a.co)}</td><td data-label="Status"><span class="pill ${a.st === "Offer" ? "ok" : a.st === "Interviewing" ? "now" : a.st === "Not selected" ? "bad" : ""}">${esc(a.st)}</span></td><td data-label="Added" class="note">${esc(a.on || "")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="note">None yet.</p>`}
+      <h4 style="margin:.8rem 0 .3rem">Outreach</h4>${x.outreach.length ? `<ul class="roles">${x.outreach.map((o) => `<li><b>${esc(o.name)} · ${esc(o.co)}</b><span class="note">${esc(o.ch)} · ${esc(o.on || "")}</span><span class="pill ${o.st === "Sent" ? "" : "ok"}">${esc(o.st)}</span></li>`).join("")}</ul>` : `<p class="note">None yet.</p>`}
+      ${x.cv ? `<details style="margin-top:.8rem"><summary class="link sm">See their CV</summary><div style="margin-top:.6rem">${cvPreview(x.cv)}</div></details>` : ""}
+    </div></details>`;
+  shell("jobs", "Job search", "Weeks 14–17. Each student's CV, LinkedIn, portfolio, pitch, outreach and job applications. It updates as students work.",
+    `<div class="kpis">${[["Outreach sent", tot.out], ["Applications", tot.apps], ["Interviews", tot.ints], ["Offers", tot.offers]].map(([l, v]) => `<div class="kpi card"><span class="eyebrow">${l}</span><b class="mono">${v}</b></div>`).join("")}</div>
+    <div class="card" style="margin-top:1rem">${L.length ? `<div class="arows">${L.map(row4).join("")}</div>` : empty("No admitted students yet.")}</div>`);
 }
 
 /* ---------- staff: academy ---------- */
