@@ -36,8 +36,7 @@ with sync_playwright() as p:
     # --- applicant
     pg.goto(U); wait_text("Become"); shot("home")
     pg.click("text=See the programme"); wait_text("The route"); shot("gep")
-    pg.click("text=Apply now"); wait_text("Do you know what you want to do yet?"); shot("start")
-    pg.click("text=Go to the application"); wait_text("About you")
+    pg.click("text=Apply now"); wait_text("Submit application")
     pg.click("#apply-form button[type=submit]"); log.append("empty submit: " + pg.inner_text("#g-err"))
     pg.fill("#g-first", "Ngozi"); pg.fill("#g-sur", "Eze"); pg.fill("#g-email", "ngozi@test.ng"); pg.fill("#g-phone", "08031234567"); pg.fill("#g-city", "Lagos")
     pg.select_option("#g-edu", "HND"); pg.select_option("#g-nysc", "Completed"); pg.select_option("#g-sit", "Recent graduate")

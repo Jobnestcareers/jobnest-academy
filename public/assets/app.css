@@ -103,3 +103,4 @@ button.snav-i{font:inherit}
 /* tour highlight */
 .snav.spot,.snav-m.spot{position:relative;z-index:31}
 @media (prefers-reduced-motion:reduce){.skel i,.shell-main.is-loading::before{animation:none}}
+.zuri-hint{background:var(--mint,#E9F3F0);border-radius:12px;padding:.75rem 1rem;margin:.25rem 0 0}.zuri-hint a{font-weight:700;color:#0B5E53}

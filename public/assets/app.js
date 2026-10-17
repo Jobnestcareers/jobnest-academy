@@ -116,23 +116,15 @@ function pageGep() {
       <p class="lp-status ${open ? "on" : ""}"><span class="lp-dot"></span>${open ? `Applications open for ${esc(c.name)}` : "Applications are closed for now"}</p>
       <h1 class="lp-h1">From graduate<br>to work-ready.</h1>
       <p class="lp-lead">${p.weeks || 17} weeks online. Learn a skill employers pay for, deliver a real client project, intern with a company, and get coached through your job search.</p>
-      ${open ? `<div class="actions"><a class="btn gold lg" href="#/start">Apply now</a>${INFO.zuri_url ? `<a class="btn ghost lg" href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Not sure yet? Talk to Zuri</a>` : ""}</div>`
+      ${open ? `<div class="actions"><a class="btn gold lg" href="#/apply">Apply now</a>${INFO.zuri_url ? `<a class="btn ghost lg" href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Not sure yet? Talk to Zuri</a>` : ""}</div>`
         : `<p class="note">Applications for the next cohort will open soon. Check back here.</p>`}
     </div></section>
     <section class="wrap lp-sec"><div class="lp-route-h"><h2>The route</h2><p class="note">Every week builds on the last. You move on when you pass.</p></div>
       <ol class="route">${ROUTE_STOPS.map(([w, t], i) => `<li class="${i === ROUTE_STOPS.length - 1 ? "end" : ""}"><span class="stop" aria-hidden="true"></span><small>${w}</small><b>${t}</b></li>`).join("")}</ol></section>
     <section class="wrap lp-sec"><dl class="lp-facts"><div><dt>Starts</dt><dd>${start}</dd></div><div><dt>Fee</dt><dd>${naira(p.fee || 0)}<small>or 2 payments of ${naira((p.inst_total || 0) / 2)} (${naira((p.inst_total || 0) - (p.fee || 0))} more in total)</small></dd></div><div><dt>Time</dt><dd>15 hours a week<small>live online classes plus your own time</small></dd></div></dl></section>
-    ${INFO.zuri_url ? `<section class="lp-zuri"><div class="wrap"><div><p>Not sure what you want to do yet?</p><span class="lp-zuri-s">Chat with Zuri for about 10 minutes. She'll help you find what you're drawn to, and we'll pick it up on your call.</span></div><a class="btn gold" href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Talk to Zuri</a></div></section>` : ""}
+    ${INFO.zuri_url ? `<section class="lp-zuri"><div class="wrap"><div><p>Not sure what you want to do yet?</p><span class="lp-zuri-s">Chat with Zuri for about 10 minutes. She'll help you find what you're drawn to, then take you straight into the application.</span></div><a class="btn gold" href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Talk to Zuri</a></div></section>` : ""}
     <section class="wrap lp-sec lp-two"><div><h2>How to get in</h2><p class="note">For final-year students, recent graduates and NYSC members with a laptop and internet.</p></div>
       <ol class="lp-steps">${[["Apply", "5 minutes"], ["Readiness check", `${INFO.cohort?.assess_minutes || 5} minutes`], ["Call with us", "15 minutes"], ["Offer and payment", "in full or 2 parts"]].map(([a, b]) => `<li><b>${a}</b><span class="note">${b}</span></li>`).join("")}</ol></section>` + pubFoot();
-}
-
-function pageStart() {
-  if (!appsOpen()) return go("#/gep");
-  app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="card app-form"><span class="eyebrow">Before you apply</span><h1>Do you know what you want to do yet?</h1>
-    <p>Most people who join the ${esc(prog().name)} don't, and that's exactly why it exists. <b>You don't choose a track when you apply.</b> You'll agree it with Admissions on Discovery Call 1, once you've had a chance to think it through.</p>
-    <div class="choose2">${INFO.zuri_url ? `<a class="opt2 rec" href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span class="tag pill ok">Recommended</span><b>Talk to Zuri first ↗</b><span class="note">A 10-minute chat that helps you get clarity. At the end, copy your summary and paste it into the application.</span></a>` : ""}
-      <a class="opt2" href="#/apply" style="text-decoration:none;color:inherit"><b>Go to the application</b><span class="note">${INFO.zuri_url ? "Back from Zuri, or skipping it? That's fine. " : ""}We'll explore your options with you on the call.</span></a></div></div></section>`;
 }
 
 const radios = (name, opts) => `<div class="rate">${opts.map((o) => `<label><input type="radio" name="${name}" value="${o}"><span>${o}</span></label>`).join("")}</div>`;
@@ -145,6 +137,7 @@ function pageApply() {
   app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><form class="card form app-form" id="apply-form" novalidate>
     <span class="eyebrow">Step 1 of 6 · Application · about 5 minutes</span><h1>Apply to the ${esc(prog().name)}</h1>
     <p class="note">You don't pick a track here. You'll agree it together on your Discovery Call.</p>
+    ${!zuri && INFO.zuri_url ? `<p class="zuri-hint">Not sure what you want to do yet? <a href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Chat with Zuri first ↗</a> She'll fill this form in for you at the end.</p>` : ""}
     <h3>About you</h3>
     <div class="grid2"><div class="field"><label for="g-first">First name</label><input id="g-first" autocomplete="given-name" maxlength="80"></div><div class="field"><label for="g-sur">Surname</label><input id="g-sur" autocomplete="family-name" maxlength="80"></div></div>
     <div class="grid2"><div class="field"><label for="g-email">Email</label><input id="g-email" type="email" autocomplete="email"></div><div class="field"><label for="g-phone">WhatsApp number</label><input id="g-phone" inputmode="tel" autocomplete="tel" placeholder="0803 000 0000"></div></div>
@@ -1227,7 +1220,7 @@ async function route() {
     if (p0 === "a" && p1 && p2) return pageApplicant(p1, p2, p3 || "");
     await info();
     if (p0 === "gep") return pageGep();
-    if (p0 === "start") return pageStart();
+    if (p0 === "start") return go("#/apply");
     if (p0 === "apply") {
       if (p1 === "zuri" && p2) { try { sessionStorage.setItem("jn_zuri", p2.slice(0, 4000)); } catch (e) {} history.replaceState(null, "", location.pathname + "#/apply"); }
       return pageApply();
