@@ -49,10 +49,17 @@ const ui = { admG: "needs", q: "", open: null, pick: null, busy: false };
 /* ---------- small helpers ---------- */
 function toast(msg) {
   const t = $("#toast");
-  t.textContent = msg;
+  t.innerHTML = `<span class="tb-msg"></span><button type="button" class="tb-x" aria-label="Close">×</button><i class="tb-bar"></i>`;
+  t.querySelector(".tb-msg").textContent = msg;
   t.hidden = false;
-  clearTimeout(toast.t);
-  toast.t = setTimeout(() => (t.hidden = true), 3200);
+  const bar = t.querySelector(".tb-bar"); bar.style.animation = "none"; void bar.offsetWidth; bar.style.animation = "";
+  clearTimeout(toast.t); toast.left = 5000; toast.start = Date.now();
+  const hide = () => { t.hidden = true; clearTimeout(toast.t); };
+  const run = () => { toast.start = Date.now(); toast.t = setTimeout(hide, toast.left); bar.style.animationPlayState = "running"; };
+  const hold = () => { clearTimeout(toast.t); toast.left = Math.max(800, toast.left - (Date.now() - toast.start)); bar.style.animationPlayState = "paused"; };
+  t.onpointerenter = hold; t.onpointerdown = hold; t.onpointerleave = run; t.onpointerup = (e) => { if (e.pointerType !== "mouse") run(); };
+  t.querySelector(".tb-x").onclick = hide;
+  run();
 }
 const empty = (t) => `<p class="empty">${t}</p>`;
 const pill = (s) => `<span class="pill ${s === "Admitted" ? "ok" : BAD_ST.includes(s) ? "bad" : s === "Deferred" ? "" : "now"}">${esc(s)}</span>`;
@@ -104,9 +111,35 @@ const pubFoot = () => `<footer class="wrap lp-foot"><a class="link" href="#/chec
 
 const TEAM = [["Admissions", "Guides you from application to your first day."], ["Programme Director", "Leads the programme and its standards."],
   ["Cohort Manager", "Keeps you on track, week by week."], ["Facilitators", "Teach your track and mark your work."], ["Career Coach", "CV, LinkedIn and your job search."]];
+const TRACK_INFO = {
+  DAT: ["Turn messy numbers into clear answers.", ["Excel and Google Sheets", "Cleaning and organising data", "Charts and dashboards", "Presenting findings"], ["Junior Data Analyst", "Reporting Assistant"]],
+  DMK: ["Grow a brand online.", ["Social media content", "Basic copywriting", "Running small ad campaigns", "Reading the results"], ["Social Media Assistant", "Marketing Assistant"]],
+  CSP: ["Help customers and solve problems well.", ["Clear written and spoken replies", "Help-desk tools", "Handling difficult customers", "Tracking and closing issues"], ["Customer Support Associate", "Customer Success Assistant"]],
+  ADM: ["Keep a team organised and running.", ["Calendars, email and documents", "Google Workspace and Microsoft 365", "Meeting notes and follow-ups", "Basic records and reporting"], ["Administrative Assistant", "Operations Assistant"]],
+};
+const part1Of = (p) => Math.ceil((p.inst_total || 0) / 2 / 500) * 500;
+const teamOf = () => { try { return JSON.parse(INFO.team || "{}") || {}; } catch { return {}; } };
 const FAQ = [["Can I join during NYSC?", "Yes."], ["Do I need experience?", "No. Just basic digital skills and clear communication."],
   ["Will I get a job at the end?", "We can't promise one, but you'll finish with experience, a portfolio and coaching."]];
 const TICK = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12l5 5 9-9"/></svg>`;
+
+function pageTracks() {
+  const p = prog(), T = (INFO.tracks || []).filter((t) => t.open !== false);
+  app.innerHTML = pubHeader() + `<section class="wrap pub-wrap tk-page"><div class="tk-head"><h1 class="nl-h1" style="font-size:clamp(2.2rem,5vw,3.4rem)">What you can learn.</h1>
+    <p class="nl-lead" style="max-width:52ch">You don't choose now. After you apply, you'll pick your track with us on a short call.</p></div>
+    <div class="tk-grid">${T.map((t) => { const [d, learn, roles] = TRACK_INFO[t.code] || ["", [], []];
+      return `<article class="tk-card"><span class="pill now" style="align-self:flex-start">Track</span><h2>${esc(t.name)}</h2>${d ? `<p class="note">${d}</p>` : ""}
+        ${learn.length ? `<div><b class="tk-lbl">You'll learn</b><ul>${learn.map((x) => `<li>${x}</li>`).join("")}</ul></div>` : ""}
+        ${roles.length ? `<div><b class="tk-lbl">Roles it leads to</b><div class="tk-roles">${roles.map((r) => `<span>${r}</span>`).join("")}</div></div>` : ""}</article>`; }).join("") || empty("Tracks will be listed here soon.")}</div>
+    ${appsOpen() ? `<div class="actions" style="margin-top:1.5rem"><a class="btn gold lg" href="#/apply">Apply now →</a><a class="btn ghost lg" href="#/">Back to the programme</a></div>` : ""}</section>` + pubFoot();
+}
+function pagePrograms() {
+  const P = INFO.programmes || [];
+  app.innerHTML = pubHeader() + `<section class="wrap pub-wrap"><h1 class="nl-h1" style="font-size:clamp(2.2rem,5vw,3.4rem)">Programmes.</h1>
+    <div class="tk-grid" style="margin-top:1.5rem">${P.map((x) => { const live = x.status === "Live" && x.code === INFO.cohort?.programme_code;
+      return `<article class="tk-card ${live ? "live" : ""}"><span class="pill ${live && appsOpen() ? "ok" : "now"}" style="align-self:flex-start">${live ? (appsOpen() ? "Applications open" : "Applications closed") : esc(x.status === "Live" ? "Open" : "Coming soon")}</span>
+        <h2>${esc(x.name)}</h2><span class="mono note">${x.weeks} weeks · online</span><p class="note">${esc(x.tagline || "")}</p>${live ? `<a class="link" href="#/" style="margin-top:auto;font-weight:700">See the programme →</a>` : ""}</article>`; }).join("") || empty("Programmes will be listed here soon.")}</div></section>` + pubFoot();
+}
 
 function pageHome() {
   const p = prog(), c = INFO.cohort || {}, open = appsOpen(), weeks = p.weeks || 17, mins = c.assess_minutes || 5;
@@ -127,17 +160,29 @@ function pageHome() {
         <div class="nl-card nl-c2"><span class="nl-time">10:00</span><span class="nl-c2t"><b>Live class</b><small>With your facilitator</small></span><span class="nl-join">Join</span></div>
         <div class="nl-card nl-c3"><span class="nl-c3h"><b>Client project</b><span class="pill ok">Passed</span></span><small>Feedback from your facilitator, then it goes in your portfolio.</small></div>
       </div></div></section>
-    <section class="nl-route"><div class="wrap"><h2 class="nl-h2">The ${weeks} weeks.</h2>
+    <section class="nl-finish"><div class="wrap"><h2 class="nl-h2">You'll finish with.</h2>
+      <div class="nl-finrow"><ul class="nl-fin">
+        <li><b>A certificate</b><span>Signed by the Programme Director, and easy for employers to verify.</span></li>
+        <li><b>A real client project</b><span>In your portfolio, with feedback you can show employers.</span></li>
+        <li><b>Internship experience</b><span>Three weeks with a partner company.</span></li>
+        <li><b>A job-ready CV and LinkedIn</b><span>Reviewed with your Career Coach.</span></li></ul>
+        <div class="nl-certwrap"><div class="cert-box nl-cert" aria-label="Example certificate">${certHTML({ name: "Your Name", programme: p.name || "Graduate Employability Programme", weeks, track: "", completed_on: null, cert_id: "JNA-27-SAMPLE", signer_name: INFO.signer_name || "Shekemi Odeyemi", signer_title: INFO.signer_title || "Programme Director", year: String(new Date().getFullYear() + 1) })}</div></div>
+      </div></div></section>
+    <section class="nl-route"><div class="wrap"><div class="nl-route-h"><h2 class="nl-h2">The ${weeks} weeks.</h2><a class="nl-more" href="#/tracks">See what you can learn →</a></div>
       <ol class="nl-weeks">${ROUTE_STOPS.map(([w, t], i) => `<li class="${i === ROUTE_STOPS.length - 1 ? "end" : ""}"><span>${w}</span><b>${t}</b></li>`).join("")}</ol></div></section>
     <section class="wrap nl-sec" id="how"><h2 class="nl-h2">How to get in.</h2>
-      <ol class="nl-steps">${[["Apply", "5 minutes"], ["Readiness check", `${mins} minutes`], ["Call with us", "15 minutes"], ["Accept and pay", "You're in"]].map(([a, b], i) => `<li><span class="nl-n ${i === 3 ? "last" : ""}">${i + 1}</span><span><b>${a}</b><small>${b}</small></span></li>`).join("")}</ol>
-      <div class="nl-need"><b>You'll need:</b><span>${TICK}A laptop</span><span>${TICK}Reliable internet</span><span>${TICK}About 15 hours a week</span></div></section>
+      <ol class="nl-steps">${[["Apply", "5 minutes"], ["Readiness check", `${mins} minutes`], ["Call with us", "15 minutes"], ["Accept and pay", p.fee ? `${naira(p.fee)}, or 2 × ${naira(part1Of(p))}` : "You're in"]].map(([a, b], i) => `<li><span class="nl-n ${i === 3 ? "last" : ""}">${i + 1}</span><span><b>${a}</b><small>${b}</small>${i === 3 && p.fee ? `<a class="nl-help" href="#/" data-act="jump" data-k="faq-cost">Need help with fees?</a>` : ""}</span></li>`).join("")}</ol>
+      <div class="nl-need"><b>You'll need:</b><span>${TICK}A laptop</span><span>${TICK}Reliable internet</span><span>${TICK}About 15 hours a week</span></div>
+      ${INFO.info_session_url || INFO.sample_lesson_url ? `<div class="nl-taste"><div><b>Not ready to apply yet?</b><span>${INFO.info_session_url ? "Join a free info session" : ""}${INFO.info_session_url && INFO.sample_lesson_url ? ", or " : ""}${INFO.sample_lesson_url ? (INFO.info_session_url ? "try a sample lesson" : "Try a sample lesson") : ""}.</span></div><div class="actions">${INFO.info_session_url ? `<a class="btn" href="${esc(INFO.info_session_url)}" target="_blank" rel="noopener">Book an info session</a>` : ""}${INFO.sample_lesson_url ? `<a class="btn ghost" href="${esc(INFO.sample_lesson_url)}" target="_blank" rel="noopener">Try a sample lesson</a>` : ""}</div></div>` : ""}</section>
     <section class="wrap nl-sec"><h2 class="nl-h2">Who supports you.</h2>
-      <ul class="nl-team">${TEAM.map(([r, d]) => `<li><b>${r}</b><span>${d}</span></li>`).join("")}</ul></section>
+      <ul class="nl-team">${TEAM.map(([r, d]) => { const m = teamOf()[r] || {}; const ini = (m.name || r).split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
+        return `<li>${m.name || m.photo ? `<span class="nl-face">${m.photo ? `<img src="${esc(m.photo)}" alt="" loading="lazy">` : esc(ini)}</span>` : ""}${m.name ? `<b>${esc(m.name)}</b><span class="nl-role">${r}</span>` : `<b>${r}</b>`}<span>${d}</span></li>`; }).join("")}</ul></section>
     <section class="wrap nl-sec nl-faq" id="faq"><h2 class="nl-h2">FAQ.</h2>
-      <div>${FAQ.map(([q, a], i) => `<details ${i ? "" : "open"}><summary>${q}</summary><p>${a}</p></details>`).join("")}</div></section>
+      <div>${p.fee ? `<details id="faq-cost" open><summary>How much does it cost?</summary><p>${naira(p.fee)} in full, or 2 payments of ${naira(part1Of(p))}. You only pay after you're offered a place. Need help with fees? Email <a href="mailto:info@jobnestcareers.com">info@jobnestcareers.com</a> and tell us your situation.</p></details>` : ""}${FAQ.map(([q, a], i) => `<details ${i || p.fee ? "" : "open"}><summary>${q}</summary><p>${a}</p></details>`).join("")}</div></section>
+    ${open ? `<section class="nl-band"><div class="wrap"><div><h2 class="nl-h2">Ready to become work-ready?</h2><p>Applying takes 5 minutes.</p></div><a class="btn gold lg" href="#/apply">Apply now →</a></div></section>` : ""}
     <footer class="nl-foot"><div class="wrap"><span>© ${new Date().getFullYear()} Jobnest Services</span>
       <nav aria-label="Footer"><a href="#/check">Continue an application</a><a href="#/learn/signin">Student sign-in</a><a href="#/staff">Staff sign-in</a><a href="${esc(INFO.website_url || "https://jobnestcareers.com")}">Jobnest.com ↗</a></nav></div></footer>`;
+  fitCert();
 }
 
 const radios = (name, opts) => `<div class="rate">${opts.map((o) => `<label><input type="radio" name="${name}" value="${o}"><span>${o}</span></label>`).join("")}</div>`;
@@ -163,7 +208,7 @@ function pageApply() {
     <h3>Your background</h3>
     <div class="grid2"><div class="field"><label for="g-edu">Highest education</label>${select("g-edu", ["OND / NCE", "HND", "B.Sc / B.A.", "Master's", "Other"])}</div>
     <div class="field"><label for="g-nysc">NYSC status</label>${select("g-nysc", ["Completed", "Currently serving", "Exempted", "Not yet"])}</div></div>
-    <div class="field"><label for="g-sit">Which best describes you now?</label>${select("g-sit", ["Final-year student", "Recent graduate", "Currently serving (NYSC)", "Graduate looking for work"])}</div>
+    <div class="field"><label for="g-sit">Which best describes you now?</label>${select("g-sit", ["Final-year student", "Recent graduate", "Currently serving (NYSC)"])}</div>
     <h3>Readiness</h3>
     <div class="field"><span class="lbl">Can you commit at least 15 hours a week for ${prog().weeks || 17} weeks?</span>${radios("g-hours", ["Yes", "Not sure", "No"])}</div>
     <div class="grid2"><div class="field"><span class="lbl">Do you have a laptop?</span>${radios("g-laptop", ["Yes", "No"])}</div>
@@ -302,7 +347,7 @@ function pageLetter(a, base) {
         <li>Make sure you have a laptop and reliable internet for about 15 hours a week.</li>
         ${bal > 0 ? `<li>Pay your second instalment of ${naira(bal)} by ${fmtDateD(f.due_date)} from your application page.</li>` : ""}</ul>
       <p>Congratulations, and welcome. We can't wait to see you build a career you're proud of.</p>
-      <div class="sign"><span class="sig-line" aria-hidden="true"></span>${a.signer_name ? `<b>${esc(a.signer_name)}</b>` : ""}<span>${esc(a.signer_title || "Programme Director")}, Jobnest Academy</span></div>
+      <div class="sign"><span class="sig-wrap"><img class="sig-img" src="/assets/signature-pd.png" alt="Signature"><span class="sig-line" aria-hidden="true"></span></span>${a.signer_name ? `<b>${esc(a.signer_name)}</b>` : ""}<span>${esc(a.signer_title || "Programme Director")}, Jobnest Academy</span></div>
       <footer class="lf">Issued online by Jobnest Academy. To confirm this letter, contact Admissions with matric number ${esc(a.matric)}.</footer>
     </article></section>`;
 }
@@ -333,6 +378,7 @@ async function pageApplicant(ref, token, view) {
   if (view === "assess" && a.status === "Assessment pending") return a.assessment_started ? pageAssess(a, token, base) : pageAssessIntro(a, token, base);
   if (view === "book" && a.status === "Call to book") return pageBook(a, token, base);
   if (view === "letter" && a.status === "Admitted") return pageLetter(a, base);
+  if (view === "certificate") { const cid = await rpc("applicant_certificate", { p_ref: ref, p_token: token }).catch(() => null); if (cid) return go(`#/certificate/${cid}`); }
   if (view === "account" && a.status === "Admitted") return pageAccount(a, base);
   if (view === "paid" || view === "payfail" || view === "paycheck") history.replaceState(null, "", base);
   app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="status-wrap">
@@ -681,6 +727,11 @@ async function tabSettings() {
       <div class="card"><h3>Fee</h3><div class="grid2">${f("st-fee", "Full fee (₦)", p.fee, 'type="number" min="0" step="1000"')}${f("st-pct", "Extra for 2 instalments (%)", p.inst_pct, 'type="number" min="0" max="50"')}</div><p class="note">2 instalments total: ${naira(p.inst_total)}</p></div>
       <div class="card"><h3>Seats by track</h3>${s.tracks.map((t) => `<div class="grid2" style="align-items:end"><div class="field"><label for="seat-${t.code}">${esc(t.name)}</label><input id="seat-${t.code}" type="number" min="0" value="${t.seats}" data-track="${t.code}"></div><label class="consent"><input type="checkbox" id="pause-${t.code}" ${t.paused ? "checked" : ""}> Paused</label></div>`).join("")}</div>
       <div class="card"><h3>Links</h3>${f("st-site", "Academy address", s.site.site_url, 'type="url"')}${f("st-web", "Jobnest website", s.site.website_url, 'type="url"')}${f("st-call", "Discovery Call meeting link (Teams)", s.site.call_link, 'type="url"')}${f("st-zuri", "Zuri chat link", s.site.zuri_url, 'type="url"')}</div>
+      <div class="card"><h3>Landing page</h3><p class="note">Optional. Each part shows on the Academy landing page only once it's filled in.</p>
+        ${f("st-info", "Free info session link (e.g. a booking form)", s.site.info_session_url, 'type="url"')}${f("st-sample", "Sample lesson link", s.site.sample_lesson_url, 'type="url"')}
+        <p class="lbl" style="margin-top:.6rem">Who supports you: names and photo links</p>
+        ${TEAM.map(([r], i) => { let tm = {}; try { tm = JSON.parse(s.site.team || "{}") || {}; } catch { /* empty */ } const m = tm[r] || {};
+          return `<div class="grid2">${f(`st-tn${i}`, `${r}: name`, m.name || "")}${f(`st-tp${i}`, `${r}: photo link`, m.photo || "", 'type="url"')}</div>`; }).join("")}</div>
       <div class="card"><h3>Testing</h3><p class="note">Opens every week of the student portal now, so the team can test lessons and tasks before the start date. Turn it off before launch.</p>
         <label class="consent"><input type="checkbox" id="st-unlock" ${unlocked ? "checked" : ""}> <span>Open all portal weeks for testing</span></label>
         <p class="note" id="st-unlock-msg" style="color:var(--danger,#B42318);font-weight:600">${unlocked ? "On: students can see every week right now." : ""}</p></div>
@@ -753,7 +804,7 @@ function pageLearnForgot() {
 
 function campusShell(tab, title, sub, body) {
   const me = CAMPUS.me;
-  const items = [["home", "Home"], ["weeks", "Weeks"], ["tasks", "Tasks"], ["sessions", "Live sessions"], ["news", "Announcements"]];
+  const items = [["home", "Home"], ["weeks", "Weeks"], ["tasks", "Tasks"], ["sessions", "Live sessions"], ["news", "Announcements"], ...(CAMPUS.cert ? [["certificate", "Certificate 🎓"]] : [])];
   const todo = CAMPUS.tasks.filter((t) => !t.sub || t.sub.status === "redo").length;
   const nav = items.map(([k, l]) => `<a class="snav-i" href="#/learn/${k}" aria-current="${k === tab ? "page" : "false"}"><span>${l}</span>${k === "tasks" && todo ? `<b class="cnt-b mono">${todo}</b>` : ""}</a>`).join("")
     + `<p class="snav-g">${esc(me.matric)}</p><button class="snav-i" data-act="tour"><span>Take the tour again</span></button><button class="snav-i" data-act="signout-learn"><span>Sign out</span></button>`;
@@ -787,15 +838,45 @@ function sessionRow(x) {
       : x.link ? `<button class="btn sm ${live ? "gold" : "ghost"}" data-act="join" data-k="${x.id}">${live ? "Join now" : "Join link"}</button>` : `<span class="note">Link coming</span>`}</li>`;
 }
 
+/* ---------- add to home screen ---------- */
+let INSTALL_EVT = null;
+window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); INSTALL_EVT = e; if ($("#inst-card")) $("#inst-card").hidden = false; });
+window.addEventListener("appinstalled", () => { INSTALL_EVT = null; $("#inst-card")?.remove(); try { localStorage.setItem("jn.installed", "1"); } catch { /* ignore */ } toast("Added to your home screen"); });
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) navigator.serviceWorker.register("/sw.js").catch(() => {});
+const isStandalone = () => window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+function installCard() {
+  let off = false; try { off = localStorage.getItem("jn.install.off") === "1" || localStorage.getItem("jn.installed") === "1"; } catch { /* ignore */ }
+  if (isStandalone() || off) return "";
+  const ios = isIOS(), canPrompt = !!INSTALL_EVT;
+  const how = ios ? `Tap <b>Share</b> <span aria-hidden="true">⎙</span> at the bottom of Safari, then <b>Add to Home Screen</b>.`
+    : canPrompt ? "Open your portal in one tap, like an app." : `Open your browser menu <b>⋮</b> and choose <b>Install app</b> or <b>Add to Home screen</b>.`;
+  return `<div class="card inst-card" id="inst-card"><span class="inst-ico" aria-hidden="true">${LOGO}</span><div class="inst-t"><b>Add Jobnest Academy to your home screen</b><span>${how}</span></div>
+    <div class="inst-a">${canPrompt ? `<button class="btn gold sm" data-act="install">Add to home screen</button>` : ""}<button class="link sm" data-act="install-off">Not now</button></div></div>`;
+}
+function progressCard(C, cert) {
+  const passed = C.tasks.filter((t) => t.sub && t.sub.status === "passed");
+  const past = C.sessions.filter((x) => new Date(x.starts_at).getTime() + x.minutes * 6e4 < Date.now());
+  const came = past.filter((x) => ["present", "late", "joined"].includes(x.att)).length;
+  const w = C.week, weeks = C.cohort.weeks;
+  const B = [["🚀", "Started", true], ["✅", "First task", passed.length >= 1], ["🔥", "5 tasks passed", passed.length >= 5],
+    ["💼", "Client project", passed.some((t) => t.week >= 8 && t.week <= 9)], ["🎓", "Graduate", !!cert]];
+  return `<div class="card prog-card"><h3>Your progress</h3>
+    <div class="prog-stats"><div><b class="mono">${passed.length}/${C.tasks.length}</b><span>tasks passed</span></div><div><b class="mono">${past.length ? Math.round((came / past.length) * 100) + "%" : "–"}</b><span>attendance</span></div></div>
+    <div class="badges" aria-label="Badges">${B.map(([e, t, on]) => `<span class="badge ${on ? "on" : ""}" title="${t}${on ? "" : " (not yet)"}"><i aria-hidden="true">${e}</i>${t}</span>`).join("")}</div></div>`;
+}
+
 async function pageLearn(tab) {
   if (!auth.session) return pageLearnSignIn();
   if (!isStudent()) { app.innerHTML = learnCard(`<h1>You're signed in as staff</h1><p>Sign out first to use the student portal.</p><div class="actions"><a class="btn" href="#/portal">Go to the staff portal</a><button class="btn ghost" data-act="signout-learn">Sign out</button></div>`); return; }
   loading();
   let extra = {};
-  try { [CAMPUS, extra] = await Promise.all([rpc("student_campus"), rpc("student_campus_extra").catch(() => ({}))]); }
+  let cert = null;
+  try { [CAMPUS, extra, cert] = await Promise.all([rpc("student_campus"), rpc("student_campus_extra").catch(() => ({})), rpc("student_certificate").catch(() => null)]); }
   catch (e) { if (e.status === 401 || /sign in/i.test(e.message)) { await auth.signOut(); return pageLearnSignIn("Please sign in again."); } throw e; }
+  CAMPUS.cert = cert;
   const C = CAMPUS, w = C.week, weeks = C.cohort.weeks;
-  const tab_ = ["home", "weeks", "tasks", "sessions", "news"].includes(tab) ? tab : "home";
+  const tab_ = ["home", "weeks", "tasks", "sessions", "news", "certificate"].includes(tab) && (tab !== "certificate" || cert) ? tab : "home";
   const upcoming = C.sessions.filter((x) => new Date(x.starts_at).getTime() + x.minutes * 6e4 > Date.now());
   const todo = C.tasks.filter((t) => !t.sub || t.sub.status === "redo");
   const bal = C.me.balance > 0 ? `<div class="notice bal"><span>Your second instalment of <b>${naira(C.me.balance)}</b> is due by ${fmtDateD(C.me.due_date)}.</span><a class="btn sm gold" href="#/a/${esc(C.me.ref)}/${esc(C.me.token)}">Pay now</a></div>` : "";
@@ -807,7 +888,8 @@ async function pageLearn(tab) {
       : w > weeks ? `<div class="card hero-c" id="t-week"><span class="eyebrow">Programme complete</span><h2>You made it 🎉</h2><p>Your lessons and work stay here for you to look back on.</p></div>`
       : `<div class="card hero-c" id="t-week"><span class="eyebrow">Week ${w} of ${weeks}</span><h2>${esc(stageOf(w))}</h2><div class="wbar" aria-label="Progress"><i style="width:${(w / weeks) * 100}%"></i></div></div>`;
     setTimeout(() => { let seen = false; try { seen = localStorage.getItem("jn.tour." + C.me.matric) === "1"; } catch { /* ignore */ } if ((ui.wantTour || (!extra.tour_done && !seen)) && TOUR_I == null) { ui.wantTour = false; startTour(); } }, 50);
-    campusShell("home", `Hi ${esc(C.me.first_name)}`, "", `${bal}${head}<div class="grid2" style="margin-top:1rem">
+    const certCard = cert ? `<div class="card cert-card"><span class="eyebrow">Certificate of completion</span><h2>Your certificate is ready 🎓</h2><div class="actions"><a class="btn gold" href="#/learn/certificate">View and download</a></div></div>` : "";
+    campusShell("home", `Hi ${esc(C.me.first_name)}`, "", `${installCard()}${bal}${certCard}${head}${progressCard(C, cert)}<div class="grid2" style="margin-top:1rem">
       <div class="card" id="t-lessons"><div class="ch"><h3>This week's lessons</h3><a class="link sm" href="#/learn/weeks">All weeks →</a></div>${L.length ? `<ul class="lessons">${L.map(lessonItem).join("")}</ul>` : empty(C.open_weeks ? "Lessons for this week will appear here." : "Week 1 opens on the Saturday before the start date.")}</div>
       <div class="stack"><div class="card" id="t-session"><div class="ch"><h3>Next live session</h3><a class="link sm" href="#/learn/sessions">All →</a></div>${upcoming.length ? `<ul class="sess-list">${sessionRow(upcoming[0])}</ul>` : empty("No sessions scheduled yet.")}</div>
         <div class="card" id="t-tasks"><div class="ch"><h3>Tasks to do</h3><a class="link sm" href="#/learn/tasks">All →</a></div>${todo.length ? `<ul class="lessons">${todo.slice(0, 4).map((t) => `<li class="lesson"><span class="lk" aria-hidden="true">📝</span><div><a class="link" href="#/learn/tasks"><b>${esc(t.title)}</b></a><span class="note" style="display:block">Due ${fmtAt(t.due_at)} WAT</span></div>${subPill(t)}</li>`).join("")}</ul>` : empty("Nothing to hand in right now.")}</div>
@@ -832,6 +914,13 @@ async function pageLearn(tab) {
     campusShell("sessions", "Live sessions", "Join from here so your attendance is recorded. Times are in WAT.",
       `<div class="card"><h3>Coming up</h3>${upcoming.length ? `<ul class="sess-list">${upcoming.map(sessionRow).join("")}</ul>` : empty("No sessions scheduled yet.")}</div>
       ${past.length ? `<div class="card" style="margin-top:1rem"><h3>Past sessions</h3><ul class="sess-list">${past.map(sessionRow).join("")}</ul></div>` : ""}`);
+  }
+  if (tab_ === "certificate") {
+    let c = null;
+    try { c = await rpc("certificate_view", { p_cert: cert.cert_id }); } catch { c = null; }
+    campusShell("certificate", `Congratulations, ${esc(C.me.first_name)}! 🎓`, "You finished the programme. Download your certificate, add it to LinkedIn, or share the link with employers.", c ? certBlock(c) : empty("Your certificate couldn't load. Please refresh."));
+    fitCert();
+    return;
   }
   if (tab_ === "news") {
     campusShell("news", "Announcements", "", C.news.length ? `<div class="stack">${C.news.map((n) => `<article class="card"><span class="eyebrow">${fmtAt(n.at)} · ${esc(n.by)}</span><h3 style="margin:.4rem 0">${esc(n.title)}</h3><p>${lines(n.body)}</p></article>`).join("")}</div>` : `<div class="card">${empty("No announcements yet.")}</div>`);
@@ -881,18 +970,20 @@ const trackOpts = (tracks, mine, val) => (mine ? tracks.filter((t) => t.code ===
 const tName = (tracks, c) => c ? (tracks.find((t) => t.code === c)?.name || c) : "All tracks";
 
 async function tabStudents() {
-  const d = await rpc("acad_students");
+  const [d, certs] = await Promise.all([rpc("acad_students"), rpc("acad_certificates").catch(() => ({}))]);
+  const canCert = ["director", "academy_admin", "super"].includes(ME.role);
   const S = d.students, set = S.filter((s) => s.account).length;
   const att = S.filter((s) => s.sessions_past).map((s) => s.sessions_attended / s.sessions_past);
   const canInvite = ["cohort_manager", "academy_admin", "adm_admin", "super"].includes(ME.role);
   shell("students", "Students", `${esc(d.cohort.name)} · ${d.week < 1 ? `starts ${fmtDateD(d.cohort.start_date)}` : `week ${d.week}`}${d.my_track ? ` · ${esc(tName(d.tracks, d.my_track))} only` : ""}`,
     `<div class="kpis">${[["Students", S.length], ["Accounts set up", `${set}/${S.length}`], ["Waiting for marking", S.reduce((t, s) => t + s.tasks_waiting, 0)], ["Average attendance", att.length ? Math.round((att.reduce((a, b) => a + b, 0) / att.length) * 100) + "%" : "–"]].map(([l, v]) => `<div class="kpi card"><span class="eyebrow">${l}</span><b class="mono">${v}</b></div>`).join("")}</div>
     ${canInvite && S.length > set ? `<div class="notice" style="margin-top:1rem"><span>${S.length - set} student${S.length - set === 1 ? " hasn't" : "s haven't"} set up their portal account yet.</span><button class="btn sm" data-act="invite">Email them a set-up link</button></div>` : ""}
-    <div class="card" style="margin-top:1rem">${S.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Student</th><th>Track</th><th>Portal</th><th>Tasks passed</th><th>Attendance</th><th>Fees</th></tr></thead><tbody>
+    <div class="card" style="margin-top:1rem">${S.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Student</th><th>Track</th><th>Portal</th><th>Tasks passed</th><th>Attendance</th><th>Fees</th><th>Certificate</th></tr></thead><tbody>
       ${S.map((s) => `<tr><td data-label="Student"><b>${esc(s.first_name)} ${esc(s.surname)}</b><span class="note" style="display:block"><span class="mono">${esc(s.matric)}</span> · ${esc(s.phone)}</span></td><td data-label="Track">${esc(s.track || "")}</td>
         <td data-label="Portal">${s.account ? `<span class="pill ok">Set up</span>` : `<span class="pill">${s.invited_at ? `Invited ${fmtDay(s.invited_at)}` : "Not yet"}</span>`}</td>
         <td data-label="Tasks passed" class="mono">${s.tasks_passed}/${s.tasks_due}${s.tasks_waiting ? ` <span class="note">(+${s.tasks_waiting} to mark)</span>` : ""}</td>
-        <td data-label="Attendance" class="mono">${s.sessions_past ? `${s.sessions_attended}/${s.sessions_past}` : "–"}</td><td data-label="Fees">${s.balance ? `<span class="pill bad">Owes ${naira(s.balance)}</span>` : `<span class="pill ok">Paid</span>`}</td></tr>`).join("")}</tbody></table></div>` : empty("No admitted students yet.")}</div>`);
+        <td data-label="Attendance" class="mono">${s.sessions_past ? `${s.sessions_attended}/${s.sessions_past}` : "–"}</td><td data-label="Fees">${s.balance ? `<span class="pill bad">Owes ${naira(s.balance)}</span>` : `<span class="pill ok">Paid</span>`}</td>
+        <td data-label="Certificate">${certs[s.id] ? `<a class="link sm" href="#/certificate/${esc(certs[s.id].cert_id)}" target="_blank" rel="noopener">View</a>${canCert ? ` · <button class="link sm" data-act="cert-revoke" data-k="${s.id}">Withdraw</button>` : ""}` : canCert ? `<button class="btn sm" data-act="cert-issue" data-k="${s.id}">Issue</button>` : `<span class="note">Not yet</span>`}</td></tr>`).join("")}</tbody></table></div>` : empty("No admitted students yet.")}</div>`);
 }
 
 async function tabContent() {
@@ -994,7 +1085,18 @@ document.addEventListener("click", async (e) => {
   if (!t) return;
   const a = t.dataset.act, k = t.dataset.k;
   if (a === "eye") { const i = t.parentNode.querySelector("input"); const show = i.type === "password"; i.type = show ? "text" : "password"; t.innerHTML = show ? EYE_OFF : EYE; t.setAttribute("aria-label", show ? "Hide password" : "Show password"); return; }
-  if (a === "jump") { e.preventDefault(); document.getElementById(k)?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+  if (a === "print") { window.print(); return; }
+  if (a === "install") { if (INSTALL_EVT) { INSTALL_EVT.prompt(); const r = await INSTALL_EVT.userChoice.catch(() => null); INSTALL_EVT = null; if (r?.outcome === "accepted") $("#inst-card")?.remove(); } return; }
+  if (a === "install-off") { try { localStorage.setItem("jn.install.off", "1"); } catch { /* ignore */ } $("#inst-card")?.remove(); return; }
+  if (a === "cert-pdf") { try { await downloadCertPdf(t); } catch (x) { toast("Couldn't make the PDF. Please try again."); } return; }
+  if (a === "cert-copy") { const u = CERT_NOW ? certUrl(CERT_NOW) : location.href; try { await navigator.clipboard.writeText(u); } catch { const ta = document.createElement("textarea"); ta.value = u; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); } toast("Verification link copied"); return; }
+  if (a === "cert-issue" || a === "cert-revoke") {
+    const issue = a === "cert-issue";
+    if (!confirm(issue ? "Issue a certificate to this student? They'll get an email with it." : "Withdraw this certificate? Its code will stop verifying.")) return;
+    try { await busy(t, () => rpc(issue ? "acad_issue_certificate" : "acad_revoke_certificate", { p_app: k })); toast(issue ? "Certificate issued" : "Certificate withdrawn"); route(); } catch (x) { toast(x.message); }
+    return;
+  }
+  if (a === "jump") { e.preventDefault(); const el = document.getElementById(k); if (el?.tagName === "DETAILS") el.open = true; el?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (a === "signout") { await auth.signOut(); ME = null; return go("#/staff"); }
   if (a === "copy-link") { const v = $("#my-ref")?.textContent || ""; try { await navigator.clipboard.writeText(v); } catch { const t = document.createElement("textarea"); t.value = v; document.body.append(t); t.select(); document.execCommand("copy"); t.remove(); } return toast("Application number copied"); }
   if (a === "pick-day") { ui.pick = { day: k, slot: null }; return route(); }
@@ -1163,7 +1265,7 @@ document.addEventListener("submit", async (e) => {
     const v = (id) => $("#" + id).value;
     const p = { cohort: { name: v("st-name"), start_date: v("st-start"), year2: v("st-year"), batch: v("st-batch"), applications_open: $("#st-open").checked, pass_mark: +v("st-pass"), ready_n: +v("st-n"), assess_minutes: +v("st-mins"), offer_days: +v("st-days"), inst_due_week: +v("st-due") },
       programme: { fee: +v("st-fee"), inst_pct: +v("st-pct") }, tracks: $$("[data-track]").map((i) => ({ code: i.dataset.track, seats: +i.value, paused: $("#pause-" + i.dataset.track).checked })),
-      site: { site_url: v("st-site"), website_url: v("st-web"), zuri_url: v("st-zuri"), call_link: v("st-call"), signer_name: v("st-sname"), signer_title: v("st-stitle") } };
+      site: { site_url: v("st-site"), website_url: v("st-web"), zuri_url: v("st-zuri"), call_link: v("st-call"), info_session_url: v("st-info"), sample_lesson_url: v("st-sample"), team: JSON.stringify(Object.fromEntries(TEAM.map(([r], i) => [r, { name: v(`st-tn${i}`), photo: v(`st-tp${i}`) }]).filter(([, m]) => m.name || m.photo))), signer_name: v("st-sname"), signer_title: v("st-stitle") } };
     try { await busy(f.querySelector("button[type=submit]"), () => rpc("admin_save_settings", { p })); INFO = null; toast("Settings saved"); route(); } catch (x) { $("#st-err").textContent = x.message; }
     return;
   }
@@ -1247,8 +1349,150 @@ document.addEventListener("submit", async (e) => {
   }
 });
 
+
+/* ---------- certificate ---------- */
+const CERT_SEAL = `<svg width="210" height="210" viewBox="0 0 210 210" aria-hidden="true"><defs><path id="cring" d="M105 105 m-78 0 a78 78 0 1 1 156 0 a78 78 0 1 1 -156 0"/></defs>
+  <circle cx="105" cy="105" r="100" fill="#FFFFFF" stroke="#F4B740" stroke-width="3"/><circle cx="105" cy="105" r="93" fill="none" stroke="#10263D" stroke-width="1.5" stroke-dasharray="2 4"/>
+  <circle cx="105" cy="105" r="62" fill="none" stroke="#10263D" stroke-width="1.5"/>
+  <text font-family="DM Sans, sans-serif" font-size="14" font-weight="700" letter-spacing="3.2" fill="#10263D"><textPath href="#cring">JOBNEST ACADEMY · BECOME WORK-READY ·</textPath></text>
+  <g transform="translate(83 72) scale(1.22)"><rect width="36" height="36" rx="10" fill="#0F7B6C"/><path d="M8 20c1.5 6 18.5 6 20 0" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="18" cy="14" r="4.2" fill="#F4B740"/></g>`;
+const CERT_WAVES = Array.from({ length: 35 }, (_, i) => { const y = 40 + i * 22; return `<path d="M0 ${y} Q 140 ${y - 30} 280 ${y} T 560 ${y} T 840 ${y} T 1120 ${y}" fill="none" stroke="#0F7B6C" stroke-opacity="0.05" stroke-width="1"/>`; }).join("");
+function certHTML(c) {
+  const done = c.completed_on ? fmtDateD(c.completed_on).replace(/^\w+ /, "") : "";
+  return `<div class="cert"><div class="cert-in">
+    <svg class="cert-bg" viewBox="0 0 1120 800" preserveAspectRatio="none" aria-hidden="true">${CERT_WAVES}</svg>
+    <div class="cert-main">
+      <div class="cert-logo"><svg width="64" height="64" viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" rx="10" fill="#0F7B6C"/><path d="M8 20c1.5 6 18.5 6 20 0" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="18" cy="14" r="4.2" fill="#F4B740"/></svg><span>Jobnest<br><span>Academy</span></span></div>
+      <span class="cert-date">${esc(done)}</span>
+      <span class="cert-name">${esc(c.name)}</span>
+      <span class="cert-sm">has successfully completed</span>
+      <span class="cert-prog">${esc(c.programme)}</span>
+      <span class="cert-sm">${c.track ? `${esc(c.track)} track · ` : ""}a ${c.weeks || 17}-week online programme by Jobnest Academy</span>
+    </div>
+    <div class="cert-sig"><img src="/assets/signature-pd.png" alt="Signature of ${esc(c.signer_name)}"><span class="cert-line"></span><b>${esc(c.signer_name)}</b><span>${esc(c.signer_title)}, Jobnest Academy</span></div>
+    <div class="cert-ribbon"><span class="cert-title">CERTIFICATE<br>OF<br>COMPLETION</span><i></i><div class="cert-seal">${CERT_SEAL}<text x="105" y="140" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#10263D">${esc(c.year || "")}</text></svg></div></div>
+    <div class="cert-verify">Verify at ${esc(location.host)}/#/verify/<b>${esc(c.cert_id)}</b><br>Jobnest Academy confirms this person completed the programme.</div>
+  </div></div>`;
+}
+function fitCert() {
+  $$(".cert-box").forEach((box) => { const c = box.querySelector(".cert"); if (!c) return;
+    const k = Math.min(1, box.clientWidth / 1123); c.style.transform = `scale(${k})`; box.style.height = `${794 * k}px`; });
+}
+window.addEventListener("resize", fitCert);
+const certUrl = (c) => `${location.origin}/#/verify/${c.cert_id}`;
+function certBlock(c) {
+  const d = c.completed_on ? new Date(c.completed_on + "T12:00:00Z") : new Date();
+  const li = "https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=" + encodeURIComponent(c.programme) + "&organizationName=" + encodeURIComponent("Jobnest Academy") +
+    "&issueYear=" + d.getUTCFullYear() + "&issueMonth=" + (d.getUTCMonth() + 1) + "&certUrl=" + encodeURIComponent(certUrl(c)) + "&certId=" + encodeURIComponent(c.cert_id);
+  CERT_NOW = c;
+  return `<div class="cert-actions"><button class="btn gold" data-act="cert-pdf">Download PDF</button><a class="btn li-btn" href="${esc(li)}" target="_blank" rel="noopener">Add to LinkedIn ↗</a><button class="btn ghost" data-act="cert-copy">Copy verification link</button></div>
+    <div id="cert-box" class="cert-box">${certHTML(c)}</div>
+    <p class="note" style="margin-top:.8rem">Employers can check it's real at <span class="mono" style="overflow-wrap:anywhere">${esc(certUrl(c).replace(/^https?:\/\//, ""))}</span></p>`;
+}
+let CERT_NOW = null;
+async function pageCertificate(code) {
+  loading();
+  let c = null;
+  try { [c] = await Promise.all([rpc("certificate_view", { p_cert: code }), info().catch(() => null)]); } catch { c = null; }
+  if (!c || !c.cert_id) {
+    app.innerHTML = pubHeader() + `<section class="wrap pub-wrap"><div class="card verify"><h1>Certificate not found</h1><p>There's no Jobnest Academy certificate with the code <b class="mono">${esc(code)}</b>. Check the code and try again.</p></div></section>`;
+    return;
+  }
+  app.innerHTML = pubHeader() + `<section class="wrap pub-wrap cert-page">
+    <div class="verified"><span class="v-tick" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-9"/></svg></span><div><b>Verified certificate</b><span>Jobnest Academy issued this certificate. It is genuine.</span></div></div>
+    <dl class="v-facts"><div><dt>Name</dt><dd>${esc(c.name)}</dd></div><div><dt>Programme</dt><dd>${esc(c.programme)}</dd></div>${c.track ? `<div><dt>Track</dt><dd>${esc(c.track)}</dd></div>` : ""}<div><dt>Completed</dt><dd>${esc(fmtDateD(c.completed_on))}</dd></div><div><dt>Certificate</dt><dd class="mono">${esc(c.cert_id)}</dd></div></dl>
+    ${certBlock(c)}</section>`;
+  document.title = `Certificate · ${c.name} · Jobnest Academy`;
+  fitCert();
+}
+
+/* Draws the certificate on a canvas (same layout as the page) and saves it as a one-page A4 PDF. */
+async function certCanvas(c, k = 2) {
+  const fonts = ['500 46px "Playfair Display"', 'italic 500 20px "Playfair Display"', '800 40px "Bricolage Grotesque"', '400 16px "DM Sans"', '700 16px "DM Sans"', '700 14px "JetBrains Mono"'];
+  try { await Promise.all(fonts.map((f) => document.fonts.load(f))); } catch { /* fall back to system fonts */ }
+  const sig = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = "/assets/signature-pd.png"; });
+  const W = 1123, H = 794, cv = document.createElement("canvas"); cv.width = W * k; cv.height = H * k;
+  const x = cv.getContext("2d"); x.scale(k, k); x.textBaseline = "alphabetic";
+  const F = (f) => (x.font = f);
+  x.fillStyle = "#EEF1F0"; x.fillRect(0, 0, W, H);
+  const ox = 14, oy = 14, iw = W - 28, ih = H - 28;
+  x.fillStyle = "#FFFFFF"; x.fillRect(ox, oy, iw, ih); x.strokeStyle = "#C9D6D2"; x.lineWidth = 1; x.strokeRect(ox + .5, oy + .5, iw - 1, ih - 1);
+  x.save(); x.beginPath(); x.rect(ox, oy, iw, ih); x.clip();
+  x.strokeStyle = "rgba(15,123,108,0.05)"; const sx = iw / 1120, sy = ih / 800;
+  for (let y = 40; y < 800; y += 22) { x.beginPath(); x.moveTo(ox, oy + y * sy); for (let s0 = 0; s0 < 1120; s0 += 280) { const up = (s0 / 280) % 2 === 0 ? -30 : 30; x.quadraticCurveTo(ox + (s0 + 140) * sx, oy + (y + up) * sy, ox + (s0 + 280) * sx, oy + y * sy); } x.stroke(); }
+  const L = ox + 90;
+  // logo
+  const logo = (lx, ly, s) => { x.save(); x.translate(lx, ly); x.scale(s / 36, s / 36); x.fillStyle = "#0F7B6C"; x.beginPath(); x.roundRect(0, 0, 36, 36, 10); x.fill();
+    x.strokeStyle = "#FFFFFF"; x.lineWidth = 2.6; x.lineCap = "round"; x.beginPath(); x.moveTo(8, 20); x.bezierCurveTo(9.5, 26, 26.5, 26, 28, 20); x.stroke();
+    x.fillStyle = "#F4B740"; x.beginPath(); x.arc(18, 14, 4.2, 0, Math.PI * 2); x.fill(); x.restore(); };
+  logo(L, oy + 80, 64);
+  F('800 40px "Bricolage Grotesque", sans-serif'); x.fillStyle = "#10263D"; x.fillText("Jobnest", L + 80, oy + 108); x.fillStyle = "#0F7B6C"; x.fillText("Academy", L + 80, oy + 150);
+  const done = c.completed_on ? fmtDateD(c.completed_on).replace(/^\w+ /, "") : "";
+  F('700 14px "JetBrains Mono", monospace'); x.fillStyle = "#5B6B7B"; x.fillText(done, L, oy + 226);
+  F('500 46px "Playfair Display", serif'); x.fillStyle = "#10263D"; let nf = 46; while (x.measureText(c.name).width > 600 && nf > 28) { nf -= 2; F(`500 ${nf}px "Playfair Display", serif`); } x.fillText(c.name, L, oy + 290);
+  F('400 16px "DM Sans", sans-serif'); x.fillStyle = "#3E5266"; x.fillText("has successfully completed", L, oy + 332);
+  F('500 28px "Playfair Display", serif'); x.fillStyle = "#10263D"; x.fillText(c.programme, L, oy + 374);
+  F('400 16px "DM Sans", sans-serif'); x.fillStyle = "#3E5266"; x.fillText(`${c.track ? `${c.track} track · ` : ""}a ${c.weeks || 17}-week online programme by Jobnest Academy`, L, oy + 408);
+  // signature
+  const sb = oy + ih - 80, lineY = sb - 46;
+  x.strokeStyle = "#9AAAB9"; x.lineWidth = 1.5; x.beginPath(); x.moveTo(L, lineY); x.lineTo(L + 260, lineY); x.stroke();
+  if (sig) { const h = 92, w = sig.width * h / sig.height; x.drawImage(sig, L + 130 - w / 2, lineY + 8 - h, w, h); }
+  F('700 15px "DM Sans", sans-serif'); x.fillStyle = "#10263D"; x.fillText(c.signer_name || "", L, lineY + 26);
+  F('400 13px "DM Sans", sans-serif'); x.fillStyle = "#5B6B7B"; x.fillText(`${c.signer_title || "Programme Director"}, Jobnest Academy`, L, lineY + 45);
+  // ribbon
+  const rx = ox + iw - 70 - 270, rw = 270, rh = 640;
+  x.fillStyle = "#10263D"; x.beginPath(); x.moveTo(rx, oy); x.lineTo(rx + rw, oy); x.lineTo(rx + rw, oy + rh); x.lineTo(rx + rw / 2, oy + rh * .88); x.lineTo(rx, oy + rh); x.closePath(); x.fill();
+  F('500 26px "Playfair Display", serif'); x.fillStyle = "#FFFFFF"; x.textAlign = "center";
+  const spaced = (t, cx, cy) => { const ls = 26 * .14; const w = [...t].reduce((a, ch) => a + x.measureText(ch).width + ls, -ls); let px = cx - w / 2; x.textAlign = "left"; for (const ch of t) { x.fillText(ch, px, cy); px += x.measureText(ch).width + ls; } x.textAlign = "center"; };
+  spaced("CERTIFICATE", rx + rw / 2, oy + 100); spaced("OF", rx + rw / 2, oy + 135); spaced("COMPLETION", rx + rw / 2, oy + 170);
+  x.fillStyle = "#F4B740"; x.beginPath(); x.roundRect(rx + rw / 2 - 28, oy + 197, 56, 4, 2); x.fill();
+  // seal
+  const cx = rx + rw / 2, cy = oy + 375;
+  x.fillStyle = "#FFFFFF"; x.beginPath(); x.arc(cx, cy, 100, 0, Math.PI * 2); x.fill(); x.strokeStyle = "#F4B740"; x.lineWidth = 3; x.stroke();
+  x.strokeStyle = "#10263D"; x.lineWidth = 1.5; x.setLineDash([2, 4]); x.beginPath(); x.arc(cx, cy, 93, 0, Math.PI * 2); x.stroke(); x.setLineDash([]);
+  x.beginPath(); x.arc(cx, cy, 62, 0, Math.PI * 2); x.stroke();
+  F('700 14px "DM Sans", sans-serif'); x.fillStyle = "#10263D"; x.textAlign = "center";
+  const ring = "JOBNEST ACADEMY · BECOME WORK-READY · "; let ang = Math.PI;
+  for (const ch of ring) { const wch = x.measureText(ch).width + 3.2; const a1 = ang + (wch / 2) / 78; x.save(); x.translate(cx + 78 * Math.cos(a1), cy + 78 * Math.sin(a1)); x.rotate(a1 + Math.PI / 2); x.fillText(ch, 0, 5); x.restore(); ang += wch / 78; }
+  logo(cx - 22, cy - 33, 44);
+  F('700 12px "JetBrains Mono", monospace'); x.fillText(c.year || String(new Date().getFullYear()), cx, cy + 35);
+  // verify
+  x.textAlign = "right"; F('400 13px "DM Sans", sans-serif'); x.fillStyle = "#5B6B7B";
+  const vr = ox + iw - 70; F('700 13px "JetBrains Mono", monospace'); const cw = x.measureText(c.cert_id).width; x.fillStyle = "#10263D"; x.fillText(c.cert_id, vr, oy + ih - 62);
+  F('400 13px "DM Sans", sans-serif'); x.fillStyle = "#5B6B7B"; x.fillText(`Verify at ${location.host}/#/verify/`, vr - cw, oy + ih - 62); x.fillText("Jobnest Academy confirms this person completed the programme.", vr, oy + ih - 41);
+  x.restore();
+  return cv;
+}
+function jpegToPdf(jpeg, w, h) {
+  const enc = new TextEncoder(), parts = [], offs = []; let len = 0;
+  const add = (b) => { const u = typeof b === "string" ? enc.encode(b) : b; parts.push(u); len += u.length; };
+  const obj = (n, body) => { offs[n] = len; add(`${n} 0 obj\n`); body(); add("\nendobj\n"); };
+  add("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n");
+  const PW = 841.89, PH = 595.28, content = `q ${PW} 0 0 ${PH} 0 0 cm /Im0 Do Q`;
+  obj(1, () => add("<< /Type /Catalog /Pages 2 0 R >>"));
+  obj(2, () => add("<< /Type /Pages /Kids [3 0 R] /Count 1 >>"));
+  obj(3, () => add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>`));
+  obj(4, () => { add(`<< /Type /XObject /Subtype /Image /Width ${w} /Height ${h} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpeg.length} >>\nstream\n`); add(jpeg); add("\nendstream"); });
+  obj(5, () => add(`<< /Length ${content.length} >>\nstream\n${content}\nendstream`));
+  const xref = len; add(`xref\n0 6\n0000000000 65535 f \n${[1, 2, 3, 4, 5].map((n) => String(offs[n]).padStart(10, "0") + " 00000 n \n").join("")}trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`);
+  return new Blob(parts, { type: "application/pdf" });
+}
+async function downloadCertPdf(btn) {
+  const c = CERT_NOW; if (!c) return;
+  await busy(btn, async () => {
+    const cv = await certCanvas(c, 2.4);
+    const blob = await new Promise((r) => cv.toBlob(r, "image/jpeg", 0.93));
+    const pdf = jpegToPdf(new Uint8Array(await blob.arrayBuffer()), cv.width, cv.height);
+    const a = document.createElement("a"); a.href = URL.createObjectURL(pdf);
+    a.download = `Jobnest-Academy-Certificate-${c.name.replace(/[^A-Za-z0-9]+/g, "-")}.pdf`;
+    document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  });
+  toast("Certificate downloaded");
+}
+
 /* ---------- router ---------- */
 async function route() {
+  $("#cert-print")?.remove();
   if (TOUR_I != null && !location.hash.startsWith("#/learn")) { TOUR_I = null; renderTour(); }
   const back = auth.takeFromUrl();
   if (back) {
@@ -1274,6 +1518,9 @@ async function route() {
     if (p0 === "a" && p1 && p2) return pageApplicant(p1, p2, p3 || "");
     await info();
     if (p0 === "gep") return pageHome();
+    if (p0 === "tracks") return pageTracks();
+    if (p0 === "programmes") return pagePrograms();
+    if ((p0 === "verify" || p0 === "certificate") && p1) return pageCertificate(p1);
     if (p0 === "start") return go("#/apply");
     if (p0 === "apply") {
       if (p1 === "zuri" && p2) { try { sessionStorage.setItem("jn_zuri", p2.slice(0, 4000)); } catch (e) {} history.replaceState(null, "", location.pathname + "#/apply"); }
