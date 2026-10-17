@@ -289,3 +289,20 @@ html,#app{overflow-x:clip}
 .badge{display:inline-flex;align-items:center;gap:.4rem;border:1.5px dashed var(--line);border-radius:99px;padding:.35rem .75rem .35rem .4rem;font-size:.85rem;font-weight:600;color:var(--muted)}
 .badge i{font-style:normal;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--bg);filter:grayscale(1);opacity:.5}
 .badge.on{border:1.5px solid var(--accent);background:var(--accent-soft);color:var(--ink)}.badge.on i{filter:none;opacity:1;background:#fff}
+
+/* ---------- student portal (prototype layout) ---------- */
+.ls-top .logo{color:var(--ink);text-decoration:none}
+.ls-top .chip{text-decoration:none}
+@media(max-width:560px){.ls-top .chip .mono{display:none}.ls-top .logo{font-size:1rem}}
+.faq-i{border-bottom:1px solid var(--line);padding:.8rem 0}.faq-i:last-child{border-bottom:0}
+.faq-i summary{cursor:pointer;list-style:none}.faq-i summary::-webkit-details-marker{display:none}
+.faq-i p{margin:.5rem 0 0}
+.prog-stats{grid-template-columns:repeat(3,1fr)}
+.appnav .tabs a{display:inline-block;border-bottom:3px solid transparent;padding:.75rem .8rem .6rem;font-weight:600;font-size:.88rem;color:var(--muted);white-space:nowrap;text-decoration:none}
+.appnav .tabs a:hover{color:var(--ink)}
+.appnav .tabs a[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+a.item,a.stage-btn,a.cl,a.seqbtn,a.sti,a.mi,a.fab{text-decoration:none;color:inherit}
+a.item b,a.cl .t{color:var(--ink)}
+a.fab{color:var(--brand-ink)}
+.oath-doc .sig-line{display:grid;height:auto;border:0;margin:0}
+@media(max-width:520px){.oath-doc .sig-line{grid-template-columns:1fr}.pledge{gap:.6rem;padding:.7rem}}

@@ -164,7 +164,7 @@ function pageHome() {
       <div class="nl-finrow"><ul class="nl-fin">
         <li><b>A certificate</b><span>Signed by the Programme Director, and easy for employers to verify.</span></li>
         <li><b>A real client project</b><span>In your portfolio, with feedback you can show employers.</span></li>
-        <li><b>Internship experience</b><span>Three weeks with a partner company.</span></li>
+        <li><b>Internship experience</b><span>Four weeks with a partner company.</span></li>
         <li><b>A job-ready CV and LinkedIn</b><span>Reviewed with your Career Coach.</span></li></ul>
         <div class="nl-certwrap"><div class="cert-box nl-cert" aria-label="Example certificate">${certHTML({ name: "Your Name", programme: p.name || "Graduate Employability Programme", weeks, track: "", completed_on: null, cert_id: "JNA-27-SAMPLE", signer_name: INFO.signer_name || "Shekemi Odeyemi", signer_title: INFO.signer_title || "Programme Director", year: String(new Date().getFullYear() + 1) })}</div></div>
       </div></div></section>
@@ -513,7 +513,6 @@ function staffNav(role) {
   adm.push({ k: "apps", l: "Applications" });
   if (["adm_admin", "super"].includes(role)) adm.push({ g: "Setup" }, { k: "emails", l: "Emails" }, { k: "settings", l: "Settings" });
   const ac = [{ g: "Academy" }, { k: "students", l: "Students" }];
-  if (["director", "cohort_manager", "facilitator", "academy_admin", "super"].includes(role)) ac.push({ k: "content", l: "Content" });
   if (["director", "cohort_manager", "facilitator", "super"].includes(role)) ac.push({ k: "grading", l: "Grading" });
   ac.push({ k: "sessions", l: "Live sessions" }, { k: "news", l: "Announcements" });
   if (role === "super") return [{ g: "Jobnest" }, { k: "staff", l: "Staff accounts" }, { k: "audit", l: "Activity log" }, ...adm, ...ac];
@@ -802,32 +801,6 @@ function pageLearnForgot() {
     <p class="note"><a class="link" href="#/learn/signin">Back to sign in</a></p>`);
 }
 
-function campusShell(tab, title, sub, body) {
-  const me = CAMPUS.me;
-  const items = [["home", "Home"], ["weeks", "Weeks"], ["tasks", "Tasks"], ["sessions", "Live sessions"], ["news", "Announcements"], ...(CAMPUS.cert ? [["certificate", "Certificate 🎓"]] : [])];
-  const todo = CAMPUS.tasks.filter((t) => !t.sub || t.sub.status === "redo").length;
-  const nav = items.map(([k, l]) => `<a class="snav-i" href="#/learn/${k}" aria-current="${k === tab ? "page" : "false"}"><span>${l}</span>${k === "tasks" && todo ? `<b class="cnt-b mono">${todo}</b>` : ""}</a>`).join("")
-    + `<p class="snav-g">${esc(me.matric)}</p><button class="snav-i" data-act="tour"><span>Take the tour again</span></button><button class="snav-i" data-act="signout-learn"><span>Sign out</span></button>`;
-  app.innerHTML = `<header class="adm-top role-top"><div class="shell-top"><div class="logo">${LOGO}Jobnest Academy · Student</div>
-    <div class="shell-tr"><span class="note" style="color:#C9D6E2">${esc(me.first_name)} · <span class="mono">${esc(me.matric)}</span></span><button class="btn sm ghost" data-act="signout-learn">Sign out</button></div></div></header>
-    <div class="shell"><aside class="snav" aria-label="Menu"><p class="snav-g">${esc(me.track || "")}</p>${nav}</aside>
-    <main class="shell-main"><details class="snav-m"><summary><span>Menu</span><b>${(items.find((x) => x[0] === tab) || [])[1] || ""}</b></summary><nav class="snav-m-list">${nav}</nav></details>
-    <div class="wrap greet"><div><p class="eyebrow">${esc(CAMPUS.cohort.programme)} · ${esc(me.track || "")}</p><h1 style="margin-top:.5rem">${title}</h1>${sub ? `<p class="note" style="font-size:.95rem;margin-top:.4rem;max-width:62ch">${sub}</p>` : ""}</div></div>
-    <section class="wrap pagebody">${body}</section></main></div>`;
-}
-
-const lessonItem = (l) => `<li class="lesson"><span class="lk" aria-hidden="true">${KIND_I[l.kind] || "📘"}</span><div><b>${esc(l.title)}</b><span class="note"> · ${KIND_L[l.kind] || "Lesson"}</span>${l.body ? `<p class="note">${lines(l.body)}</p>` : ""}</div>${l.url ? `<a class="btn sm ghost" href="${esc(l.url)}" target="_blank" rel="noopener">Open ↗</a>` : ""}</li>`;
-const subPill = (t) => !t.sub ? (new Date(t.due_at) < new Date() ? `<span class="pill bad">Overdue</span>` : `<span class="pill now">To do</span>`)
-  : t.sub.status === "passed" ? `<span class="pill ok">Passed${t.sub.score != null ? ` · ${t.sub.score}%` : ""}</span>` : t.sub.status === "redo" ? `<span class="pill bad">Try again</span>` : `<span class="pill">Waiting for marking</span>`;
-function taskCard(t, open = false) {
-  const s = t.sub;
-  return `<details class="arow noav task" ${open ? "open" : ""}><summary><span class="an"><b>${esc(t.title)}</b><span class="note">Week ${t.week} · due ${fmtAt(t.due_at)} WAT</span></span>${subPill(t)}</summary>
-    <div class="abody">${t.brief ? `<p>${lines(t.brief)}</p>` : ""}${t.url ? `<p><a class="link" href="${esc(t.url)}" target="_blank" rel="noopener">Task materials ↗</a></p>` : ""}
-      ${s ? `<div class="rec ${s.status === "passed" ? "rec-offer" : s.status === "redo" ? "rec-decline" : ""}"><span class="eyebrow">Your work · sent ${fmtAt(s.submitted_at)}</span><a class="link" href="${esc(s.link)}" target="_blank" rel="noopener">${esc(s.link)}</a>${s.feedback ? `<span><b>Feedback:</b> ${lines(s.feedback)}</span>` : ""}</div>` : ""}
-      ${s?.status === "passed" ? "" : `<form class="form sub-form" data-k="${t.id}" novalidate><div class="field"><label for="sl-${t.id}">Link to your work</label><input id="sl-${t.id}" type="url" placeholder="https://docs.google.com/…" value="${s?.status === "redo" ? esc(s.link) : ""}"><span class="note">Set sharing to “Anyone with the link can view”.</span></div>
-        <div class="field"><label for="sn-${t.id}">Note for your facilitator (optional)</label><input id="sn-${t.id}"></div>
-        <div class="actions"><button class="btn sm" type="submit">${s ? "Send again" : "Submit"}</button></div></form>`}</div></details>`;
-}
 function sessionRow(x) {
   const st = new Date(x.starts_at), end = new Date(st.getTime() + x.minutes * 6e4), now = new Date();
   const live = now >= new Date(st - 30 * 6e4) && now <= end, past = now > end;
@@ -855,91 +828,473 @@ function installCard() {
     <div class="inst-a">${canPrompt ? `<button class="btn gold sm" data-act="install">Add to home screen</button>` : ""}<button class="link sm" data-act="install-off">Not now</button></div></div>`;
 }
 function progressCard(C, cert) {
-  const passed = C.tasks.filter((t) => t.sub && t.sub.status === "passed");
-  const past = C.sessions.filter((x) => new Date(x.starts_at).getTime() + x.minutes * 6e4 < Date.now());
+  const wd = LS.W.filter((_, i) => weekDone(i)).length, avg = avgScore();
+  const past = (C.sessions || []).filter((x) => new Date(x.starts_at).getTime() + x.minutes * 6e4 < Date.now());
   const came = past.filter((x) => ["present", "late", "joined"].includes(x.att)).length;
-  const w = C.week, weeks = C.cohort.weeks;
-  const B = [["🚀", "Started", true], ["✅", "First task", passed.length >= 1], ["🔥", "5 tasks passed", passed.length >= 5],
-    ["💼", "Client project", passed.some((t) => t.week >= 8 && t.week <= 9)], ["🎓", "Graduate", !!cert]];
+  const projWk = LS.W.findIndex((w) => w.stage === 3), internEnd = LS.W.map((w, i) => (w.stage === 4 ? i : -1)).filter((i) => i >= 0).at(-1);
+  const B = [["✍️", "Oath signed", oathSigned()], ["✅", "First week passed", wd >= 2], ["🔥", "5 weeks done", wd >= 5],
+    ["💼", "Client project", projWk >= 0 && weekDone(projWk + 1)], ["🏢", "Internship", internEnd != null && weekDone(internEnd)], ["🎓", "Graduate", !!cert]];
   return `<div class="card prog-card"><h3>Your progress</h3>
-    <div class="prog-stats"><div><b class="mono">${passed.length}/${C.tasks.length}</b><span>tasks passed</span></div><div><b class="mono">${past.length ? Math.round((came / past.length) * 100) + "%" : "–"}</b><span>attendance</span></div></div>
+    <div class="prog-stats"><div><b class="mono">${wd}/${LS.W.length}</b><span>weeks done</span></div><div><b class="mono">${avg != null ? avg + "%" : "–"}</b><span>average</span></div><div><b class="mono">${past.length ? Math.round((came / past.length) * 100) + "%" : "–"}</b><span>attendance</span></div></div>
     <div class="badges" aria-label="Badges">${B.map(([e, t, on]) => `<span class="badge ${on ? "on" : ""}" title="${t}${on ? "" : " (not yet)"}"><i aria-hidden="true">${e}</i>${t}</span>`).join("")}</div></div>`;
 }
 
-async function pageLearn(tab) {
+/* =========================================================
+   Student portal (follows the approved prototype)
+   Home · My Learning (stages and weeks) · More: Assignments, My Cohort, Profile, Help
+   ========================================================= */
+let LS = null; // { C: student_campus, L: learn_state, W: weeks for my track, stages }
+const DAY = 864e5;
+const LICON = {
+  lesson: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z" fill="currentColor"/></svg>`,
+  quiz: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01"/></svg>`,
+  task: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,
+  logweek: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M5 17a3 3 0 0 1 3-3h11M9 8h6"/></svg>`,
+  oath: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 17c1.5-2 2.5-2 3.5 0s2 2 3.5 0"/></svg>`,
+  guide: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5l-2 5-5 2 2-5z"/></svg>`,
+  lock: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`,
+  file: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>`,
+  done: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5 9-10"/></svg>`,
+};
+const LKIND = { lesson: "Video lesson", quiz: "Assessment", task: "Activity", logweek: "Internship logbook", oath: "Student Oath", guide: "Getting started" };
+const STAFF_STEPS = ["Supervisor grading", "Supervisor performance evaluation"];
+const PLEDGES = [
+  "I will attend my live sessions and complete every week of the programme on time.",
+  "I will submit only my own work, and credit others honestly when I use their ideas.",
+  "I will treat my classmates, facilitators and host organisations with respect.",
+  "I will communicate early and clearly whenever I am stuck or need help.",
+  "I will take feedback openly and use it to improve.",
+  "I will represent Jobnest Academy professionally during my client project and internship.",
+  "I will keep going when it gets hard, because I am building a career I am proud of.",
+];
+const LESSON_TPL = [
+  () => "Employers notice this quickly. Start by practising it on one real task this week, then make it part of your routine.",
+  () => "Most new hires skip this step. Doing it consistently is an easy way to stand out in your first 90 days.",
+  () => "Think of a recent task where this would have helped. What would you do differently next time?",
+  () => "Keep it simple at first. Small, repeated habits matter more than getting it perfect once.",
+];
+const RUBRIC = [["Meets the brief", "All required parts are delivered and follow the instructions.", 30], ["Quality & accuracy", "Work is correct, complete and shows the skills taught.", 30],
+  ["Clarity & presentation", "Easy to follow, well organised and professional.", 20], ["Timeliness", "Submitted by the deadline.", 20]];
+const LB_FIELDS = [
+  { sec: "Week details", fields: [{ k: "from", l: "Week starting", t: "date", req: 1 }, { k: "to", l: "Week ending", t: "date", req: 1 },
+    { k: "days", l: "Days worked", t: "number", min: 0, max: 7, req: 1 }, { k: "hours", l: "Total hours worked", t: "number", min: 0, max: 80, req: 1 }] },
+  { sec: "Work done", fields: [{ k: "tasks", l: "What tasks did you complete this week?", t: "area", req: 1, ph: "List each task and what you delivered." },
+    { k: "tools", l: "Which tools or software did you use?", t: "text", ph: "e.g. Excel, Google Sheets, Trello, Zendesk" },
+    { k: "meetings", l: "Which meetings or stand-ups did you attend?", t: "area", ph: "e.g. Daily stand-up (Mon–Fri), weekly review with supervisor" },
+    { k: "evidence", l: "Link to evidence of your work (optional)", t: "url", ph: "https://" }] },
+  { sec: "Learning & reflection", fields: [{ k: "skills", l: "What new skills did you learn or practise?", t: "area", req: 1 },
+    { k: "challenges", l: "What challenges did you face, and how did you solve them?", t: "area", req: 1 },
+    { k: "feedback", l: "What feedback did you receive from your supervisor or team?", t: "area" },
+    { k: "next", l: "What are your goals for next week?", t: "area", req: 1 }] },
+];
+const LB_FINAL = { k: "achievement", l: "What was your biggest achievement during this internship?", t: "area", req: 1 };
+const MORE_PAGES = [["assignments", "Assignments & Projects", "Submissions, grades and feedback"], ["cohort", "My Cohort", "Live sessions and announcements"],
+  ["profile", "Profile & Achievements", "Student ID, certificate, badges"], ["help", "Help & Support", "FAQs and how to get help"]];
+
+/* ---------- derived state ---------- */
+const lsStart = () => new Date(LS.L.start_date + "T00:00:00+01:00");
+const weekStartAt = (wi) => new Date(lsStart().getTime() + wi * 7 * DAY);
+const weekDue = (wi) => new Date(weekStartAt(wi).getTime() + 4 * DAY + 17 * 36e5);
+const graceDue = (wi) => new Date(weekStartAt(wi).getTime() + 6 * DAY + (23 * 60 + 59) * 6e4);
+const fmtD = (d) => fmt(d, { weekday: "short", day: "numeric", month: "short" });
+const PASS = () => LS.L.pass_mark || 70;
+const row = (it) => LS.L.progress[it.key];
+const isDoneIt = (it) => { const r = row(it); return !!r && r.status !== "revise"; };
+function itemScoreIt(it) { const r = row(it); if (!r) return null; if (it.type === "quiz") return r.score ?? null; if (it.proj) return r.status === "graded" ? r.score : null; return null; }
+function weekProgress(wi) { let d = 0, n = 0; LS.W[wi].items.forEach((it) => { if (it.opt) return; n++; if (isDoneIt(it)) d++; }); return { d, n, pct: n ? Math.round((d / n) * 100) : 100 }; }
+const weekItemsDone = (wi) => { const p = weekProgress(wi); return p.d === p.n; };
+function weekGate(wi) {
+  const wk = LS.W[wi]; if (!wk || wk.stage < 1 || wk.stage > 3) return null;
+  const qi = wk.items.findIndex((x) => x.type === "quiz"), pi = wk.items.findIndex((x) => x.proj);
+  const q = qi >= 0 ? itemScoreIt(wk.items[qi]) : null, pr = pi >= 0 ? row(wk.items[pi]) : null, p = pr && pr.status === "graded" ? pr.score : null;
+  const g = { qi, pi, q, p, hasQuiz: qi >= 0, attempt: LS.L.attempts[wi + 1] || 1 };
+  if (pr && pr.status === "revise") return { ...g, state: "revise" };
+  if (!weekItemsDone(wi)) return { ...g, state: "open" };
+  if (pi >= 0 && p == null) return { ...g, state: "grading" };
+  g.avg = Math.round(qi >= 0 && pi >= 0 ? (q + p) / 2 : pi >= 0 ? p : q ?? 100);
+  g.state = g.avg >= PASS() ? "pass" : "fail"; return g;
+}
+const weekDone = (wi) => { if (!weekItemsDone(wi)) return false; const g = weekGate(wi); return !g || g.state === "pass"; };
+const dateOpen = (wi) => wi === 0 || Date.now() >= weekStartAt(wi).getTime() - 2 * DAY;
+function unlockedW(wi) { if (LS.L.unlock_all || wi === 0) return true; return weekDone(wi - 1) && dateOpen(wi); }
+const curWeek = () => { const i = LS.W.findIndex((_, wi) => !weekDone(wi)); return i < 0 ? LS.W.length - 1 : i; };
+const oathSigned = () => { const it = LS.W[0].items.find((x) => x.type === "oath"); return it ? isDoneIt(it) : true; };
+function weekScore(wi) { const sc = LS.W[wi].items.map(itemScoreIt).filter((x) => x != null); return sc.length ? Math.round(sc.reduce((a, b) => a + b, 0) / sc.length) : null; }
+function avgScore() { const sc = LS.W.map((_, i) => weekScore(i)).filter((x) => x != null); return sc.length ? Math.round(sc.reduce((a, b) => a + b, 0) / sc.length) : null; }
+function findItem(key) { for (let wi = 0; wi < LS.W.length; wi++) { const ii = LS.W[wi].items.findIndex((x) => x.key === key); if (ii >= 0) return { wi, ii, it: LS.W[wi].items[ii] }; } return null; }
+function lsSessions() { return (LS.C.sessions || []).map((s) => ({ ...s, at: new Date(s.starts_at), wi: Math.floor((new Date(s.starts_at) - lsStart()) / (7 * DAY)) })); }
+function dueLabel(d) { const days = Math.ceil((d - Date.now()) / DAY); return days < 0 ? { t: "Overdue", c: "bad" } : days === 0 ? { t: "Due today", c: "warn" } : days <= 3 ? { t: `Due in ${days} day${days > 1 ? "s" : ""}`, c: "warn" } : { t: "Due " + fmtD(d), c: "" }; }
+const greeting = () => { const h = Number(fmt(new Date(), { hour: "numeric", hour12: false })); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
+function itemSub(it) {
+  const r = row(it);
+  return it.type === "lesson" ? `${LKIND.lesson}${it.mins ? ` · ${it.mins} min` : ""}` : it.type === "quiz" ? `${LKIND.quiz} · ${(it.qs || []).length} questions · counts toward your week result`
+    : it.type === "logweek" ? `${LKIND.logweek} · ${r ? "submitted" : "fill at the end of the week"}` : it.type === "oath" ? (r ? "Signed" : "Required to unlock Week 2 · about 3 min")
+    : it.type === "guide" ? "Platform guide · about 4 min" : STAFF_STEPS.includes(it.title) ? "Completed by staff" : LKIND.task + (it.link ? " · submit a link" : "");
+}
+function aStatus(it) {
+  const r = row(it); if (it.type === "logweek") return r ? "Submitted" : "Not Started";
+  if (!r) return "Not Started"; return { submitted: "Submitted", graded: "Graded", revise: "Revision Required", done: "Submitted" }[r.status] || "Submitted";
+}
+const STATUS_CLS = { "Not Started": "", "In Progress": "now", Submitted: "info", "Revision Required": "bad", Graded: "ok" };
+const pillS = (s) => `<span class="pill ${STATUS_CLS[s] || ""}">${s}</span>`;
+const lsAssignments = () => { const out = []; LS.W.forEach((wk, wi) => wk.items.forEach((it, ii) => { if ((it.type === "task" && it.link) || it.type === "logweek") out.push({ wi, ii, it, wk }); })); return out; };
+const deadlineLine = (wi) => `<div class="deadlines"><span><b>Full marks</b> until ${fmtD(weekDue(wi))}, 17:00</span><span><b>80% max</b> until ${fmtD(graceDue(wi))}, 23:59</span><span><b>50% max</b> after that</span></div>`;
+
+/* ---------- shell ---------- */
+function lsShell(page, body) {
+  const me = LS.C.me, inMore = !["home", "learning"].includes(page), cur = MORE_PAGES.find((m) => m[0] === page);
+  const due = lsAssignments().filter((a) => a.wi === curWeek() && !a.it.opt && ["Not Started", "Revision Required"].includes(aStatus(a.it))).length;
+  app.innerHTML = `<header class="top ls-top"><div class="wrap"><a class="logo" href="#/learn">${LOGO}Jobnest Academy</a>
+    <div class="who"><a class="chip" href="#/learn/profile" id="tour-profile"><span class="av">${esc((me.first_name[0] || "") + (me.surname?.[0] || ""))}</span><span class="nm">${esc(me.first_name)}</span><span class="mono">${esc(me.matric)}</span></a><button class="link" data-act="signout-learn" style="font-size:.85rem">Sign out</button></div></div></header>
+    <nav class="appnav" aria-label="Main"><div class="wrap"><div class="tabs">
+      <a href="#/learn" id="nav-home" aria-current="${page === "home" ? "page" : "false"}">Home</a>
+      <a href="#/learn/learning" id="nav-learning" aria-current="${page === "learning" ? "page" : "false"}">My Learning</a>
+      <button id="more" data-act="ls-more" aria-expanded="${!!ui.lsMore}" aria-current="${inMore ? "page" : "false"}">${inMore && cur ? `More · ${cur[1]}` : "More"} ▾</button></div></div>
+      ${ui.lsMore ? `<div class="wrap more-wrap"><div class="morepanel" role="menu">${MORE_PAGES.map(([k, l, d]) => `<a role="menuitem" class="mi" href="#/learn/${k}"><b>${l}${k === "assignments" && due ? ` <span class="cnt">${due}</span>` : ""}</b><span>${d}</span></a>`).join("")}
+        <button role="menuitem" class="mi" data-act="tour"><b>Take the tour again</b><span>A quick look around</span></button><button role="menuitem" class="mi" data-act="signout-learn"><b>Sign out</b><span>${esc(me.matric)}</span></button></div></div>` : ""}</nav>
+    ${body}${page === "help" ? "" : `<a class="fab" href="#/learn/help" aria-label="Need help? Go to Help & Support"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .9-1 1.7M12 17h.01"/></svg><span>Need help?</span></a>`}`;
+}
+const pageHead = (eyebrow, title, sub) => `<div class="wrap greet"><div><p class="eyebrow">${eyebrow}</p><h1 style="margin-top:.5rem">${title}</h1>${sub ? `<p class="note" style="font-size:.95rem;margin-top:.4rem;max-width:62ch">${sub}</p>` : ""}</div></div>`;
+
+/* ---------- Home ---------- */
+function encouragement(cur) {
+  const p = weekProgress(cur), left = p.n - p.d;
+  if (!oathSigned()) return "Start here: read and sign your Student Oath to unlock Week 2.";
+  const g = weekGate(cur);
+  if (g && g.state === "fail") return `Week ${cur + 1} average: ${g.avg}%. You need ${PASS()}% to move on, so repeat this week. You've got this.`;
+  if (g && g.state === "grading") return `All Week ${cur + 1} tasks done. Your project is being graded.`;
+  if (g && g.state === "revise") return `Your facilitator asked for changes to your Week ${cur + 1} project.`;
+  if (left === 0) return cur + 1 < LS.W.length ? `Week ${cur + 1} is done. Week ${cur + 2} opens on its start date.` : "You've finished the programme. Well done!";
+  if (left === 1) return `You're 1 task away from finishing Week ${cur + 1}. Finish strong!`;
+  if (p.d === 0) { const n = LS.W[cur].items.find((it) => !it.opt && !isDoneIt(it)); return `New week, fresh start. Begin with “${n ? n.title : "your first task"}”.`; }
+  return `${p.d} of ${p.n} required tasks done this week. Keep the momentum going.`;
+}
+function lsHome(cert) {
+  const C = LS.C, cur = curWeek(), wk = LS.W[cur], p = weekProgress(cur);
+  let ni = wk.items.findIndex((it) => !it.opt && !isDoneIt(it)); if (ni < 0) ni = wk.items.findIndex((it) => !isDoneIt(it));
+  const nIt = ni >= 0 ? wk.items[ni] : null, dl = dueLabel(weekDue(cur)), daysLeft = Math.max(0, Math.ceil((weekDue(cur) - Date.now()) / DAY));
+  const due = lsAssignments().filter((a) => a.wi === cur && !a.it.opt && ["Not Started", "Revision Required"].includes(aStatus(a.it)));
+  const sc = weekScore(cur), avg = avgScore();
+  const sess = lsSessions().filter((s) => s.at.getTime() + s.minutes * 6e4 >= Date.now())[0];
+  const ann = (C.news || [])[0], before = Date.now() < lsStart().getTime();
+  const bal = C.me.balance > 0 ? `<div class="notice bal"><span>Your second instalment of <b>${naira(C.me.balance)}</b> is due by ${fmtDateD(C.me.due_date)}.</span><a class="btn sm gold" href="#/a/${esc(C.me.ref)}/${esc(C.me.token)}/pay">Pay now</a></div>` : "";
+  const certCard = cert ? `<div class="card cert-card"><span class="eyebrow">Certificate of completion</span><h2>Your certificate is ready 🎓</h2><div class="actions"><a class="btn gold" href="#/learn/certificate">View and download</a></div></div>` : "";
+  lsShell("home", pageHead(`Week ${cur + 1} of ${LS.W.length} · ${esc(C.me.track || "")}`, `${greeting()}, ${esc(C.me.first_name)}`, esc(before ? `The programme starts on ${fmtDateD(LS.L.start_date)}. You can start Week 1 now.` : encouragement(cur))) +
+  `<section class="wrap home">${installCard()}${bal}${certCard}
+    <div class="card today" id="t-today"><div class="today-l">
+        ${cur === 0 ? "" : `<p class="cd-inline ${dl.c}">⏳ <b>${daysLeft} day${daysLeft === 1 ? "" : "s"} left</b> · due ${fmtD(weekDue(cur))}, 17:00</p>`}
+        <p class="eyebrow">Today · Week ${cur + 1}: ${esc(wk.title)}</p>
+        <h2>${nIt ? esc(nIt.title) : "You're all caught up"}</h2>
+        <p class="note">${nIt ? `${LKIND[nIt.type] || "Activity"}${nIt.mins ? " · " + nIt.mins + " min" : ""} · ${nIt.opt ? "Optional" : "Mandatory"}` : "Open My Learning to look ahead"}</p>
+        <div class="actions"><a class="btn gold" href="${nIt ? `#/learn/learning/${cur + 1}/${nIt.key}` : "#/learn/learning"}">Continue →</a></div></div>
+      <div class="countdown ${cur === 0 ? "" : dl.c}"><span class="eyebrow">Week due</span><b class="mono">${cur === 0 ? "—" : daysLeft}</b><span class="note">${cur === 0 ? "No deadline in Orientation" : daysLeft === 1 ? "day left" : "days left"}</span>${cur === 0 ? "" : `<span class="note">${fmtD(weekDue(cur))}, 17:00</span>`}</div></div>
+    <div class="strip" id="t-strip">
+      <a class="sti" href="#/learn/learning"><span class="eyebrow">This week</span><b class="mono">${p.d}/${p.n}</b><span class="note">required done</span></a>
+      <a class="sti" href="#/learn/assignments"><span class="eyebrow">Due this week</span><b class="mono">${due.length}</b><span class="note">assignment${due.length === 1 ? "" : "s"}</span></a>
+      <div class="sti"><span class="eyebrow">Week score</span><b class="mono">${sc != null ? sc + "%" : "—"}</b><span class="note">${sc != null ? "so far" : "no grades yet"}</span></div>
+      <div class="sti"><span class="eyebrow">Average</span><b class="mono">${avg != null ? avg + "%" : "—"}</b><span class="note">all graded work</span></div></div>
+    <div class="cols">
+      <div class="card"><div class="ch"><h3>This week's checklist</h3><span class="note">${p.d} of ${p.n} required</span></div><div class="bar"><i style="width:${p.pct}%"></i></div>
+        <ul class="checklist">${wk.items.map((it) => { const dn = isDoneIt(it); return `<li><a class="cl ${dn ? "done" : ""}" href="#/learn/learning/${cur + 1}/${it.key}"><span class="box">${dn ? LICON.done.replace(/20/g, "14") : ""}</span><span class="t">${esc(it.title)}</span>${it.opt ? `<span class="req opt">Optional</span>` : ""}</a></li>`; }).join("")}</ul></div>
+      <div class="stack">
+        <div class="card"><div class="ch"><h3>Next live session</h3><a class="link" href="#/learn/cohort">Full schedule</a></div>${sess ? `<ul class="sess-list">${sessionRow(sess)}</ul>` : `<p class="empty">No upcoming sessions.</p>`}</div>
+        <div class="card"><div class="ch"><h3>Latest announcement</h3><a class="link" href="#/learn/cohort">All</a></div>${ann ? `<div class="ann" style="border:0;padding:0"><b>${esc(ann.title)}</b><p class="note">${lines(ann.body).slice(0, 400)}</p><small class="note">${fmtAt(ann.at)}</small></div>` : `<p class="empty">No announcements yet.</p>`}</div>
+      </div></div></section>`);
+}
+
+/* ---------- My Learning ---------- */
+function weekSelect(sel) {
+  let out = "", last = -1;
+  LS.W.forEach((w, i) => { if (w.stage !== last) { if (last >= 0) out += "</optgroup>"; last = w.stage; out += `<optgroup label="Stage ${w.stage + 1}: ${esc(COURSE_STAGES[w.stage].title)}">`; }
+    out += `<option value="${i + 1}" ${i === sel ? "selected" : ""}>Week ${i + 1}: ${esc(w.title)}${weekDone(i) ? " ✓" : unlockedW(i) ? "" : " 🔒"}</option>`; });
+  return `<label class="wk-select-wrap" for="week-select"><span class="eyebrow">Jump to a week</span><select id="week-select" data-change="week-select">${out}</optgroup></select></label>`;
+}
+function lsLearning(wi, key) {
+  let total = 0, done = 0; LS.W.forEach((_, i) => { const p = weekProgress(i); total += p.n; done += p.d; });
+  const pct = Math.round((done / total) * 100), current = curWeek(), avg = avgScore(), viewStage = LS.W[wi].stage;
+  const groups = COURSE_STAGES.map((st, si) => {
+    const idx = LS.W.map((w, i) => (w.stage === si ? i : -1)).filter((i) => i >= 0); if (!idx.length) return "";
+    const dn = idx.filter((i) => weekDone(i)).length, open = unlockedW(idx[0]), all = dn === idx.length;
+    const wks = idx.map((i) => { const wk = LS.W[i], p = weekProgress(i), un = unlockedW(i), d = weekDone(i), gg = weekGate(i);
+      return `<a class="stage-btn ${d ? "done" : i === current ? "now" : ""} ${un ? "" : "locked"}" href="#/learn/learning/${i + 1}" aria-current="${!key && i === wi}">
+        <span class="n">${d ? "✓" : i + 1}</span><span><small>Week ${i + 1}</small><b>${esc(wk.title)}</b></span><span class="lk">${!un ? "🔒" : d ? "" : gg && gg.state === "fail" ? "Repeat" : gg && gg.state === "grading" ? "Grading" : p.d + "/" + p.n}</span></a>`; }).join("");
+    return `<details class="sg ${all ? "done" : open ? "" : "locked"}" ${si === viewStage ? "open" : ""}><summary><span class="sg-n">${all ? "✓" : si + 1}</span><span class="sg-t"><small>Stage ${si + 1}</small><b>${esc(st.title)}</b></span><span class="sg-s">${all ? "Done" : open ? `${dn}/${idx.length}` : "🔒"}</span></summary><div class="sg-w">${wks}</div></details>`; }).join("");
+  const f = key ? findItem(key) : null;
+  const main = f && f.wi === wi ? lsItemView(wi, f.ii) : key === "brief" ? lsBrief(wi) : lsWeekView(wi);
+  lsShell("learning", `<div class="wrap lhead"><div><p class="eyebrow">${esc(LS.C.me.track || "")} · ${esc(LS.C.cohort.name)}</p><h1>My Learning</h1></div>
+    <div class="lh-prog" id="tour-progress"><div class="lh-bar"><i style="width:${pct}%"></i></div><span><b class="mono">${pct}%</b> complete · Week ${current + 1} of ${LS.W.length}${avg != null ? ` · avg <b class="mono">${avg}%</b>` : ""}</span></div></div>
+    <section class="wrap campus"><aside>${weekSelect(wi)}<nav class="rail" id="tour-rail" aria-label="Programme stages and weeks">${groups}</nav></aside><div>${main}</div></section>`);
+}
+function gateCard(wi) {
+  const g = weekGate(wi); if (!g) return "";
+  const tile = (l, v, n) => `<div class="gt"><span class="eyebrow">${l}</span><b class="mono">${v}</b><span class="note">${n}</span></div>`;
+  const pr = g.pi >= 0 ? row(LS.W[wi].items[g.pi]) : null;
+  const pLabel = g.p != null ? g.p + "%" : pr?.status === "revise" ? "Revise" : pr ? "Grading" : "—";
+  const msg = { open: `Complete ${g.hasQuiz && g.pi >= 0 ? "the assessment and the week project" : g.pi >= 0 ? "the week project" : "the assessment"}. You need ${g.hasQuiz && g.pi >= 0 ? "an average of " : ""}<b>${PASS()}% or more</b> to move on. Below ${PASS()}%, you repeat this week.`,
+    grading: `Your week project is with your facilitator. The next week unlocks once it's graded and your ${g.hasQuiz ? "average" : "grade"} is ${PASS()}% or more.`,
+    revise: "Your facilitator asked for changes to your week project. Make them and resubmit.", pass: "Passed. Well done!",
+    fail: `You need ${PASS()}% to move on. Repeat this week to try again: the lessons, assessment and project reset.` }[g.state];
+  return `<div class="gate-card ${g.state}"><div class="gc-h"><div><span class="eyebrow">Week result${g.attempt > 1 ? ` · attempt ${g.attempt}` : ""}</span><b>${g.state === "pass" ? "Week passed" : g.state === "fail" ? "Week not passed" : g.state === "grading" ? "Waiting for your grade" : g.state === "revise" ? "Revision requested" : "Pass mark: " + PASS() + "%"}</b></div>
+    <div class="gc-tiles">${g.hasQuiz ? tile("Assessment", g.q != null ? g.q + "%" : "—", "quiz") : ""}${g.pi >= 0 ? tile("Week project", pLabel, "graded by facilitator") : ""}${tile(g.hasQuiz && g.pi >= 0 ? "Average" : "Result", g.avg != null ? g.avg + "%" : "—", "need " + PASS() + "%")}</div></div>
+    <p>${msg}</p>${g.state === "fail" ? `<div><button class="btn" data-act="ls-repeat" data-k="${wi + 1}">Repeat Week ${wi + 1}</button></div>` : ""}</div>`;
+}
+function weekPill(wi, un) {
+  if (!un) return `<span class="pill">Locked</span>`; const g = weekGate(wi), p = weekProgress(wi);
+  if (g && g.state !== "open") return `<span class="pill ${g.state === "pass" ? "ok" : g.state === "fail" ? "bad" : "info"}">${g.state === "pass" ? "Passed · " + g.avg + "%" : g.state === "fail" ? "Not passed · " + g.avg + "%" : g.state === "revise" ? "Revision requested" : "Awaiting grade"}</span>`;
+  return `<span class="pill ${p.d === p.n ? "ok" : "now"}">${p.d === p.n ? "Complete" : p.d + " of " + p.n + " required done"}</span>`;
+}
+function lsWeekView(wi) {
+  const wk = LS.W[wi], st = COURSE_STAGES[wk.stage], p = weekProgress(wi), un = unlockedW(wi), me = LS.C.me;
+  const items = wk.items.map((it) => { const dn = isDoneIt(it), s = itemScoreIt(it), r = row(it);
+    if (!un) return `<div class="item locked"><span class="ic">${LICON.lock}</span><div><b>${esc(it.title)}</b><small>${itemSub(it)}</small></div>${it.opt ? `<span class="req opt">Optional</span>` : ""}</div>`;
+    const pill = r?.status === "revise" ? `<span class="pill bad">Revise</span>` : r?.status === "submitted" ? `<span class="pill info">Grading</span>` : dn ? `<span class="pill ok">${s != null ? s + "%" : "Done"}</span>` : `<span class="pill">Start</span>`;
+    return `<a class="item ${dn ? "done" : ""}" href="#/learn/learning/${wi + 1}/${it.key}"><span class="ic">${dn ? LICON.done : LICON[it.type] || LICON.task}</span><div><b>${esc(it.title)}</b><small>${itemSub(it)}</small></div><span class="item-r">${it.opt ? `<span class="req opt">Optional</span>` : ""}${pill}</span></a>`; }).join("");
+  const next = un && weekDone(wi) && wi < LS.W.length - 1 ? `<div class="celebrate"><div><b>Week ${wi + 1} complete.</b> <span class="note">${unlockedW(wi + 1) ? `Week ${wi + 2}: ${esc(LS.W[wi + 1].title)} is now unlocked.` : `Week ${wi + 2} opens on ${fmtD(new Date(weekStartAt(wi + 1).getTime() - 2 * DAY))}.`}</span></div>${unlockedW(wi + 1) ? `<a class="btn sm" href="#/learn/learning/${wi + 2}">Start Week ${wi + 2} →</a>` : ""}</div>` : "";
+  const head = (extra) => `<div class="stage-head wk-head" id="tour-head"><div class="row"><div><p class="eyebrow">Week ${wi + 1} of ${LS.W.length} · Stage ${wk.stage + 1}: ${esc(st.title)}</p><h2 style="margin-top:.45rem">${esc(wk.title)}</h2></div>${weekPill(wi, un)}</div>${extra}</div>`;
+  if (st.welcome) return head(`<div class="welcome"><p class="big">Congratulations, ${esc(me.first_name)}. You took a bold step.</p>
+      <p>Choosing to invest in yourself and your future takes courage, and you've already done the hardest part: you started. We're proud to have you in ${esc(LS.C.cohort.name)}.</p>
+      <p>Over the next ${LS.W.length} weeks you'll learn skills employers are hiring for, solve a real business problem in your own client project, and gain real work experience in your internship. Some weeks will stretch you. That is where the growth happens, and we'll be beside you every week.</p>
+      <p>Show up, ask questions and keep going. We can't wait to see you build a career you are proud of.</p><div><span class="sig">The Jobnest Academy Team</span></div></div>
+    <div class="bar" aria-hidden="true"><i style="width:${p.pct}%"></i></div>
+    ${oathSigned() ? "" : `<div class="gate">${LICON.lock}<span>Complete the ${p.n} required tasks below. <b>Week 2 stays locked until you read and sign your Student Oath.</b></span></div>`}`) + `<div class="items" id="tour-items">${items}</div>${next}`;
+  const tab = ui.wtab || "tasks", sess = un ? lsSessions().filter((s) => s.wi === wi)[0] : null;
+  const stWeeks = LS.W.map((w, i) => (w.stage === wk.stage ? i + 1 : null)).filter(Boolean);
+  const tabs = [["tasks", "Tasks", `${p.d}/${p.n}`], ["about", "About this week", ""], ["res", "Resources", String((wk.resources || []).length)]];
+  const lockMsg = !un ? `<div class="gate">${LICON.lock}<span><b>Preview.</b> ${wi === 1 && !oathSigned() ? "Opens when you sign your Student Oath in Week 1." : !weekDone(wi - 1) ? `Opens when you pass Week ${wi}: ${esc(LS.W[wi - 1].title)}.` : `Opens on ${fmtD(new Date(weekStartAt(wi).getTime() - 2 * DAY))}.`}</span></div>` : "";
+  const meta = `<div class="wk-meta-row"><span>Due ${fmtD(weekDue(wi))}, 17:00</span>${sess ? `<span>Live: ${fmtD(sess.at)}, ${fmtTime(sess.at)}</span>` : ""}</div>
+    ${un ? `<div class="bar" aria-hidden="true"><i style="width:${p.pct}%"></i></div>` : ""}
+    <div class="wtabs" role="tablist">${tabs.map(([k, l, c]) => `<button role="tab" data-act="ls-wtab" data-k="${k}" aria-selected="${tab === k}">${l}${c ? ` <span class="mono">${c}</span>` : ""}</button>`).join("")}</div>`;
+  let body = "";
+  if (tab === "tasks") { const ck = LS.L.checkins[wi + 1];
+    body = `${lockMsg}${un ? gateCard(wi) : ""}<div class="items" id="tour-items">${items}</div>${next}
+    ${un && wi % 2 === 1 ? `<form class="card checkin" id="checkin" data-wk="${wi + 1}" novalidate><div class="ch"><h3>Weekly check-in</h3>${ck ? `<span class="pill ok">Sent ${fmtDay(ck.at)}</span>` : ""}</div>
+      <p class="note">How confident do you feel about this week? Your facilitator reaches out if you need support.</p>
+      <div class="rate conf" role="radiogroup" aria-label="Confidence this week">${[["1", "Lost"], ["2", "Unsure"], ["3", "Okay"], ["4", "Confident"], ["5", "Very confident"]].map(([n, t]) => `<label><input type="radio" name="conf" value="${n}" ${String(ck?.conf) === n ? "checked" : ""}><span>${n} · ${t}</span></label>`).join("")}</div>
+      <div class="field"><label for="ck-note">Anything you're stuck on? (optional)</label><input id="ck-note" value="${esc(ck?.note || "")}" placeholder="e.g. I don't understand pivot tables yet"></div>
+      <div><button class="btn sm" type="submit">${ck ? "Update check-in" : "Send check-in"}</button></div></form>` : ""}`; }
+  if (tab === "about") body = `<div class="card about-card"><h3>By the end of this week you can</h3><ul class="obj">${(wk.objectives || []).map((o) => `<li>${esc(o)}</li>`).join("")}</ul>
+      <h3>Deadlines</h3>${deadlineLine(wi)}
+      ${wk.stage >= 1 && wk.stage <= 3 ? `<h3>How this week is passed</h3><p class="note">Your assessment score and week project grade are averaged. You need ${PASS()}% or more to move on; below that, you repeat the week.</p>` : ""}
+      ${sess ? `<h3>Live session</h3><ul class="sess-list">${sessionRow(sess)}</ul>` : ""}
+      <h3>About Stage ${wk.stage + 1}: ${esc(st.title)}</h3><p>${esc(st.objective || "")}</p>
+      <dl class="kv"><div><dt>Weeks</dt><dd>${stWeeks.length > 1 ? `Weeks ${stWeeks[0]}–${stWeeks.at(-1)}` : `Week ${stWeeks[0]}`}</dd></div>${st.facilitators ? `<div><dt>Facilitators</dt><dd>${esc(st.facilitators)}</dd></div>` : ""}</dl></div>`;
+  if (tab === "res") body = `<div class="card"><ul class="res">${(wk.resources || []).map((r) => `<li><span class="resbtn" aria-disabled="true">${LICON.file}<span>${esc(r[0])}</span><span class="tag">${r[1]}</span></span></li>`).join("")}</ul><p class="note" style="margin-top:.6rem">Your facilitators upload this week's files here.</p></div>`;
+  return head(meta) + `<div class="wk-body">${body}</div>`;
+}
+function seqNav(wi, ii) {
+  const flat = []; LS.W.forEach((w, i) => { if (unlockedW(i)) w.items.forEach((_, k) => flat.push([i, k])); });
+  const at = flat.findIndex(([a, b]) => a === wi && b === ii), prev = at > 0 ? flat[at - 1] : null, nxt = at >= 0 && at < flat.length - 1 ? flat[at + 1] : null;
+  const lbl = ([w, i]) => `${w !== wi ? `Week ${w + 1}: ` : ""}${esc(LS.W[w].items[i].title)}`, href = ([w, i]) => `#/learn/learning/${w + 1}/${LS.W[w].items[i].key}`;
+  const right = nxt ? `<a class="seqbtn nx" href="${href(nxt)}"><small>Next →</small><span>${lbl(nxt)}</span></a>` : `<a class="seqbtn nx" href="#/learn/learning/${wi + 1}"><small>Done</small><span>Back to Week ${wi + 1}</span></a>`;
+  return `<div class="seq">${prev ? `<a class="seqbtn" href="${href(prev)}"><small>← Previous</small><span>${lbl(prev)}</span></a>` : "<span></span>"}${right}</div>`;
+}
+function lessonBody(it) {
+  const pts = it.points || [];
+  return `<div class="lesson-doc" id="textver"><p class="eyebrow">Text version</p>
+    <h3>Overview</h3><p>${esc(it.intro || "")} By the end of this lesson you'll be able to apply each idea below to real work.</p>
+    ${pts.map((pt, i) => `<h4>${i + 1}. ${esc(pt)}</h4><p>${LESSON_TPL[i % LESSON_TPL.length](pt)}</p>`).join("")}
+    ${pts[0] ? `<div class="ex-box"><span class="eyebrow">Real-world example</span><p>Chidera, a junior analyst, started applying “${esc(pts[0])}” in her first month. Her manager mentioned it in her 3-month review as the reason she was given her own client.</p></div>` : ""}
+    <div class="try-box"><span class="eyebrow">Try it now · 10 minutes</span><p>Pick one point above and apply it to something you're working on today. Write two or three sentences in your notes about what you did and what changed.</p></div>
+    <h3>Key takeaways</h3><ul>${pts.map((p) => `<li>${esc(p)}</li>`).join("")}</ul></div>`;
+}
+function lsItemView(wi, ii) {
+  const it = LS.W[wi].items[ii], r = row(it), dn = isDoneIt(it), un = unlockedW(wi), me = LS.C.me;
+  const head = `<a class="back" href="#/learn/learning/${wi + 1}">← Week ${wi + 1}: ${esc(LS.W[wi].title)}</a><div><p class="eyebrow">${LKIND[it.type] || "Activity"}${it.mins ? " · " + it.mins + " min" : ""}${it.opt ? " · Optional" : ""}</p><h2 style="margin-top:.4rem">${esc(it.title)}</h2></div>`;
+  const nav = seqNav(wi, ii), btn = (lbl, undo) => `<div><button class="btn ${dn ? "ghost" : ""}" data-act="ls-done" data-k="${it.key}" data-v="${dn ? 0 : 1}">${dn ? undo : lbl}</button></div>`;
+  if (!un) return `<div class="view">${head}<div class="gate">${LICON.lock}<span><b>Locked.</b> This opens when Week ${wi + 1} unlocks.</span></div></div>`;
+  if (it.type === "oath") return `<div class="view">${head}${oathView(dn, r)}${nav}</div>`;
+  if (it.type === "guide") return `<div class="view">${head}${guideView()}<div class="actions"><button class="btn ghost" data-act="tour">Take the guided tour again</button><button class="btn ${dn ? "ghost" : ""}" data-act="ls-done" data-k="${it.key}" data-v="${dn ? 0 : 1}">${dn ? "Done ✓ · Mark as not done" : "I know my way around"}</button></div>${nav}</div>`;
+  if (it.title === "Read the Student Handbook") return `<div class="view">${head}${handbookView()}${btn("I've read the handbook", "Read ✓ · Mark as not read")}${nav}</div>`;
+  if (it.title === "Join your cohort community") return `<div class="view">${head}${communityView()}${btn("I've joined and introduced myself", "Joined ✓ · Undo")}${nav}</div>`;
+  if (it.title === "Read your project brief") return `<div class="view">${head}<p style="max-width:62ch">${esc(it.detail || "")}</p><div class="actions"><a class="btn ghost" href="#/learn/learning/${wi + 1}/brief">Read the full brief</a><button class="btn ${dn ? "ghost" : ""}" data-act="ls-done" data-k="${it.key}" data-v="${dn ? 0 : 1}">${dn ? "Read ✓ · Undo" : "I've read the brief"}</button></div>${nav}</div>`;
+  if (STAFF_STEPS.includes(it.title)) return `<div class="view">${head}<p style="max-width:62ch">${esc(it.detail || "")}</p><div class="signoff ${dn ? "signed" : ""}"><b>${dn ? "Completed by staff" : "Waiting for staff"}</b><p class="note">${dn ? "This step is done." : "You don't need to do anything here. Staff mark it complete."}</p></div>${nav}</div>`;
+  if (it.type === "logweek") return `<div class="view">${head}${logWeek(wi, it, r)}${nav}</div>`;
+  if (it.type === "lesson") return `<div class="view">${head}<div class="video"><span class="play" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg></span><span class="cap">${esc(it.title)} · video coming soon</span></div>
+    <p class="note">Your facilitator adds the video here. Until then, the text version below covers the lesson.</p>${lessonBody(it)}${btn("Mark lesson complete", "Completed ✓ · Mark as not done")}${nav}</div>`;
+  if (it.type === "quiz") { const qs = it.qs || [], d = r?.data || {}, ans = d.answers || [], cor = d.correct || [];
+    return `<div class="view">${head}<p class="note">Answer all ${qs.length} questions. You have <b>one attempt</b>. ${it.title.includes("Readiness") || LS.W[wi].stage >= 1 ? `Your score counts toward your week result, and you need ${PASS()}% or more to move on.` : ""}</p>
+      <form id="ls-quiz" data-k="${it.key}" novalidate>${qs.map((q, qi) => `<fieldset class="q"><legend>${qi + 1}. ${esc(q.q)}</legend>${q.o.map((o, oi) => {
+        const cls = r ? (oi === cor[qi] ? "right" : oi === Number(ans[qi]) ? "wrong" : "") : "";
+        return `<label class="opt ${cls}"><input type="radio" name="q${qi}" value="${oi}" ${r ? "disabled" : ""} ${r && Number(ans[qi]) === oi ? "checked" : ""}> ${esc(o)}</label>`; }).join("")}</fieldset>`).join("")}
+      <div id="qres" style="margin-top:1rem">${r ? `<div class="result ${r.score >= PASS() ? "pass" : "fail"}">You scored ${r.score}%. ${r.score >= PASS() ? "Well done!" : "Review the lessons before your week result."}</div>` : ""}</div>
+      <p class="err" id="quiz-err" role="alert"></p>${r ? "" : `<div style="margin-top:1rem"><button class="btn" type="submit">Submit answers</button></div>`}</form>${nav}</div>`; }
+  if (it.link) {
+    const st = aStatus(it), canEdit = !r || r.status === "revise" || (r.status !== "graded" && !it.proj) || r.status === "submitted";
+    return `<div class="view">${head}<p style="max-width:64ch">${esc(it.detail || "")}</p>${deadlineLine(wi)}
+      ${r?.feedback ? `<div class="card fb ${r.status === "graded" ? "ok" : "bad"}"><div class="ch"><h3>${r.status === "graded" ? "Facilitator feedback" : "Revision requested"}</h3>${r.status === "graded" ? `<span class="score mono">${r.score}/100</span>` : ""}</div><p>${esc(r.feedback)}</p><p class="note">${esc(r.graded_by || "Your facilitator")}${r.cap && r.cap < 1 && r.status === "graded" ? ` · Marked ${r.grade}/100, capped at ${r.cap * 100}% for late submission` : ""}</p></div>` : ""}
+      ${r?.status === "graded" ? `<p>Submitted link: <a class="mono" style="word-break:break-all" href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.link)}</a></p>` : `<form id="ls-link" data-k="${it.key}" class="form" novalidate>
+        <div class="field"><label for="ls-url">Link to your work</label><input id="ls-url" inputmode="url" placeholder="https://" value="${esc(r?.link || "")}"></div>
+        <p class="err" id="ls-err" role="alert"></p>
+        ${r && r.cap != null && r.cap < 1 ? `<p class="note">Submitted after the first deadline: maximum ${r.cap * 100}% for this assignment.</p>` : ""}
+        <div class="actions"><button class="btn" type="submit">${r ? (r.status === "revise" ? "Resubmit" : "Update link") : "Submit"}</button>${r && r.status !== "revise" ? `<button class="btn ghost" type="button" data-act="ls-unsubmit" data-k="${it.key}">Undo submission</button>` : ""}<a class="link" href="#/learn/assignments/${it.key}">See feedback & history</a></div></form>`}
+      ${r ? `<p class="note">${pillS(st)} ${it.proj ? (r.status === "submitted" ? "Waiting for your facilitator to grade it. Feedback arrives within 5 working days." : "") : ""}</p>` : ""}${nav}</div>`;
+  }
+  return `<div class="view">${head}<p style="max-width:64ch">${esc(it.detail || "")}</p>${btn("Mark as done", "Done ✓ · Undo")}${nav}</div>`;
+}
+function oathView(dn, r) {
+  const me = LS.C.me, name = `${me.first_name} ${me.surname || ""}`.trim();
+  const crest = `<div class="crest">${LOGO}<div><p class="eyebrow">Jobnest Academy · ${esc(LS.C.cohort.name)}</p><h3 style="margin-top:.3rem">The Jobnest Student Oath</h3></div></div>`;
+  const list = PLEDGES.map((t, i) => `<li><label class="pledge ${dn ? "ro" : ""}"><span class="num">${i + 1}</span><span>${t}</span><input type="checkbox" class="pl" ${dn ? "checked disabled" : ""}><span class="tick">${LICON.done.replace('width="20" height="20"', 'width="14" height="14"')}</span></label></li>`).join("");
+  const sign = dn ? `<div class="signed-stamp"><span class="eyebrow">Signed</span><span class="sig">${esc(r?.data?.sig || name)}</span><span class="note">${esc(name)} · <span class="mono">${esc(me.matric)}</span> · ${r?.at ? fmtDateD(String(r.at).slice(0, 10)) : ""}</span></div>`
+    : `<div class="sign-area"><p><b>Tick each pledge as you read it.</b> Then sign with your full name: <b>${esc(name)}</b>.</p>
+      <div class="sig-line"><div class="field"><label for="oath-sig">Your signature</label><input id="oath-sig" class="sig-input" autocomplete="off" placeholder="${esc(name)}"></div>
+      <div class="field"><span class="lbl">Date</span><span class="mono" style="padding-bottom:.6rem">${fmtDateD(new Date().toISOString().slice(0, 10))}</span></div></div>
+      <p class="err" id="oath-err" role="alert"></p><div class="actions"><button class="btn gold" data-act="oath-sign" type="button">Sign the oath</button></div></div>`;
+  return `<div class="oath-doc">${crest}<p class="pre">I, <b>${esc(name)}</b>, admitted into the <b>${esc(me.track || "")}</b> track of Jobnest Academy, solemnly pledge that:</p><ol class="pledges">${list}</ol>${sign}</div>`;
+}
+function guideView() {
+  const rows = [["guide", "Home", "Your daily starting point: today's task, days left this week and your next live session."],
+    ["lesson", "My Learning", "Every week is listed in order, grouped by stage. A week unlocks once you finish the week before it."],
+    ["task", "Inside each week", "Every week has lessons, assessments and tasks. Open an item, complete it and it gets a green tick."],
+    ["quiz", "Assessments", `Each assessment counts toward your week result. You need ${PASS()}% to move on.`],
+    ["logweek", "Internship logbook", "In Weeks 10 to 13 you fill one logbook entry each week."],
+    ["oath", "The More menu", "Assignments, your cohort, your profile and Help & Support live here."]].map(([ic, t, b]) => `<div class="guide-row"><span class="ic">${LICON[ic]}</span><div><b>${t}</b><span class="note" style="font-size:.9rem">${b}</span></div></div>`).join("");
+  return `<p style="max-width:64ch">Here's everything you need to find your way around the Jobnest student portal.</p><div class="guide">${rows}</div>`;
+}
+const handbookView = () => `<div class="lesson-doc"><h3>1. Attendance</h3><p>Join every live session. If you can't, tell Student Success before the session and watch the recording within 48 hours.</p>
+  <h3>2. Deadlines</h3><p>Weekly work is due Friday at 17:00 for full marks. Until Sunday 23:59 you can still get up to 80%. After that, the maximum is 50%.</p>
+  <h3>3. Grading</h3><p>Assignments are graded out of 100 using a rubric. You'll get feedback within 5 working days and may be asked to revise.</p>
+  <h3>4. Code of conduct</h3><p>Submit your own work, respect everyone in your cohort and represent Jobnest professionally at your internship. Breaking the Student Oath can lead to removal from the programme.</p>
+  <h3>5. Getting help</h3><p>Use Help & Support in the portal, or message Student Success in your cohort community.</p>
+  <h3>6. Certificates</h3><p>You earn your certificate when every requirement is met. It appears in your profile.</p></div>`;
+const communityView = () => `<div class="lesson-doc"><p>Your cohort community is where announcements, reminders and peer help happen.</p>
+  <h3>How to join</h3><ol class="obj"><li>Open the invite link your cohort manager shares.</li><li>Use your real name and add your matric number to your profile.</li><li>Post your introduction.</li></ol>
+  <h3>Introduction template</h3><div class="tpl"><pre>Hi everyone! I'm ${esc(LS.C.me.first_name)} from [city], on the ${esc(LS.C.me.track || "")} track.
+One goal I have for this programme: [your goal].
+Fun fact: [something about you].</pre></div></div>`;
+function lsBrief(wi) {
+  const it = LS.W[wi].items.find((x) => x.title === "Read your project brief");
+  return `<div class="view brief-doc"><a class="back" href="#/learn/learning/${wi + 1}">← Week ${wi + 1}: ${esc(LS.W[wi].title)}</a>
+    <div><p class="eyebrow">Client project brief</p><h2 style="margin-top:.4rem">Your client project</h2><p class="note" style="font-size:.95rem;margin-top:.3rem">${esc(LS.C.me.track || "")} track · individual project · Weeks 8–9</p></div>
+    <h3>Your task</h3><p>${esc(it?.detail || "")}</p>
+    <h3>Timeline</h3><dl class="kv tl"><div><dt>Week 8</dt><dd>Project plan due ${fmtD(weekDue(7))}, 17:00. Check in with your supervisor.</dd></div><div><dt>Week 9</dt><dd>Final project due ${fmtD(weekDue(8))}, 17:00. Self-review, then supervisor grading.</dd></div></dl>
+    <h3>How you'll be graded</h3><table class="tbl rub"><tbody>${RUBRIC.map((x) => `<tr><td><b>${x[0]}</b><span class="note">${x[1]}</span></td><td class="mono">${x[2]}</td></tr>`).join("")}</tbody></table>
+    <h3>How to submit</h3><p>Put everything in one Google Drive or Notion folder, set sharing to “anyone with the link can view”, and paste the link into the Week 9 task “Submit your final project”.</p></div>`;
+}
+function logWeek(wi, it, r) {
+  const w = it.wk || wi - 8, e = r?.data || {}, ro = !!r, last = w === 4;
+  const fld = (f) => { const v = esc(e[f.k] || ""), req = f.req ? " *" : "", ro2 = ro ? "readonly" : "";
+    if (f.t === "area") return `<div class="field"><label for="lb-${f.k}">${f.l}${req}</label><textarea id="lb-${f.k}" ${ro2} placeholder="${esc(f.ph || "")}">${v}</textarea></div>`;
+    return `<div class="field"><label for="lb-${f.k}">${f.l}${req}</label><input id="lb-${f.k}" type="${f.t}" ${f.min != null ? `min="${f.min}" max="${f.max}"` : ""} ${ro2} placeholder="${esc(f.ph || "")}" value="${v}"></div>`; };
+  const sections = LB_FIELDS.map((s) => `<div class="lb-sec"><h3>${s.sec}</h3>${s.sec === "Week details" ? `<div class="grid2">${s.fields.map(fld).join("")}</div>` : s.fields.map(fld).join("")}${s.sec === "Learning & reflection" && last ? fld(LB_FINAL) : ""}</div>`).join("");
+  const rating = `<div class="field"><span class="lbl" id="rate-l">How would you rate this week? *</span><div class="rate" role="radiogroup" aria-labelledby="rate-l">${[["1", "Tough"], ["2", "Okay"], ["3", "Good"], ["4", "Great"], ["5", "Excellent"]].map(([n, t]) => `<label><input type="radio" name="lb-rate" value="${n}" ${e.rate === n ? "checked" : ""} ${ro ? "disabled" : ""}><span>${n} · ${t}</span></label>`).join("")}</div></div>`;
+  return `<div class="lb-due"><span class="eyebrow">Due</span><b>${fmtD(weekDue(wi))}, 17:00</b><span class="note">Internship week ${w} of 4 · fill this entry at the end of the week</span></div>
+    <form class="lb-form" id="lb-form" data-k="${it.key}" data-last="${last ? 1 : 0}" novalidate>${sections}<div class="lb-sec">${rating}</div><p class="err" id="lb-err" role="alert"></p>
+    ${ro ? `<div class="signoff"><b>Submitted</b><p class="note">Submitted on ${fmtDateD(String(r.at).slice(0, 10))}. Your supervisor reviews it.</p></div>` : `<div class="actions"><button class="btn" type="submit">Submit logbook entry</button></div>`}</form>`;
+}
+
+/* ---------- More pages ---------- */
+function lsAssignmentsPage(key) {
+  if (key) return lsAssignmentDetail(key);
+  const list = lsAssignments(), f = ui.asf || "All", groups = ["All", "Not Started", "Submitted", "Revision Required", "Graded"];
+  const shown = list.filter((a) => f === "All" || aStatus(a.it) === f);
+  const hist = (LS.L.history || []).slice().reverse().slice(0, 8).map((h) => ({ ...h, f: findItem(h.key) }));
+  lsShell("assignments", pageHead("Assignments & Projects", "Your submissions", "Everything you need to submit across the 17 weeks, with deadlines, rubrics and facilitator feedback.") +
+  `<section class="wrap pagebody"><div class="chips" role="group" aria-label="Filter by status">${groups.map((g) => `<button class="chipf" data-act="ls-asf" data-k="${g}" aria-pressed="${f === g}">${g}${g === "All" ? "" : ` <span class="mono">${list.filter((a) => aStatus(a.it) === g).length}</span>`}</button>`).join("")}</div>
+    <div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Assignment</th><th>Week</th><th>Deadline</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody>
+    ${shown.length ? shown.map((a) => { const un = unlockedW(a.wi), st = aStatus(a.it);
+      return `<tr><td data-label="Assignment"><b>${esc(a.it.title)}</b><span class="note" style="display:block">${esc(a.wk.title)}</span></td><td data-label="Week" class="mono">W${a.wi + 1}</td><td data-label="Deadline">${fmtD(weekDue(a.wi))}</td><td data-label="Type">${a.it.type === "logweek" ? "Logbook form" : "Link submission"}</td><td data-label="Status">${un ? pillS(st) : `<span class="pill">Opens in Week ${a.wi + 1}</span>`}</td>
+        <td>${un ? `<a class="btn sm ghost" href="${a.it.type === "logweek" ? `#/learn/learning/${a.wi + 1}/${a.it.key}` : `#/learn/assignments/${a.it.key}`}">${st === "Revision Required" ? "Revise" : st === "Not Started" ? "Start" : "View"}</a>` : ""}</td></tr>`; }).join("") : `<tr><td colspan="6"><p class="empty">No assignments with the status “${f}”.</p></td></tr>`}
+    </tbody></table></div>
+    <div class="card"><h3>Submission history</h3>${hist.length ? `<ul class="hist">${hist.map((h) => `<li><span class="mono note">${fmtAt(h.at)}</span><span><b>${esc(h.f ? h.f.it.title : "Week " + h.key.slice(1))}</b> · ${esc(h.action)}</span></li>`).join("")}</ul>` : `<p class="empty">Nothing submitted yet. Your submissions and feedback will appear here.</p>`}</div></section>`);
+}
+function lsAssignmentDetail(key) {
+  const f = findItem(key); if (!f) return go("#/learn/assignments");
+  const { wi, it } = f, r = row(it), st = aStatus(it), un = unlockedW(wi), total = RUBRIC.reduce((s, x) => s + x[2], 0);
+  const hist = (LS.L.history || []).filter((h) => h.key === key).slice().reverse();
+  lsShell("assignments", pageHead(`Week ${wi + 1} · ${esc(LS.W[wi].title)}`, esc(it.title)) + `<section class="wrap pagebody"><nav class="crumbs"><a class="link" href="#/learn/assignments">Assignments & Projects</a> / <span>${esc(it.title)}</span></nav>
+  <div class="cols wide"><div class="stack">
+    <div class="card"><div class="ch"><h3>Instructions</h3>${pillS(st)}</div><p>${esc(it.detail || "")}</p>${deadlineLine(wi)}<ul class="reqs"><li>Submit one link that anyone with the link can view (Google Drive, Notion, Canva, GitHub, etc.).</li><li>Feedback arrives within 5 working days.</li></ul></div>
+    ${r?.feedback ? `<div class="card fb ${r.status === "graded" ? "ok" : "bad"}"><div class="ch"><h3>${r.status === "graded" ? "Facilitator feedback" : "Revision requested"}</h3>${r.status === "graded" ? `<span class="score mono">${r.score}/100</span>` : ""}</div><p>${esc(r.feedback)}</p><p class="note">${esc(r.graded_by || "Your facilitator")}${r.cap && r.cap < 1 && r.status === "graded" ? ` · Marked ${r.grade}/100, capped at ${r.cap * 100}% for late submission` : ""}</p></div>` : ""}
+    <div class="card"><h3>${st === "Revision Required" ? "Resubmit your work" : "Your submission"}</h3>${!un ? `<p class="empty">This assignment opens in Week ${wi + 1}.</p>` : r?.status === "graded" ? `<p>Submitted link: <a class="mono" style="word-break:break-all" href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.link)}</a></p>`
+      : `<form id="ls-link" data-k="${it.key}" class="form" style="margin-top:.8rem" novalidate><div class="field"><label for="ls-url">Link to your work *</label><input id="ls-url" inputmode="url" placeholder="https://" value="${esc(r?.link || "")}"></div><p class="err" id="ls-err" role="alert"></p>
+        <div class="actions"><button class="btn" type="submit">${st === "Revision Required" ? "Resubmit" : r ? "Update link" : "Submit assignment"}</button></div></form>${r?.status === "submitted" ? `<p class="note" style="margin-top:.6rem">Waiting for your facilitator to grade it. Feedback arrives within 5 working days.</p>` : ""}`}</div></div>
+    <div class="stack"><div class="card"><h3>Details</h3><dl class="kv"><div><dt>Deadlines</dt><dd>Full marks: ${fmtD(weekDue(wi))}, 17:00<br>80% max: ${fmtD(graceDue(wi))}, 23:59</dd></div><div><dt>Stage</dt><dd>${esc(COURSE_STAGES[LS.W[wi].stage].title)}</dd></div><div><dt>In My Learning</dt><dd><a class="link" href="#/learn/learning/${wi + 1}/${it.key}">Week ${wi + 1} item</a></dd></div></dl></div>
+      ${it.proj ? `<div class="card"><h3>Assessment rubric</h3><table class="tbl rub"><tbody>${RUBRIC.map((x) => `<tr><td><b>${x[0]}</b><span class="note">${x[1]}</span></td><td class="mono">${x[2]}</td></tr>`).join("")}<tr><td><b>Total</b></td><td class="mono">${total}</td></tr></tbody></table></div>` : ""}
+      <div class="card"><h3>History</h3>${hist.length ? `<ul class="hist">${hist.map((h) => `<li><span class="mono note">${fmtAt(h.at)}</span><span>${esc(h.action)}${h.by ? ` · ${esc(h.by)}` : ""}</span></li>`).join("")}</ul>` : `<p class="empty">No activity yet.</p>`}</div></div></div></section>`);
+}
+function lsCohortPage() {
+  const C = LS.C, up = lsSessions().filter((x) => x.at.getTime() + x.minutes * 6e4 > Date.now()), past = lsSessions().filter((x) => x.at.getTime() + x.minutes * 6e4 <= Date.now()).reverse();
+  lsShell("cohort", pageHead("My Cohort", esc(C.cohort.name), "Your live sessions and announcements.") + `<section class="wrap pagebody"><div class="cols">
+    <div class="stack"><div class="card"><h3>Coming up</h3>${up.length ? `<ul class="sess-list">${up.slice(0, 8).map(sessionRow).join("")}</ul>` : `<p class="empty">No sessions scheduled yet.</p>`}</div>
+      ${past.length ? `<div class="card"><h3>Earlier sessions</h3><ul class="sess-list">${past.slice(0, 10).map(sessionRow).join("")}</ul></div>` : ""}</div>
+    <div class="stack"><div class="card"><h3>Announcements</h3>${(C.news || []).length ? C.news.map((n) => `<div class="ann"><span class="eyebrow">${fmtAt(n.at)} · ${esc(n.by || "")}</span><b>${esc(n.title)}</b><p class="note">${lines(n.body)}</p></div>`).join("") : `<p class="empty">No announcements yet.</p>`}</div></div></div></section>`);
+}
+function lsProfilePage(cert) {
+  const me = LS.C.me;
+  lsShell("profile", pageHead("Profile & Achievements", "Your profile", "Your student ID, certificate and badges.") + `<section class="wrap pagebody"><div class="cols">
+    <div class="stack"><div class="card idcard"><div class="ch"><h3>Student ID</h3>${LOGO}</div><p style="margin:.4rem 0 0;font-size:1.3rem"><b>${esc(me.first_name)} ${esc(me.surname || "")}</b></p>
+      <dl class="kv"><div><dt>Matric number</dt><dd class="mono">${esc(me.matric)}</dd></div><div><dt>Track</dt><dd>${esc(me.track || "")}</dd></div><div><dt>Cohort</dt><dd>${esc(LS.C.cohort.name)}</dd></div><div><dt>Email</dt><dd>${esc(me.email || "")}</dd></div></dl></div>
+      ${cert ? `<div class="card cert-card"><span class="eyebrow">Certificate of completion</span><h2>Your certificate is ready 🎓</h2><div class="actions"><a class="btn gold" href="#/learn/certificate">View and download</a></div></div>` : `<div class="card"><h3>Certificate</h3><p class="note">Your certificate appears here once you complete the programme.</p></div>`}
+      ${installCard()}</div>
+    <div class="stack">${progressCard(LS.C, cert)}<div class="card"><h3>Account</h3><div class="actions"><a class="btn ghost" href="#/learn/forgot">Change password</a><button class="btn ghost" data-act="signout-learn">Sign out</button></div></div></div></div></section>`);
+}
+function lsHelpPage() {
+  const Q = [["I can't open the next week", "Each week opens when you pass the week before it, and not earlier than the Saturday before it starts. Check the week result on the previous week."],
+    ["How are weeks passed?", `In Stages 2–4, your assessment score and week project grade are averaged. You need ${PASS()}% or more. Below that, you repeat the week.`],
+    ["What if I submit late?", "Work is due Friday at 17:00 for full marks. Until Sunday 23:59 the maximum is 80%. After that, it's 50%."],
+    ["How do I join a live session?", "Open My Cohort or Home and tap Join. Joining through the portal records your attendance."],
+    ["I forgot my password", "Use Forgot password on the sign-in page. We'll email you a link."]];
+  lsShell("help", pageHead("Help & Support", "How can we help?", "Answers to common questions, and how to reach us.") + `<section class="wrap pagebody"><div class="cols">
+    <div class="card">${Q.map(([q, a], i) => `<details ${i ? "" : "open"} class="faq-i"><summary><b>${q}</b></summary><p class="note">${a}</p></details>`).join("")}</div>
+    <div class="card"><h3>Still stuck?</h3><p>Email <a href="mailto:info@jobnestcareers.com">info@jobnestcareers.com</a> with your matric number, or message Student Success in your cohort community.</p></div></div></section>`);
+}
+
+/* ---------- entry ---------- */
+let COURSE_STAGES = null, COURSE_DATA = null;
+async function pageLearn(p1, p2, p3) {
   if (!auth.session) return pageLearnSignIn();
   if (!isStudent()) { app.innerHTML = learnCard(`<h1>You're signed in as staff</h1><p>Sign out first to use the student portal.</p><div class="actions"><a class="btn" href="#/portal">Go to the staff portal</a><button class="btn ghost" data-act="signout-learn">Sign out</button></div>`); return; }
-  loading();
-  let extra = {};
-  let cert = null;
-  try { [CAMPUS, extra, cert] = await Promise.all([rpc("student_campus"), rpc("student_campus_extra").catch(() => ({})), rpc("student_certificate").catch(() => null)]); }
-  catch (e) { if (e.status === 401 || /sign in/i.test(e.message)) { await auth.signOut(); return pageLearnSignIn("Please sign in again."); } throw e; }
-  CAMPUS.cert = cert;
-  const C = CAMPUS, w = C.week, weeks = C.cohort.weeks;
-  const tab_ = ["home", "weeks", "tasks", "sessions", "news", "certificate"].includes(tab) && (tab !== "certificate" || cert) ? tab : "home";
-  const upcoming = C.sessions.filter((x) => new Date(x.starts_at).getTime() + x.minutes * 6e4 > Date.now());
-  const todo = C.tasks.filter((t) => !t.sub || t.sub.status === "redo");
-  const bal = C.me.balance > 0 ? `<div class="notice bal"><span>Your second instalment of <b>${naira(C.me.balance)}</b> is due by ${fmtDateD(C.me.due_date)}.</span><a class="btn sm gold" href="#/a/${esc(C.me.ref)}/${esc(C.me.token)}">Pay now</a></div>` : "";
-  if (tab_ === "home") {
-    const days = Math.ceil((new Date(C.cohort.start_date + "T00:00:00+01:00") - Date.now()) / 864e5);
-    const thisWeek = Math.min(Math.max(w, 1), weeks);
-    const L = C.lessons.filter((l) => l.week === thisWeek);
-    const head = w < 1 ? `<div class="card hero-c" id="t-week"><span class="eyebrow">Before you start</span><h2>${days} day${days === 1 ? "" : "s"} to go</h2><p>${esc(C.cohort.name)} starts on <b>${fmtDateD(C.cohort.start_date)}</b> with Week 1: Orientation. Week 1 opens here on the Saturday before.</p></div>`
-      : w > weeks ? `<div class="card hero-c" id="t-week"><span class="eyebrow">Programme complete</span><h2>You made it 🎉</h2><p>Your lessons and work stay here for you to look back on.</p></div>`
-      : `<div class="card hero-c" id="t-week"><span class="eyebrow">Week ${w} of ${weeks}</span><h2>${esc(stageOf(w))}</h2><div class="wbar" aria-label="Progress"><i style="width:${(w / weeks) * 100}%"></i></div></div>`;
-    setTimeout(() => { let seen = false; try { seen = localStorage.getItem("jn.tour." + C.me.matric) === "1"; } catch { /* ignore */ } if ((ui.wantTour || (!extra.tour_done && !seen)) && TOUR_I == null) { ui.wantTour = false; startTour(); } }, 50);
-    const certCard = cert ? `<div class="card cert-card"><span class="eyebrow">Certificate of completion</span><h2>Your certificate is ready 🎓</h2><div class="actions"><a class="btn gold" href="#/learn/certificate">View and download</a></div></div>` : "";
-    campusShell("home", `Hi ${esc(C.me.first_name)}`, "", `${installCard()}${bal}${certCard}${head}${progressCard(C, cert)}<div class="grid2" style="margin-top:1rem">
-      <div class="card" id="t-lessons"><div class="ch"><h3>This week's lessons</h3><a class="link sm" href="#/learn/weeks">All weeks →</a></div>${L.length ? `<ul class="lessons">${L.map(lessonItem).join("")}</ul>` : empty(C.open_weeks ? "Lessons for this week will appear here." : "Week 1 opens on the Saturday before the start date.")}</div>
-      <div class="stack"><div class="card" id="t-session"><div class="ch"><h3>Next live session</h3><a class="link sm" href="#/learn/sessions">All →</a></div>${upcoming.length ? `<ul class="sess-list">${sessionRow(upcoming[0])}</ul>` : empty("No sessions scheduled yet.")}</div>
-        <div class="card" id="t-tasks"><div class="ch"><h3>Tasks to do</h3><a class="link sm" href="#/learn/tasks">All →</a></div>${todo.length ? `<ul class="lessons">${todo.slice(0, 4).map((t) => `<li class="lesson"><span class="lk" aria-hidden="true">📝</span><div><a class="link" href="#/learn/tasks"><b>${esc(t.title)}</b></a><span class="note" style="display:block">Due ${fmtAt(t.due_at)} WAT</span></div>${subPill(t)}</li>`).join("")}</ul>` : empty("Nothing to hand in right now.")}</div>
-        ${C.news[0] ? `<div class="card"><div class="ch"><h3>Latest announcement</h3><a class="link sm" href="#/learn/news">All →</a></div><p><b>${esc(C.news[0].title)}</b></p><p class="note">${lines(C.news[0].body).slice(0, 400)}</p></div>` : ""}</div></div>`);
-  }
-  if (tab_ === "weeks") {
-    const rows = [...Array(weeks)].map((_, i) => {
-      const n = i + 1, open = n <= C.open_weeks, L = C.lessons.filter((l) => l.week === n), T = C.tasks.filter((t) => t.week === n);
-      const opens = new Date(new Date(C.cohort.start_date + "T12:00:00Z").getTime() + ((n - 1) * 7 - 2) * 864e5);
-      return `<details class="arow wk ${open ? "" : "locked"}" ${n === Math.max(w, 1) && open ? "open" : ""} ${open ? "" : 'data-locked="1"'}><summary><span class="aav mono">${n}</span><span class="an"><b>Week ${n}</b><span class="note">${esc(stageOf(n))}</span></span><span class="anext">${open ? `${L.length} item${L.length === 1 ? "" : "s"}${T.length ? ` · ${T.length} task${T.length === 1 ? "" : "s"}` : ""}` : `🔒 Opens ${fmtDay(opens)}`}</span>${n === w ? `<span class="pill now">This week</span>` : n < w ? `<span class="pill ok">Done</span>` : ""}</summary>
-        ${open ? `<div class="abody">${L.length ? `<ul class="lessons">${L.map(lessonItem).join("")}</ul>` : empty("Nothing posted for this week yet.")}${T.length ? `<p class="eyebrow" style="margin-top:.6rem">Tasks</p>${T.map((t) => `<p><a class="link" href="#/learn/tasks">${esc(t.title)}</a> ${subPill(t)}</p>`).join("")}` : ""}</div>` : ""}</details>`;
-    }).join("");
-    campusShell("weeks", "Weeks", `${weeks} weeks. Each week opens on the Saturday before it starts.`, `<div class="arows">${rows}</div>`);
-  }
-  if (tab_ === "tasks") {
-    const passed = C.tasks.filter((t) => t.sub?.status === "passed").length;
-    campusShell("tasks", "Tasks", `Hand in each task by sharing a link to your work. You've passed <b>${passed}</b> of ${C.tasks.length}.`,
-      C.tasks.length ? `<div class="arows">${C.tasks.slice().sort((a, b) => (a.sub?.status === "passed") - (b.sub?.status === "passed") || new Date(a.due_at) - new Date(b.due_at)).map((t, i) => taskCard(t, i === 0 && t.sub?.status !== "passed")).join("")}</div>` : `<div class="card">${empty("No tasks yet. They'll appear here as each week opens.")}</div>`);
-  }
-  if (tab_ === "sessions") {
-    const past = C.sessions.filter((x) => !upcoming.includes(x)).reverse();
-    campusShell("sessions", "Live sessions", "Join from here so your attendance is recorded. Times are in WAT.",
-      `<div class="card"><h3>Coming up</h3>${upcoming.length ? `<ul class="sess-list">${upcoming.map(sessionRow).join("")}</ul>` : empty("No sessions scheduled yet.")}</div>
-      ${past.length ? `<div class="card" style="margin-top:1rem"><h3>Past sessions</h3><ul class="sess-list">${past.map(sessionRow).join("")}</ul></div>` : ""}`);
-  }
-  if (tab_ === "certificate") {
-    let c = null;
-    try { c = await rpc("certificate_view", { p_cert: cert.cert_id }); } catch { c = null; }
-    campusShell("certificate", `Congratulations, ${esc(C.me.first_name)}! 🎓`, "You finished the programme. Download your certificate, add it to LinkedIn, or share the link with employers.", c ? certBlock(c) : empty("Your certificate couldn't load. Please refresh."));
+  if (!LS) loading();
+  try {
+    const [C, L, ex, ct, mod] = await Promise.all([rpc("student_campus"), rpc("learn_state"), rpc("student_campus_extra").catch(() => ({})), rpc("student_certificate").catch(() => null), COURSE_DATA ? null : import("./course.js")]);
+    if (mod) { COURSE_DATA = mod.COURSE; COURSE_STAGES = mod.COURSE.stages; }
+    CAMPUS = C; CAMPUS.cert = ct;
+    const cert = ct && ct.cert_id ? ct : null; CAMPUS.cert = cert;
+    LS = { C, L, W: COURSE_DATA.tracks[L.track] || COURSE_DATA.tracks.DAT, cert, extra: ex || {} };
+  } catch (e) { if (e.status === 401 || /sign in/i.test(e.message)) { await auth.signOut(); LS = null; return pageLearnSignIn("Please sign in again."); } throw e; }
+  ui.lsMore = false;
+  const wk = p1 === "learning" ? (p2 || "") + "|" + (p3 || "") : null;
+  if (wk !== null && wk.split("|")[0] !== (ui.lsWk || "").split("|")[0]) ui.wtab = "tasks";
+  ui.lsWk = wk || ui.lsWk;
+  await lsRender(p1, p2, p3);
+  if (!p1 || p1 === "home") setTimeout(() => { let seen = false; try { seen = localStorage.getItem("jn.tour." + LS.C.me.matric) === "1"; } catch { /* ignore */ } if ((ui.wantTour || (!LS.extra.tour_done && !seen)) && TOUR_I == null) { ui.wantTour = false; startTour(); } }, 400);
+}
+const lsParts = () => location.hash.replace(/^#\/?/, "").split("/").map(decodeURIComponent).slice(1);
+async function lsRender(p1, p2, p3) {
+  if (p1 === undefined) [p1, p2, p3] = lsParts();
+  const page = p1 || "home", cert = LS.cert;
+  if (page === "learning") { const wi = Math.min(Math.max((parseInt(p2, 10) || curWeek() + 1) - 1, 0), LS.W.length - 1); lsLearning(wi, p3 || null); }
+  else if (page === "assignments") lsAssignmentsPage(p2 || null);
+  else if (["cohort", "sessions", "news"].includes(page)) lsCohortPage();
+  else if (page === "profile") lsProfilePage(cert);
+  else if (page === "help") lsHelpPage();
+  else if (page === "certificate" && cert) {
+    let c = null; try { c = await rpc("certificate_view", { p_cert: cert.cert_id }); } catch { c = null; }
+    lsShell("profile", pageHead("Certificate", `Congratulations, ${esc(LS.C.me.first_name)}! 🎓`, "Download your certificate, add it to LinkedIn, or share the link with employers.") + `<section class="wrap pagebody">${c ? certBlock(c) : empty("Your certificate couldn't load. Please refresh.")}</section>`);
     fitCert();
-    return;
-  }
-  if (tab_ === "news") {
-    campusShell("news", "Announcements", "", C.news.length ? `<div class="stack">${C.news.map((n) => `<article class="card"><span class="eyebrow">${fmtAt(n.at)} · ${esc(n.by)}</span><h3 style="margin:.4rem 0">${esc(n.title)}</h3><p>${lines(n.body)}</p></article>`).join("")}</div>` : `<div class="card">${empty("No announcements yet.")}</div>`);
-  }
+  } else lsHome(cert);
+}
+// Run a learn_* call, keep the new state, redraw in place.
+async function lsCall(fn, args, btn, msg) {
+  let r;
+  try { r = await busy(btn || null, () => rpc(fn, args)); } catch { return false; }
+  if (!r) return false;
+  LS.L = r; if (msg) toast(msg); await lsRender(); return true;
 }
 
 /* ---------- welcome tour (student portal) ---------- */
 const TOUR = [
   { t: "Welcome to your student portal", b: "Here's a quick look around. It takes less than a minute." },
-  { t: "Where you are", b: "Your week and stage of the programme. Before the start date, this counts down the days.", sel: "#t-week" },
-  { t: "This week's lessons", b: "Videos, readings and links for the week. Tap Open to start one. Each week opens on the Saturday before it starts.", sel: "#t-lessons" },
-  { t: "Live sessions", b: "Join classes from here. Joining through the portal records your attendance.", sel: "#t-session" },
-  { t: "Tasks", b: "Hand in each task by pasting a link to your work. Your facilitator marks it and you'll get an email with feedback.", sel: "#t-tasks" },
-  { t: "Your menu", b: "Weeks, Tasks, Live sessions and Announcements are all here. On a phone, tap Menu at the top.", sel: [".snav", ".snav-m"] },
-  { t: "You're all set", b: "Sign out from the top bar or the menu. You can take this tour again from the menu any time." },
+  { t: "Today", b: "Your next task and how many days are left this week. Tap Continue to pick up where you left off.", sel: "#t-today" },
+  { t: "Your week at a glance", b: "Required tasks done, assignments due and your scores.", sel: "#t-strip" },
+  { t: "My Learning", b: "All 17 weeks, grouped into stages. Each week opens when you pass the one before it.", sel: "#nav-learning" },
+  { t: "More", b: "Assignments & Projects, My Cohort, your profile and Help & Support live here.", sel: "#more" },
+  { t: "You're all set", b: "Start with Week 1: Orientation and sign your Student Oath. You can take this tour again from the More menu." },
 ];
 let TOUR_I = null;
 function clearSpot() { $$(".spot").forEach((x) => x.classList.remove("spot")); }
-function startTour() { if (!$("#t-week")) { ui.wantTour = true; return go("#/learn/home"); } TOUR_I = 0; $("#toast").hidden = true; clearTimeout(toast.t); renderTour(); }
+function startTour() { ui.lsMore = false; if (!$("#t-today")) { ui.wantTour = true; return go("#/learn"); } TOUR_I = 0; $("#toast").hidden = true; clearTimeout(toast.t); renderTour(); }
 function renderTour() {
   clearSpot();
   let root = $("#tour-root");
@@ -970,18 +1325,18 @@ const trackOpts = (tracks, mine, val) => (mine ? tracks.filter((t) => t.code ===
 const tName = (tracks, c) => c ? (tracks.find((t) => t.code === c)?.name || c) : "All tracks";
 
 async function tabStudents() {
-  const [d, certs] = await Promise.all([rpc("acad_students"), rpc("acad_certificates").catch(() => ({}))]);
+  const [d, certs, ls] = await Promise.all([rpc("acad_students"), rpc("acad_certificates").catch(() => ({})), rpc("acad_learn_stats").catch(() => ({}))]);
   const canCert = ["director", "academy_admin", "super"].includes(ME.role);
   const S = d.students, set = S.filter((s) => s.account).length;
   const att = S.filter((s) => s.sessions_past).map((s) => s.sessions_attended / s.sessions_past);
   const canInvite = ["cohort_manager", "academy_admin", "adm_admin", "super"].includes(ME.role);
   shell("students", "Students", `${esc(d.cohort.name)} · ${d.week < 1 ? `starts ${fmtDateD(d.cohort.start_date)}` : `week ${d.week}`}${d.my_track ? ` · ${esc(tName(d.tracks, d.my_track))} only` : ""}`,
-    `<div class="kpis">${[["Students", S.length], ["Accounts set up", `${set}/${S.length}`], ["Waiting for marking", S.reduce((t, s) => t + s.tasks_waiting, 0)], ["Average attendance", att.length ? Math.round((att.reduce((a, b) => a + b, 0) / att.length) * 100) + "%" : "–"]].map(([l, v]) => `<div class="kpi card"><span class="eyebrow">${l}</span><b class="mono">${v}</b></div>`).join("")}</div>
+    `<div class="kpis">${[["Students", S.length], ["Accounts set up", `${set}/${S.length}`], ["Waiting for grading", S.reduce((t, s) => t + (ls[s.id]?.to_grade || 0), 0)], ["Average attendance", att.length ? Math.round((att.reduce((a, b) => a + b, 0) / att.length) * 100) + "%" : "–"]].map(([l, v]) => `<div class="kpi card"><span class="eyebrow">${l}</span><b class="mono">${v}</b></div>`).join("")}</div>
     ${canInvite && S.length > set ? `<div class="notice" style="margin-top:1rem"><span>${S.length - set} student${S.length - set === 1 ? " hasn't" : "s haven't"} set up their portal account yet.</span><button class="btn sm" data-act="invite">Email them a set-up link</button></div>` : ""}
-    <div class="card" style="margin-top:1rem">${S.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Student</th><th>Track</th><th>Portal</th><th>Tasks passed</th><th>Attendance</th><th>Fees</th><th>Certificate</th></tr></thead><tbody>
+    <div class="card" style="margin-top:1rem">${S.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Student</th><th>Track</th><th>Portal</th><th>Progress</th><th>Attendance</th><th>Fees</th><th>Certificate</th></tr></thead><tbody>
       ${S.map((s) => `<tr><td data-label="Student"><b>${esc(s.first_name)} ${esc(s.surname)}</b><span class="note" style="display:block"><span class="mono">${esc(s.matric)}</span> · ${esc(s.phone)}</span></td><td data-label="Track">${esc(s.track || "")}</td>
         <td data-label="Portal">${s.account ? `<span class="pill ok">Set up</span>` : `<span class="pill">${s.invited_at ? `Invited ${fmtDay(s.invited_at)}` : "Not yet"}</span>`}</td>
-        <td data-label="Tasks passed" class="mono">${s.tasks_passed}/${s.tasks_due}${s.tasks_waiting ? ` <span class="note">(+${s.tasks_waiting} to mark)</span>` : ""}</td>
+        <td data-label="Progress" class="mono">${ls[s.id] ? `${ls[s.id].done}/${ls[s.id].total}${ls[s.id].avg != null ? ` · avg ${ls[s.id].avg}%` : ""}${ls[s.id].to_grade ? ` <span class="note">(${ls[s.id].to_grade} to grade)</span>` : ""}` : "–"}</td>
         <td data-label="Attendance" class="mono">${s.sessions_past ? `${s.sessions_attended}/${s.sessions_past}` : "–"}</td><td data-label="Fees">${s.balance ? `<span class="pill bad">Owes ${naira(s.balance)}</span>` : `<span class="pill ok">Paid</span>`}</td>
         <td data-label="Certificate">${certs[s.id] ? `<a class="link sm" href="#/certificate/${esc(certs[s.id].cert_id)}" target="_blank" rel="noopener">View</a>${canCert ? ` · <button class="link sm" data-act="cert-revoke" data-k="${s.id}">Withdraw</button>` : ""}` : canCert ? `<button class="btn sm" data-act="cert-issue" data-k="${s.id}">Issue</button>` : `<span class="note">Not yet</span>`}</td></tr>`).join("")}</tbody></table></div>` : empty("No admitted students yet.")}</div>`);
 }
@@ -1019,17 +1374,26 @@ async function tabContent() {
 }
 
 async function tabGrading() {
-  const L = await rpc("acad_submissions");
-  const wait = L.filter((x) => x.status === "submitted"), done = L.filter((x) => x.status !== "submitted");
-  const canGrade = ["cohort_manager", "facilitator", "super"].includes(ME.role);
-  const row = (x) => `<details class="arow noav" data-id="g${x.id}" ${ui.open === "g" + x.id ? "open" : ""}><summary><span class="an"><b>${esc(x.student)}</b><span class="note">${esc(x.matric)} · ${esc(x.task)} · week ${x.week}</span></span><span class="anext">${x.status === "submitted" ? `Sent ${ago(x.submitted_at)}${new Date(x.submitted_at) > new Date(x.due_at) ? " · late" : ""}` : `${x.status === "passed" ? "Passed" : "Asked to redo"} · ${esc(x.graded_by || "")}`}</span>${x.status === "submitted" ? `<span class="pill now">To mark</span>` : x.status === "passed" ? `<span class="pill ok">Passed</span>` : `<span class="pill bad">Redo</span>`}</summary>
-    <div class="abody"><p><a class="btn sm ghost" href="${esc(x.link)}" target="_blank" rel="noopener">Open their work ↗</a></p>${x.note ? `<p class="note">“${esc(x.note)}”</p>` : ""}${x.brief ? `<p class="note"><b>Task:</b> ${lines(x.brief)}</p>` : ""}${x.feedback && x.status !== "submitted" ? `<p class="note"><b>Your feedback:</b> ${lines(x.feedback)}</p>` : ""}
-      ${canGrade && x.status === "submitted" ? `<form class="form grade-form" data-k="${x.id}" novalidate><div class="rate"><label><input type="radio" name="gr-${x.id}" value="passed"><span>Passed</span></label><label><input type="radio" name="gr-${x.id}" value="redo"><span>Needs another try</span></label></div>
-        <div class="grid2"><div class="field"><label for="gs-${x.id}">Score % (optional)</label><input id="gs-${x.id}" type="number" min="0" max="100" inputmode="numeric"></div></div>
-        <div class="field"><label for="gf-${x.id}">Feedback (required for “another try”)</label><textarea id="gf-${x.id}" rows="2"></textarea></div><div class="actions"><button class="btn sm" type="submit">Send result</button></div></form>` : ""}</div></details>`;
-  shell("grading", "Grading", "Students get an email with your result and feedback.",
-    `<div class="card"><div class="ch"><h3>To mark</h3><span class="note">${wait.length}</span></div>${wait.length ? `<div class="arows">${wait.map(row).join("")}</div>` : empty("Nothing waiting. 🎉")}</div>
-    <div class="card" style="margin-top:1rem"><h3>Marked in the last 30 days</h3>${done.length ? `<div class="arows">${done.map(row).join("")}</div>` : empty("Nothing yet.")}</div>`);
+  const d = await rpc("acad_learn_queue"); ui.lq = d;
+  const wait = d.work.filter((x) => x.status === "submitted"), done = d.work.filter((x) => x.status !== "submitted");
+  const canGrade = ["cohort_manager", "facilitator", "director", "super"].includes(ME.role);
+  const row = (x) => { const i = d.work.indexOf(x), late = x.cap != null && x.cap < 1;
+    return `<details class="arow noav" data-id="lg${i}" ${ui.open === "lg" + i ? "open" : ""}><summary><span class="an"><b>${esc(x.name)}</b><span class="note">${esc(x.matric)} · ${esc(x.track)} · Week ${x.week}: ${esc(x.title)}</span></span>
+      <span class="anext">${x.status === "submitted" ? `Sent ${ago(x.at)}${late ? ` · late, max ${x.cap * 100}%` : ""}` : x.status === "graded" ? `${x.score}%${x.graded_by ? " · " + esc(x.graded_by) : ""}` : "Waiting for resubmission"}</span>
+      ${x.status === "submitted" ? `<span class="pill now">To grade</span>` : x.status === "graded" ? `<span class="pill ok">Graded</span>` : `<span class="pill bad">Revise</span>`}</summary>
+    <div class="abody"><p><a class="btn sm ghost" href="${esc(x.link)}" target="_blank" rel="noopener">Open their work ↗</a></p>${x.feedback && x.status !== "submitted" ? `<p class="note"><b>Feedback:</b> ${lines(x.feedback)}</p>` : ""}
+      ${canGrade && x.status === "submitted" ? `<form class="form lgrade-form" data-i="${i}" novalidate><div class="rate"><label><input type="radio" name="lg-${i}" value="graded" checked><span>Grade it</span></label><label><input type="radio" name="lg-${i}" value="revise"><span>Ask for changes</span></label></div>
+        <div class="grid2"><div class="field"><label for="lgg-${i}">Grade out of 100</label><input id="lgg-${i}" type="number" min="0" max="100" inputmode="numeric">${late ? `<span class="note">Late: their score is capped at ${x.cap * 100}% of this.</span>` : ""}</div></div>
+        <div class="field"><label for="lgf-${i}">Feedback (required when asking for changes)</label><textarea id="lgf-${i}" rows="2"></textarea></div>
+        <p class="note">Rubric: meets the brief 30 · quality & accuracy 30 · clarity & presentation 20 · timeliness 20. Students need ${70}% averaged with the week's quiz to move on.</p>
+        <div class="actions"><button class="btn sm" type="submit">Send result</button></div></form>` : ""}</div></details>`; };
+  const steps = d.staff_steps, open = steps.filter((x) => !x.done);
+  shell("grading", "Grading", "Week projects students have submitted. Students get an email with your grade and feedback.",
+    `<div class="card"><div class="ch"><h3>To grade</h3><span class="note">${wait.length}</span></div>${wait.length ? `<div class="arows">${wait.map(row).join("")}</div>` : empty("Nothing waiting. 🎉")}</div>
+    <div class="card" style="margin-top:1rem"><div class="ch"><h3>Supervisor steps</h3><span class="note">${open.length} open</span></div><p class="note">Internship steps staff complete for each student. Tick them when done.</p>
+      ${steps.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Student</th><th>Week</th><th>Step</th><th></th></tr></thead><tbody>${steps.map((x) => `<tr><td data-label="Student"><b>${esc(x.name)}</b><span class="note" style="display:block">${esc(x.matric)}</span></td><td data-label="Week" class="mono">W${x.week}</td><td data-label="Step">${esc(x.title)}</td>
+        <td>${canGrade ? `<label class="consent" style="margin:0"><input type="checkbox" data-change="lmark" data-app="${x.app}" data-key="${esc(x.key)}" ${x.done ? "checked" : ""}> Done</label>` : x.done ? `<span class="pill ok">Done</span>` : ""}</td></tr>`).join("")}</tbody></table></div>` : empty("No admitted students yet.")}</div>
+    <div class="card" style="margin-top:1rem"><h3>Graded and sent back</h3>${done.length ? `<div class="arows">${done.map(row).join("")}</div>` : empty("Nothing yet.")}</div>`);
 }
 
 async function tabSessions() {
@@ -1081,6 +1445,7 @@ async function tabNews() {
 
 /* ---------- events ---------- */
 document.addEventListener("click", async (e) => {
+  if (ui.lsMore && LS && !e.target.closest(".morepanel,#more")) { ui.lsMore = false; lsRender(); }
   const t = e.target.closest("[data-act]");
   if (!t) return;
   const a = t.dataset.act, k = t.dataset.k;
@@ -1124,7 +1489,21 @@ document.addEventListener("click", async (e) => {
   if (a === "mark-sent") { await busy(t, () => rpc("admin_mark_sent", { p_id: +k })); toast("Marked as sent"); return route(); }
   if (a === "pay") { try { await startPay(t); } catch { /* shown */ } return; }
   if (a === "start-assess") { t.disabled = true; t.textContent = "Starting…"; const base = `#/a/${t.dataset.ref}/${t.dataset.token}`; return pageAssess({ ref: t.dataset.ref }, t.dataset.token, base); }
-  if (a === "signout-learn") { TOUR_I = null; renderTour(); await auth.signOut(); CAMPUS = null; return go("#/learn/signin"); }
+  if (a === "ls-more") { ui.lsMore = !ui.lsMore; return lsRender(); }
+  if (a === "ls-wtab") { ui.wtab = k; return lsRender(); }
+  if (a === "ls-asf") { ui.asf = k; return lsRender(); }
+  if (a === "ls-done") { await lsCall("learn_done", { p_key: k, p_done: t.dataset.v === "1", p_data: null }, t, t.dataset.v === "1" ? "Marked complete" : null); return; }
+  if (a === "ls-unsubmit") { await lsCall("learn_unsubmit", { p_key: k }, t, "Submission removed"); return; }
+  if (a === "ls-repeat") { if (!confirm(`Start Week ${k} again? Your work for this week resets.`)) return; ui.wtab = "tasks"; await lsCall("learn_repeat", { p_week: +k }, t, `Week ${k} reset. You've got this.`); return; }
+  if (a === "oath-sign") {
+    const me = LS.C.me, name = `${me.first_name} ${me.surname || ""}`.trim(), sig = $("#oath-sig").value.trim(), err = $("#oath-err");
+    if ($$(".pl").some((x) => !x.checked)) { err.textContent = "Tick every pledge first."; return; }
+    if (sig.toLowerCase().replace(/\s+/g, " ") !== name.toLowerCase().replace(/\s+/g, " ")) { err.textContent = `Sign with your full name: ${name}.`; return; }
+    const key = LS.W[0].items.find((x) => x.type === "oath").key;
+    if (await lsCall("learn_done", { p_key: key, p_done: true, p_data: { sig } }, t, "Oath signed. Week 2 is on its way.")) window.scrollTo({ top: 0, behavior: "smooth" });
+    return;
+  }
+  if (a === "signout-learn") { TOUR_I = null; renderTour(); await auth.signOut(); CAMPUS = null; LS = null; return go("#/learn/signin"); }
   if (a === "tour") { $$("details.snav-m").forEach((d) => (d.open = false)); return startTour(); }
   if (a === "tour-next") { TOUR_I++; return renderTour(); }
   if (a === "tour-back") { TOUR_I--; return renderTour(); }
@@ -1185,6 +1564,13 @@ document.addEventListener("change", (e) => {
   const el = e.target, k = el.dataset.k;
   if (el.dataset.actChange === "track") { const none = el.value === "NONE"; $("#wi-" + k).hidden = !none; $("#ri-" + k).hidden = none; }
   if (el.dataset.actChange === "interest") { $("#wo-" + k).hidden = el.value !== "Other"; }
+  if (el.dataset.change === "lmark") {
+    el.disabled = true;
+    rpc("acad_learn_mark", { p_app: el.dataset.app, p_key: el.dataset.key, p_done: el.checked }).then(() => toast(el.checked ? "Marked done" : "Marked not done"))
+      .catch((x) => { el.checked = !el.checked; toast(x.message); }).finally(() => { el.disabled = false; });
+    return;
+  }
+  if (el.id === "week-select") { ui.wtab = "tasks"; return go("#/learn/learning/" + el.value); }
   if (el.id === "g-state") fillTowns();
   if (el.id === "g-town") { const o = $("#g-town-o"); o.hidden = el.value !== "Other"; if (!o.hidden) o.focus(); }
   if (el.id === "st-unlock") {
@@ -1304,10 +1690,30 @@ document.addEventListener("submit", async (e) => {
     app.innerHTML = learnCard(`<h1>Check your email</h1><p>If <b>${esc(m.toUpperCase())}</b> is a valid matric number, we've emailed a link to the address you applied with. It can take a couple of minutes.</p><div><a class="btn" href="#/learn/signin">Back to sign in</a></div>`);
     return;
   }
-  if (f.classList.contains("sub-form")) {
-    const k = f.dataset.k, link = $("#sl-" + k).value.trim();
-    if (!/^https?:\/\//i.test(link)) return toast("Paste the full link, starting with https://");
-    try { await busy(f.querySelector("button"), () => rpc("student_submit", { p_task: +k, p_link: link, p_note: $("#sn-" + k).value.trim() || null })); toast("Submitted. Your facilitator will mark it."); route(); } catch { /* shown */ }
+  if (f.id === "ls-quiz") {
+    const it = findItem(f.dataset.k)?.it, n = (it?.qs || []).length, ans = [];
+    for (let i = 0; i < n; i++) { const c = f.querySelector(`input[name="q${i}"]:checked`); if (!c) { $("#quiz-err").textContent = `Answer question ${i + 1} first.`; return; } ans.push(+c.value); }
+    $("#quiz-err").textContent = "";
+    await lsCall("learn_quiz", { p_key: f.dataset.k, p_answers: ans }, f.querySelector("button[type=submit]"), "Answers submitted");
+    return;
+  }
+  if (f.id === "ls-link") {
+    const u = $("#ls-url").value.trim();
+    if (!/^https?:\/\/\S+\.\S+/i.test(u)) { $("#ls-err").textContent = "Paste the full link, starting with https://"; return; }
+    await lsCall("learn_submit", { p_key: f.dataset.k, p_link: u }, f.querySelector("button[type=submit]"), "Submitted");
+    return;
+  }
+  if (f.id === "checkin") {
+    const c = f.querySelector('input[name="conf"]:checked');
+    if (!c) return toast("Choose how confident you feel");
+    await lsCall("learn_checkin", { p_week: +f.dataset.wk, p_conf: +c.value, p_note: $("#ck-note").value.trim() }, f.querySelector("button"), "Check-in sent. Thank you.");
+    return;
+  }
+  if (f.id === "lb-form") {
+    const fields = [...LB_FIELDS.flatMap((x) => x.fields), ...(f.dataset.last === "1" ? [LB_FINAL] : [])], d = {};
+    for (const x of fields) { const v = $("#lb-" + x.k).value.trim(); if (x.req && !v) { $("#lb-err").textContent = `Fill in “${x.l}”.`; $("#lb-" + x.k).focus(); return; } d[x.k] = v; }
+    const r = f.querySelector('input[name="lb-rate"]:checked'); if (!r) { $("#lb-err").textContent = "Rate your week."; return; } d.rate = r.value;
+    await lsCall("learn_done", { p_key: f.dataset.k, p_done: true, p_data: d }, f.querySelector("button[type=submit]"), "Logbook entry submitted");
     return;
   }
   if (f.id === "lesson-form" || f.id === "task-form") {
@@ -1322,6 +1728,12 @@ document.addEventListener("submit", async (e) => {
     const k = f.dataset.k, st = $(`input[name="gr-${k}"]:checked`)?.value, sc = $("#gs-" + k).value;
     if (!st) return toast("Choose Passed or Needs another try");
     try { await busy(f.querySelector("button"), () => rpc("acad_grade", { p_id: +k, p_status: st, p_score: sc === "" ? null : +sc, p_feedback: $("#gf-" + k).value })); toast("Result sent"); ui.open = null; route(); } catch { /* shown */ }
+    return;
+  }
+  if (f.classList.contains("lgrade-form")) {
+    const i = +f.dataset.i, x = ui.lq.work[i], st = $(`input[name="lg-${i}"]:checked`)?.value, g = $("#lgg-" + i).value;
+    if (st === "graded" && g === "") return toast("Enter a grade from 0 to 100");
+    try { await busy(f.querySelector("button"), () => rpc("acad_learn_grade", { p_app: x.app, p_key: x.key, p_status: st, p_grade: g === "" ? null : +g, p_feedback: $("#lgf-" + i).value })); toast(st === "graded" ? "Grade sent" : "Changes requested"); ui.open = null; route(); } catch { /* shown */ }
     return;
   }
   if (f.id === "session-form") {
@@ -1513,7 +1925,7 @@ async function route() {
     if (p0 === "learn") {
       if (p1 === "signin") return auth.session && isStudent() ? go("#/learn") : pageLearnSignIn();
       if (p1 === "forgot") return pageLearnForgot();
-      return pageLearn(p1 || "home");
+      return pageLearn(p1 || "home", p2, p3);
     }
     if (p0 === "a" && p1 && p2) return pageApplicant(p1, p2, p3 || "");
     await info();
