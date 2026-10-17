@@ -168,7 +168,7 @@ function pageHome() {
         <li><b>A real client project</b><span>In your portfolio, with feedback you can show employers.</span></li>
         <li><b>Internship experience</b><span>Four weeks with a partner company.</span></li>
         <li><b>A job-ready CV and LinkedIn</b><span>Reviewed with your Career Coach.</span></li></ul>
-        <div class="nl-certwrap"><div class="cert-box nl-cert" aria-label="Example certificate">${certHTML({ name: "Your Name", programme: p.name || "Graduate Employability Programme", weeks, track: "", completed_on: null, cert_id: "JNA-27-SAMPLE", signer_name: INFO.signer_name || "Shekemi Odeyemi", signer_title: INFO.signer_title || "Programme Director", year: String(new Date().getFullYear() + 1) })}</div></div>
+        <div class="nl-certwrap"><div class="cert-box nl-cert" aria-label="Example certificate">${certHTML({ name: "Your Name", programme: p.name || "Graduate Employability Programme", weeks, track: "", completed_on: null, cert_id: "JNA-GEP27A-001", signer_name: INFO.signer_name || "Shekemi Odeyemi", signer_title: INFO.signer_title || "Programme Director", year: String(new Date().getFullYear() + 1) })}</div></div>
       </div></div></section>
     <section class="nl-route"><div class="wrap"><div class="nl-route-h"><h2 class="nl-h2">The ${weeks} weeks.</h2><a class="nl-more" href="#/tracks">See what you can learn →</a></div>
       <ol class="nl-weeks">${ROUTE_STOPS.map(([w, t], i) => `<li class="${i === ROUTE_STOPS.length - 1 ? "end" : ""}"><span>${w}</span><b>${t}</b></li>`).join("")}</ol></div></section>
