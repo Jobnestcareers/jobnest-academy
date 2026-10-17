@@ -327,7 +327,7 @@ function pil(k) { return P.filter(function (p) { return p.k === k; })[0]; }
 function ph(t) { return '<span class="phx">' + t + '</span>'; }
 /* Programme buttons open the Jobnest Academy site, which lists every programme. */
 var ACAD_URL = 'https://academy.jobnestcareers.com';
-var ACAD = { programmes: ACAD_URL + '#programmes', gep: ACAD_URL + '#gep' };
+var ACAD = { programmes: ACAD_URL, gep: ACAD_URL };
 function btn(label, to, cls, st, arrow) {
   cls = cls || 'btn-p';
   if (ACAD[to]) return '<a class="btn ' + cls + '" href="' + ACAD[to] + '" target="_blank" rel="noopener" style="' + (st || '') + '">' + label + (arrow ? AR : '') + '</a>';
