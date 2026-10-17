@@ -98,44 +98,56 @@ function pubHeader(kind = "academy") {
 }
 const pubFoot = () => `<footer class="wrap lp-foot"><a class="link" href="#/check">Check an application</a><a class="link" href="#/staff">Staff sign-in</a><span class="note">© ${new Date().getFullYear()} Jobnest Services</span></footer>`;
 
-function pageHome() {
-  const P = INFO.programmes || [];
-  app.innerHTML = pubHeader() + `<section class="lp-hero ac-hero"><div class="wrap"><h1 class="lp-h1 ac-h1">Become<br>work-ready.</h1><p class="lp-lead">Jobnest Academy runs practical, online programmes for students and graduates in Nigeria. Pick a programme to see how it works.</p></div></section>
-    <section class="wrap lp-sec"><ul class="ac-progs">${P.map((x) => {
-      const live = x.status === "Live" && x.code === INFO.cohort?.programme_code;
-      return `<li class="ac-p ${live ? "live" : ""}"><div class="ac-ph"><span class="mono">${esc(x.code)}</span><span class="pill ${live && appsOpen() ? "ok" : "now"}">${live ? (appsOpen() ? "Applications open" : "Applications closed") : esc(x.status)}</span></div>
-        <h2>${esc(x.name)}</h2><p class="note">${esc(x.tagline || "")}</p><p class="ac-meta">${x.weeks} weeks · online</p>
-        ${live ? `<a class="btn ${appsOpen() ? "gold" : ""}" href="#/gep">See the programme</a>` : `<span class="note">Coming soon</span>`}</li>`;
-    }).join("") || empty("Programmes will be listed here soon.")}</ul></section>` + pubFoot();
-}
+const TEAM = [["Admissions", "Guides you from application to your first day."], ["Programme Director", "Leads the programme and its standards."],
+  ["Cohort Manager", "Keeps you on track, week by week."], ["Facilitators", "Teach your track and mark your work."], ["Career Coach", "CV, LinkedIn and your job search."]];
+const FAQ = [["Can I join during NYSC?", "Yes."], ["Do I need experience?", "No. Just basic digital skills and clear communication."],
+  ["Will I get a job at the end?", "We can't promise one, but you'll finish with experience, a portfolio and coaching."]];
+const TICK = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12l5 5 9-9"/></svg>`;
 
-function pageGep() {
-  const p = prog(), c = INFO.cohort || {}, open = appsOpen();
-  const start = c.start_date ? fmt(c.start_date + "T12:00:00Z", { day: "numeric", month: "long" }) : "To be announced";
-  app.innerHTML = pubHeader() + `<section class="lp-hero"><div class="wrap">
-      <p class="lp-status ${open ? "on" : ""}"><span class="lp-dot"></span>${open ? `Applications open for ${esc(c.name)}` : "Applications are closed for now"}</p>
-      <h1 class="lp-h1">From graduate<br>to work-ready.</h1>
-      <p class="lp-lead">${p.weeks || 17} weeks online. Learn a skill employers pay for, deliver a real client project, intern with a company, and get coached through your job search.</p>
-      ${open ? `<div class="actions"><a class="btn gold lg" href="#/apply">Apply now</a>${INFO.zuri_url ? `<a class="btn ghost lg" href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Not sure yet? Talk to Zuri</a>` : ""}</div>`
-        : `<p class="note">Applications for the next cohort will open soon. Check back here.</p>`}
-    </div></section>
-    <section class="wrap lp-sec"><div class="lp-route-h"><h2>The route</h2><p class="note">Every week builds on the last. You move on when you pass.</p></div>
-      <ol class="route">${ROUTE_STOPS.map(([w, t], i) => `<li class="${i === ROUTE_STOPS.length - 1 ? "end" : ""}"><span class="stop" aria-hidden="true"></span><small>${w}</small><b>${t}</b></li>`).join("")}</ol></section>
-    <section class="wrap lp-sec"><dl class="lp-facts"><div><dt>Starts</dt><dd>${start}</dd></div><div><dt>Fee</dt><dd>${naira(p.fee || 0)}<small>or 2 payments of ${naira((p.inst_total || 0) / 2)} (${naira((p.inst_total || 0) - (p.fee || 0))} more in total)</small></dd></div><div><dt>Time</dt><dd>15 hours a week<small>live online classes plus your own time</small></dd></div></dl></section>
-    ${INFO.zuri_url ? `<section class="lp-zuri"><div class="wrap"><div><p>Not sure what you want to do yet?</p><span class="lp-zuri-s">Chat with Zuri for about 10 minutes. She'll help you find what you're drawn to, then take you straight into the application.</span></div><a class="btn gold" href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Talk to Zuri</a></div></section>` : ""}
-    <section class="wrap lp-sec lp-two"><div><h2>How to get in</h2><p class="note">For final-year students, recent graduates and NYSC members with a laptop and internet.</p></div>
-      <ol class="lp-steps">${[["Apply", "5 minutes"], ["Readiness check", `${INFO.cohort?.assess_minutes || 5} minutes`], ["Call with us", "15 minutes"], ["Offer and payment", "in full or 2 parts"]].map(([a, b]) => `<li><b>${a}</b><span class="note">${b}</span></li>`).join("")}</ol></section>` + pubFoot();
+function pageHome() {
+  const p = prog(), c = INFO.cohort || {}, open = appsOpen(), weeks = p.weeks || 17, mins = c.assess_minutes || 5;
+  const start = c.start_date ? fmt(c.start_date + "T12:00:00Z", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "";
+  const mine = myApp();
+  app.innerHTML = `<header class="nl-top"><div class="wrap"><a class="logo" href="#/" style="text-decoration:none;color:inherit">${LOGO}Jobnest Academy</a>
+      <nav class="nl-nav" aria-label="Jobnest Academy"><a href="#/" data-act="jump" data-k="faq">FAQ</a>${mine ? `<a href="#/a/${esc(mine.ref)}/${esc(mine.token)}">My application</a>` : `<a class="nl-check" href="#/check">Check an application</a>`}</nav></div></header>
+    <section class="nl-hero" id="top"><div class="wrap nl-hero-in">
+      <div class="nl-hero-txt">
+        <p class="nl-status ${open ? "on" : ""}"><span class="nl-dot"></span>${open ? `Applications open${start ? ` · ${esc(c.name || "Next cohort")} starts ${start}` : ""}` : "Applications are closed for now"}</p>
+        <h1 class="nl-h1">From graduate to work-ready.</h1>
+        <p class="nl-lead">In ${weeks} weeks, learn a skill employers pay for, deliver a real client project, intern with a company, and get coached through your job search. All online.</p>
+        ${open ? `<div class="actions"><a class="btn gold lg" href="#/apply">Apply now →</a>${INFO.zuri_url ? `<a class="btn ghost lg nl-ghost" href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Not sure yet? Talk to Zuri</a>` : ""}</div>`
+          : `<p class="note">Applications for the next cohort will open soon. Check back here.</p>`}
+      </div>
+      <div class="nl-art" aria-hidden="true">
+        <div class="nl-card nl-c1"><span class="nl-eyebrow">Your route · Week 8 of ${weeks}</span><div class="nl-bars"><i class="d"></i><i class="d"></i><i class="n"></i><i></i></div><div class="nl-bl"><span>Learn</span><span>Skills</span><span class="b">Project</span><span>Intern</span></div></div>
+        <div class="nl-card nl-c2"><span class="nl-time">10:00</span><span class="nl-c2t"><b>Live class</b><small>With your facilitator</small></span><span class="nl-join">Join</span></div>
+        <div class="nl-card nl-c3"><span class="nl-c3h"><b>Client project</b><span class="pill ok">Passed</span></span><small>Feedback from your facilitator, then it goes in your portfolio.</small></div>
+      </div></div></section>
+    <section class="nl-route"><div class="wrap"><h2 class="nl-h2">The ${weeks} weeks.</h2>
+      <ol class="nl-weeks">${ROUTE_STOPS.map(([w, t], i) => `<li class="${i === ROUTE_STOPS.length - 1 ? "end" : ""}"><span>${w}</span><b>${t}</b></li>`).join("")}</ol></div></section>
+    <section class="wrap nl-sec" id="how"><h2 class="nl-h2">How to get in.</h2>
+      <ol class="nl-steps">${[["Apply", "5 minutes"], ["Readiness check", `${mins} minutes`], ["Call with us", "15 minutes"], ["Accept and pay", "You're in"]].map(([a, b], i) => `<li><span class="nl-n ${i === 3 ? "last" : ""}">${i + 1}</span><span><b>${a}</b><small>${b}</small></span></li>`).join("")}</ol>
+      <div class="nl-need"><b>You'll need:</b><span>${TICK}A laptop</span><span>${TICK}Reliable internet</span><span>${TICK}About 15 hours a week</span></div></section>
+    <section class="wrap nl-sec"><h2 class="nl-h2">Who supports you.</h2>
+      <ul class="nl-team">${TEAM.map(([r, d]) => `<li><b>${r}</b><span>${d}</span></li>`).join("")}</ul></section>
+    <section class="wrap nl-sec nl-faq" id="faq"><h2 class="nl-h2">FAQ.</h2>
+      <div>${FAQ.map(([q, a], i) => `<details ${i ? "" : "open"}><summary>${q}</summary><p>${a}</p></details>`).join("")}</div></section>
+    <footer class="nl-foot"><div class="wrap"><span>© ${new Date().getFullYear()} Jobnest Services</span>
+      <nav aria-label="Footer"><a href="#/check">Check an application</a><a href="#/learn/signin">Student sign-in</a><a href="#/staff">Staff sign-in</a><a href="${esc(INFO.website_url || "https://jobnestcareers.com")}">Jobnest.com ↗</a></nav></div></footer>`;
 }
 
 const radios = (name, opts) => `<div class="rate">${opts.map((o) => `<label><input type="radio" name="${name}" value="${o}"><span>${o}</span></label>`).join("")}</div>`;
 const select = (id, opts) => `<select id="${id}">${["", ...opts].map((o) => `<option value="${esc(o)}">${o || "Choose one"}</option>`).join("")}</select>`;
+
+const STEPS = ["Apply", "Readiness check", "Call", "Offer", "Pay", "Admitted"];
+const stepBar = (n) => `<ol class="stepbar" aria-label="Your progress: step ${n + 1} of ${STEPS.length}">${STEPS.map((t, i) => `<li class="${i < n ? "done" : i === n ? "now" : ""}"${i === n ? ' aria-current="step"' : ""}><span></span><em>${t}</em></li>`).join("")}</ol><p class="stepbar-m" aria-hidden="true">Step ${n + 1} of ${STEPS.length} · ${STEPS[n]}</p>`;
 
 function pageApply() {
   if (!appsOpen()) return go("#/gep");
   let zuri = ""; try { zuri = sessionStorage.getItem("jn_zuri") || ""; } catch (e) {}
   const zGoal = (zuri.match(/^Goal[^:]*:\s*(.+)$/m) || [])[1] || "";
   app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><form class="card form app-form" id="apply-form" novalidate>
-    <span class="eyebrow">Step 1 of 6 · Application · about 5 minutes</span><h1>Apply to the ${esc(prog().name)}</h1>
+    ${stepBar(0)}<h1>Apply to the ${esc(prog().name)}</h1>
     <p class="note">You don't pick a track here. You'll agree it together on your Discovery Call.</p>
     ${!zuri && INFO.zuri_url ? `<p class="zuri-hint">Not sure what you want to do yet? <a href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Chat with Zuri first ↗</a> She'll fill this form in for you at the end.</p>` : ""}
     <h3>About you</h3>
@@ -306,13 +318,11 @@ async function pageApplicant(ref, token, view) {
 function pageAssessIntro(a, token, base) {
   const m = INFO.cohort?.assess_minutes || 5, n = INFO.cohort?.questions || 10;
   app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="card form app-form">
-    <span class="eyebrow">Step 2 of 6 · Readiness assessment</span><h1>Before you start</h1>
-    <p>Hi ${esc(a.first_name)}, this checks two things you'll use every day on the programme: <b>basic digital skills</b> and <b>clear communication</b>.</p>
-    <ul class="ticks"><li><b>${n} questions</b>, multiple choice. You need <b>${a.pass_mark}%</b> to continue.</li>
-      <li>You have <b>${m} minutes</b>. The timer starts when you press Start and keeps running if you leave the page.</li>
-      <li>Your answers are saved as you go. When time runs out, what you've answered is submitted automatically.</li>
-      <li>You get <b>one attempt</b>, so find a quiet spot with good internet first.</li></ul>
-    <div class="actions"><button class="btn gold" data-act="start-assess" data-ref="${esc(a.ref)}" data-token="${esc(token)}">Start the ${m}-minute assessment</button><a class="btn ghost" href="${base}">Not now</a></div></div></section>`;
+    ${stepBar(1)}<h1>Readiness check</h1>
+    <p>Hi ${esc(a.first_name)}, this checks your <b>basic digital skills</b> and <b>clear communication</b>.</p>
+    <div class="as-stats"><div><b>${n}</b><span>questions</span></div><div><b>${m}:00</b><span>minutes</span></div><div><b>${a.pass_mark}%</b><span>to pass</span></div><div><b>1</b><span>attempt</span></div></div>
+    <p class="note">The timer starts when you press Start and keeps running if you leave the page. Answers save as you go, and submit when time runs out. Find a quiet spot with good internet first.</p>
+    <div class="actions"><button class="btn gold lg" data-act="start-assess" data-ref="${esc(a.ref)}" data-token="${esc(token)}">Start</button><a class="btn ghost lg" href="${base}">Not now</a></div></div></section>`;
 }
 
 const AS = { timer: null, save: null };
@@ -325,15 +335,15 @@ async function pageAssess(a, token, base) {
   let saved = d.answers || [];
   try { const loc = JSON.parse(localStorage.getItem(key) || "null"); if (loc && loc.filter((x) => x != null).length > saved.filter((x) => x != null).length) saved = loc; } catch { /* ignore */ }
   const skew = Date.now() - new Date(d.now).getTime(), deadline = new Date(d.deadline).getTime() + skew;
-  app.innerHTML = pubHeader("admissions") + `<div class="timer-bar" id="timer-bar" role="timer" aria-live="off"><div class="wrap"><span>Readiness assessment</span><b class="mono" id="timer-left">--:--</b><span class="note" id="timer-ans"></span></div></div>
+  app.innerHTML = pubHeader("admissions") + `<div class="timer-bar" id="timer-bar" role="timer" aria-live="off"><div class="wrap"><span>Readiness check</span><b class="mono" id="timer-left">--:--</b><span class="tb-prog"><span class="tb-track"><span id="timer-fill"></span></span><span class="note" id="timer-ans"></span></span></div></div>
     <section class="wrap pub-wrap"><form class="card form app-form" id="ready-form" data-ref="${esc(a.ref)}" data-token="${esc(token)}" novalidate>
-    <span class="eyebrow">Step 2 of 6 · Readiness assessment · ${d.minutes} minutes</span><h1>Readiness assessment</h1>
+    <h1>Readiness check</h1>
     <p class="note">Every applicant gets a different set of questions. Your answers save automatically.</p>
-    ${qs.map((q, qi) => `<fieldset class="q"><legend>${qi + 1}. ${esc(q.q)}</legend>${q.o.map((o, oi) => `<label class="opt"><input type="radio" name="rq${qi}" value="${oi}" ${saved[qi] === oi ? "checked" : ""}> ${esc(o)}</label>`).join("")}</fieldset>`).join("")}
+    ${qs.map((q, qi) => `<fieldset class="q"><legend><span class="q-n mono">${String(qi + 1).padStart(2, "0")}</span>${esc(q.q)}</legend>${q.o.map((o, oi) => `<label class="opt"><input type="radio" name="rq${qi}" value="${oi}" ${saved[qi] === oi ? "checked" : ""}> ${esc(o)}</label>`).join("")}</fieldset>`).join("")}
     <p class="err" id="rq-err" role="alert"></p><div><button class="btn gold" type="submit">Submit assessment</button></div></form></section>`;
   const form = $("#ready-form");
   const answers = () => qs.map((_, i) => { const v = $(`input[name="rq${i}"]:checked`, form)?.value; return v == null ? null : +v; });
-  const count = () => { const n = answers().filter((x) => x != null).length; $("#timer-ans").textContent = `${n} of ${qs.length} answered`; };
+  const count = () => { const n = answers().filter((x) => x != null).length; $("#timer-ans").textContent = `${n} of ${qs.length} answered`; const f = $("#timer-fill"); if (f) f.style.width = (100 * n / qs.length) + "%"; };
   form.addEventListener("change", () => {
     const ans = answers(); count();
     try { localStorage.setItem(key, JSON.stringify(ans)); } catch { /* ignore */ }
@@ -951,6 +961,7 @@ document.addEventListener("click", async (e) => {
   if (!t) return;
   const a = t.dataset.act, k = t.dataset.k;
   if (a === "eye") { const i = t.parentNode.querySelector("input"); const show = i.type === "password"; i.type = show ? "text" : "password"; t.innerHTML = show ? EYE_OFF : EYE; t.setAttribute("aria-label", show ? "Hide password" : "Show password"); return; }
+  if (a === "jump") { e.preventDefault(); document.getElementById(k)?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (a === "signout") { await auth.signOut(); ME = null; return go("#/staff"); }
   if (a === "copy-link") { const i = $("#my-link"); i.select(); try { await navigator.clipboard.writeText(i.value); } catch { document.execCommand("copy"); } return toast("Link copied"); }
   if (a === "pick-day") { ui.pick = { day: k, slot: null }; return route(); }
@@ -1219,7 +1230,7 @@ async function route() {
     }
     if (p0 === "a" && p1 && p2) return pageApplicant(p1, p2, p3 || "");
     await info();
-    if (p0 === "gep") return pageGep();
+    if (p0 === "gep") return pageHome();
     if (p0 === "start") return go("#/apply");
     if (p0 === "apply") {
       if (p1 === "zuri" && p2) { try { sessionStorage.setItem("jn_zuri", p2.slice(0, 4000)); } catch (e) {} history.replaceState(null, "", location.pathname + "#/apply"); }
