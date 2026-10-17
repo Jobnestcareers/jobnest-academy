@@ -23,4 +23,7 @@ end $$;
 revoke execute on function public.admin_test_unlock(boolean) from public, anon;
 grant execute on function public.admin_test_unlock(boolean) to authenticated;
 
+-- Tell the API about the new function straight away.
+notify pgrst, 'reload schema';
+
 select 'Test unlock switch installed' as done;
