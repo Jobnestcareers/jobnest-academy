@@ -180,3 +180,17 @@ button.snav-i{font:inherit}
 #ready-form .opt:has(input:checked){border:2px solid var(--brand);background:var(--surface-2);font-weight:600}
 .stepbar em{font-style:normal}.stepbar-m{display:none;margin:0 0 .4rem;font-size:.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
 @media(max-width:700px){.stepbar{margin:0}.stepbar em{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}.stepbar-m{display:block}}
+/* ---------- phone fixes: no sideways movement, no text spilling out of cards ---------- */
+html,#app{overflow-x:clip}
+.nl-weeks{grid-template-columns:repeat(4,minmax(0,1fr))}
+@media(max-width:760px){.nl-weeks{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.nl-weeks li,.nl-team li,.nl-steps li,.nl-card,.as-stats div{min-width:0;overflow-wrap:break-word;hyphens:auto}
+.nl-weeks b{font-size:1rem;line-height:1.3}
+/* iPhones zoom in (and the page shifts) when a box with small text is tapped */
+@media(max-width:700px){input:not(.sig-input),select,textarea{font-size:16px!important}}
+/* ---------- application number ---------- */
+.appno-row{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem 1rem;margin:.4rem 0}
+.appno-row b{font-size:1.7rem;letter-spacing:.04em;color:var(--brand)}
+.appno-new{background:var(--accent-soft);border:1.5px solid var(--accent);border-radius:16px;padding:14px 18px;display:flex;flex-direction:column;gap:2px;margin:.2rem 0 .6rem}
+.appno-new>span{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.appno-new small{font-size:.9rem;color:var(--ink)}

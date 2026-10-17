@@ -68,7 +68,7 @@ select * from (values
 insert into email_templates(key, subject, body, cta) values
   ('received', 'We''ve received your application ({ref})', 'Hi {first},
 
-Thank you for applying to the {programme}. Your application reference is {ref}.
+Thank you for applying to the {programme}. Your application number is {ref}. Keep it safe: you''ll need it with your surname to come back to your application.
 
 Your next step is a 5-minute readiness assessment on basic digital skills and communication. You can take it now or any time in the next 3 days.', 'Take the readiness assessment'),
   ('passed', 'You passed! Book your Discovery Call', 'Hi {first},

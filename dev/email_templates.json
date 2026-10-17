@@ -3,7 +3,7 @@
   "g": "Application",
   "n": "Application received",
   "s": "We've received your application ({ref})",
-  "b": "Hi {first},\n\nThank you for applying to the {programme}. Your application reference is {ref}.\n\nYour next step is a 5-minute readiness assessment on basic digital skills and communication. You can take it now or any time in the next 3 days."
+  "b": "Hi {first},\n\nThank you for applying to the {programme}. Your application number is {ref}. Keep it safe: you'll need it with your surname to come back to your application.\n\nYour next step is a 5-minute readiness assessment on basic digital skills and communication. You can take it now or any time in the next 3 days."
  },
  "passed": {
   "g": "Application",

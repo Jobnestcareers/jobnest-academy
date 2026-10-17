@@ -34,6 +34,9 @@ update cohorts set matric_next = 1;
 insert into audit_log(actor, text) values ('System', 'Test data cleared before launch');
 commit;
 
+-- Clear wrong-surname attempts.
+delete from continue_attempts;
+
 -- Close the testing switch so portal weeks open on their real dates.
 insert into app_settings(key, value) values ('unlock_weeks', 'off') on conflict (key) do update set value = 'off';
 

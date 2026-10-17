@@ -1,5 +1,6 @@
 // Jobnest Academy web app: public Academy site, applicant journey, staff portals.
 import { rpc, auth } from "./api.js";
+import { NG } from "./ng.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -14,6 +15,9 @@ const fmtAt = (d) => `${fmtDay(d)}, ${fmtTime(d)}`;
 const fmtDate = (d) => fmt(d, { day: "numeric", month: "long", year: "numeric" });
 const naira = (n) => "₦" + Math.round(n).toLocaleString("en-NG");
 const fmtDateD = (iso) => fmt(iso + "T12:00:00Z", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+const gcalStamp = (d) => new Date(d).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+const gcalUrl = (start, mins, title, details, loc) => "https://calendar.google.com/calendar/render?action=TEMPLATE&text=" + encodeURIComponent(title) +
+  "&dates=" + gcalStamp(start) + "/" + gcalStamp(new Date(new Date(start).getTime() + mins * 60000)) + "&details=" + encodeURIComponent(details || "") + "&location=" + encodeURIComponent(loc || "");
 const balanceOf = (a) => a.plan && a.fees ? Math.max(0, (a.fees.plan_total || 0) - (a.paid_total || 0)) : 0;
 const MY_APP = "jn.myapp";
 
@@ -91,12 +95,12 @@ function pubHeader(kind = "academy") {
     return `<header class="pub-top adm-site"><div class="wrap"><a class="logo" href="#/" style="text-decoration:none;color:inherit">${LOGO}Jobnest Admissions</a>
       <nav class="pub-nav">${myApp() ? `<a class="link" href="#/a/${esc(myApp().ref)}/${esc(myApp().token)}">My application</a>` : ""}<a class="btn sm ghost" href="#/">Jobnest Academy</a></nav></div></header>`;
   }
-  const links = `<a class="navl" href="#/">Programmes</a><a class="navl" href="#/check">Check an application</a><a class="navl" href="${esc(INFO?.website_url || "https://jobnestcareers.com")}" style="text-decoration:none">Jobnest.com ↗</a>`;
+  const links = `<a class="navl" href="#/">Programmes</a><a class="navl" href="#/check">Continue an application</a><a class="navl" href="${esc(INFO?.website_url || "https://jobnestcareers.com")}" style="text-decoration:none">Jobnest.com ↗</a>`;
   return `<header class="pub-top ac-top"><div class="wrap"><a class="logo" href="#/" style="text-decoration:none;color:inherit">${LOGO}Jobnest Academy</a>
     <nav class="pub-nav ac-nav" aria-label="Jobnest Academy">${links}</nav>
     <details class="ac-mnav"><summary aria-label="Open menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</summary><nav class="ac-mlist">${links}</nav></details></div></header>`;
 }
-const pubFoot = () => `<footer class="wrap lp-foot"><a class="link" href="#/check">Check an application</a><a class="link" href="#/staff">Staff sign-in</a><span class="note">© ${new Date().getFullYear()} Jobnest Services</span></footer>`;
+const pubFoot = () => `<footer class="wrap lp-foot"><a class="link" href="#/check">Continue an application</a><a class="link" href="#/staff">Staff sign-in</a><span class="note">© ${new Date().getFullYear()} Jobnest Services</span></footer>`;
 
 const TEAM = [["Admissions", "Guides you from application to your first day."], ["Programme Director", "Leads the programme and its standards."],
   ["Cohort Manager", "Keeps you on track, week by week."], ["Facilitators", "Teach your track and mark your work."], ["Career Coach", "CV, LinkedIn and your job search."]];
@@ -109,7 +113,7 @@ function pageHome() {
   const start = c.start_date ? fmt(c.start_date + "T12:00:00Z", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "";
   const mine = myApp();
   app.innerHTML = `<header class="nl-top"><div class="wrap"><a class="logo" href="#/" style="text-decoration:none;color:inherit">${LOGO}Jobnest Academy</a>
-      <nav class="nl-nav" aria-label="Jobnest Academy"><a href="#/" data-act="jump" data-k="faq">FAQ</a>${mine ? `<a href="#/a/${esc(mine.ref)}/${esc(mine.token)}">My application</a>` : `<a class="nl-check" href="#/check">Check an application</a>`}</nav></div></header>
+      <nav class="nl-nav" aria-label="Jobnest Academy"><a href="#/" data-act="jump" data-k="faq">FAQ</a>${mine ? `<a href="#/a/${esc(mine.ref)}/${esc(mine.token)}">My application</a>` : `<a class="nl-check" href="#/check">Continue an application</a>`}</nav></div></header>
     <section class="nl-hero" id="top"><div class="wrap nl-hero-in">
       <div class="nl-hero-txt">
         <p class="nl-status ${open ? "on" : ""}"><span class="nl-dot"></span>${open ? `Applications open${start ? ` · ${esc(c.name || "Next cohort")} starts ${start}` : ""}` : "Applications are closed for now"}</p>
@@ -133,7 +137,7 @@ function pageHome() {
     <section class="wrap nl-sec nl-faq" id="faq"><h2 class="nl-h2">FAQ.</h2>
       <div>${FAQ.map(([q, a], i) => `<details ${i ? "" : "open"}><summary>${q}</summary><p>${a}</p></details>`).join("")}</div></section>
     <footer class="nl-foot"><div class="wrap"><span>© ${new Date().getFullYear()} Jobnest Services</span>
-      <nav aria-label="Footer"><a href="#/check">Check an application</a><a href="#/learn/signin">Student sign-in</a><a href="#/staff">Staff sign-in</a><a href="${esc(INFO.website_url || "https://jobnestcareers.com")}">Jobnest.com ↗</a></nav></div></footer>`;
+      <nav aria-label="Footer"><a href="#/check">Continue an application</a><a href="#/learn/signin">Student sign-in</a><a href="#/staff">Staff sign-in</a><a href="${esc(INFO.website_url || "https://jobnestcareers.com")}">Jobnest.com ↗</a></nav></div></footer>`;
 }
 
 const radios = (name, opts) => `<div class="rate">${opts.map((o) => `<label><input type="radio" name="${name}" value="${o}"><span>${o}</span></label>`).join("")}</div>`;
@@ -153,7 +157,9 @@ function pageApply() {
     <h3>About you</h3>
     <div class="grid2"><div class="field"><label for="g-first">First name</label><input id="g-first" autocomplete="given-name" maxlength="80"></div><div class="field"><label for="g-sur">Surname</label><input id="g-sur" autocomplete="family-name" maxlength="80"></div></div>
     <div class="grid2"><div class="field"><label for="g-email">Email</label><input id="g-email" type="email" autocomplete="email"></div><div class="field"><label for="g-phone">WhatsApp number</label><input id="g-phone" inputmode="tel" autocomplete="tel" placeholder="0803 000 0000"></div></div>
-    <div class="field"><label for="g-city">City / State</label><input id="g-city" placeholder="e.g. Ikeja, Lagos"></div>
+    <div class="grid2"><div class="field"><label for="g-state">State</label>${select("g-state", Object.keys(NG))}</div>
+    <div class="field"><label for="g-town">City or town</label><select id="g-town" disabled><option value="">Choose your state first</option></select>
+      <input id="g-town-o" placeholder="Type your city or town" maxlength="80" hidden style="margin-top:.5rem"></div></div>
     <h3>Your background</h3>
     <div class="grid2"><div class="field"><label for="g-edu">Highest education</label>${select("g-edu", ["OND / NCE", "HND", "B.Sc / B.A.", "Master's", "Other"])}</div>
     <div class="field"><label for="g-nysc">NYSC status</label>${select("g-nysc", ["Completed", "Currently serving", "Exempted", "Not yet"])}</div></div>
@@ -170,12 +176,27 @@ function pageApply() {
   </form></section>`;
 }
 
+function cityValue() {
+  const st = $("#g-state")?.value || "", t = $("#g-town")?.value || "", o = ($("#g-town-o")?.value || "").trim();
+  if (!st) return "";
+  if (st === "Outside Nigeria") return o ? `${o} (outside Nigeria)` : "";
+  const town = t === "Other" ? o : t;
+  return town ? `${town}, ${st}` : "";
+}
+function fillTowns() {
+  const st = $("#g-state").value, sel = $("#g-town"), other = $("#g-town-o");
+  const list = NG[st] || [];
+  if (st === "Outside Nigeria") { sel.hidden = true; sel.innerHTML = ""; other.hidden = false; other.placeholder = "City and country"; return; }
+  sel.hidden = false; sel.disabled = !st; other.hidden = true; other.value = ""; other.placeholder = "Type your city or town";
+  sel.innerHTML = st ? `<option value="">Choose one</option>${list.map((c) => `<option>${esc(c)}</option>`).join("")}<option value="Other">Other (type it)</option>` : `<option value="">Choose your state first</option>`;
+}
+
 async function submitApply(form) {
   const v = (id) => ($("#" + id)?.value || "").trim();
   const r = (n) => $(`input[name="${n}"]:checked`)?.value || "";
-  const d = { first_name: v("g-first"), surname: v("g-sur"), email: v("g-email"), phone: v("g-phone"), city: v("g-city"), edu: v("g-edu"), nysc: v("g-nysc"),
+  const d = { first_name: v("g-first"), surname: v("g-sur"), email: v("g-email"), phone: v("g-phone"), city: cityValue(), edu: v("g-edu"), nysc: v("g-nysc"),
     situation: v("g-sit"), hours: r("g-hours"), laptop: r("g-laptop"), internet: r("g-net"), motivation: v("g-mot"), zuri_summary: v("g-zuri") };
-  const miss = [["first_name", "first name"], ["surname", "surname"], ["email", "email"], ["phone", "WhatsApp number"], ["city", "city"], ["edu", "education"], ["nysc", "NYSC status"],
+  const miss = [["first_name", "first name"], ["surname", "surname"], ["email", "email"], ["phone", "WhatsApp number"], ["city", "state and city"], ["edu", "education"], ["nysc", "NYSC status"],
     ["situation", "current situation"], ["hours", "weekly hours"], ["laptop", "laptop"], ["internet", "internet"], ["motivation", "6-month answer"]].filter(([k]) => !d[k]).map(([, l]) => l);
   const err = $("#g-err");
   if (miss.length) { err.textContent = "Please complete: " + miss.join(", ") + "."; return; }
@@ -187,18 +208,19 @@ async function submitApply(form) {
     const res = await busy(form.querySelector("button[type=submit]"), () => rpc("submit_application", { p: d }));
     try { sessionStorage.removeItem("jn_zuri"); } catch (e) {}
     saveMyApp(res.ref, res.token);
-    toast(`Application received · ref ${res.ref}`);
+    toast(`Application received · ${res.ref}`);
     go(`#/a/${res.ref}/${res.token}/assess`);
   } catch (e) { err.textContent = e.message; }
 }
 
 function pageCheck() {
   const mine = myApp();
-  app.innerHTML = pubHeader() + `<section class="wrap pub-wrap"><div class="card verify"><span class="eyebrow">Applicants</span><h1>Check your application</h1>
+  app.innerHTML = pubHeader() + `<section class="wrap pub-wrap"><div class="card verify"><span class="eyebrow">Applicants</span><h1>Continue your application</h1>
     ${mine ? `<div class="notice">You applied on this device. <a class="link" href="#/a/${esc(mine.ref)}/${esc(mine.token)}">Continue application ${esc(mine.ref)} →</a></div>` : ""}
-    <p>Enter the reference from your confirmation email and the email you applied with.</p>
-    <form id="find-form" class="form" novalidate><div class="grid2"><div class="field"><label for="f-ref">Application reference</label><input id="f-ref" placeholder="APP-1A2B3C" style="text-transform:uppercase"></div>
-      <div class="field"><label for="f-email">Email</label><input id="f-email" type="email"></div></div><p class="err" id="f-err" role="alert"></p><div><button class="btn" type="submit">Find my application</button></div></form></div></section>` + pubFoot();
+    <p>Enter your application number and the surname you applied with. Your application number is in every email we've sent you.</p>
+    <form id="find-form" class="form" novalidate><div class="grid2"><div class="field"><label for="f-ref">Application number</label><input id="f-ref" placeholder="APP-1A2B3C" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase"></div>
+      <div class="field"><label for="f-sur">Surname</label><input id="f-sur" autocomplete="family-name"></div></div><p class="err" id="f-err" role="alert"></p><div><button class="btn gold" type="submit">Continue</button></div></form>
+    <p class="note" style="margin-top:1rem">New here? <a class="link" href="#/apply">Start an application</a></p></div></section>` + pubFoot();
 }
 
 function pagePayCheck() {
@@ -219,7 +241,12 @@ function statusCard(a, base) {
   if (a.status === "Assessment pending") card = `<p>Your application is in. Next, take the ${INFO.cohort?.assess_minutes || 5}-minute readiness assessment.</p><div><a class="btn gold" href="${base}/assess">${a.assessment_started ? "Continue assessment" : "Go to the assessment"}</a></div>`;
   if (a.status === "Assessment failed") card = `<p>Thank you for applying. Your assessment score was <b>${a.score}%</b>, and the pass mark is ${a.pass_mark}%. You can apply again for the next batch.</p>${communityNote()}`;
   if (a.status === "Call to book") card = `<p>You passed the assessment with <b>${a.score}%</b>. Book your 15-minute Discovery Call.</p><div><a class="btn gold" href="${base}/book">Book Discovery Call 1</a></div>`;
-  if (a.status === "Call booked") card = `<p>Your Discovery Call is booked for <b>${fmtLong(a.dc1_at)} at ${fmtTime(a.dc1_at)} WAT</b>${a.officer ? ` with ${esc(a.officer)}` : ""}. The video link will be sent to ${esc(a.email)}. This is where we agree your track together.</p>`;
+  if (a.status === "Call booked") {
+    const meet = a.meet || "", gc = gcalUrl(a.dc1_at, 15, "Jobnest Academy Discovery Call", `Your 15-minute Discovery Call${a.officer ? ` with ${a.officer}` : ""}.${meet ? ` Join here: ${meet}` : ""}`, meet || "Online");
+    card = `<p>Your Discovery Call is booked for <b>${fmtLong(a.dc1_at)} at ${fmtTime(a.dc1_at)} WAT</b>${a.officer ? ` with ${esc(a.officer)}` : ""}. This is where we agree your track together.</p>
+      <div class="actions">${meet ? `<a class="btn gold" href="${esc(meet)}" target="_blank" rel="noopener">Join the call ↗</a>` : ""}<a class="btn ghost" href="${esc(gc)}" target="_blank" rel="noopener">Add to Google Calendar</a></div>
+      <p class="note">${meet ? "The link opens Microsoft Teams. Join a few minutes early." : "The meeting link is in your booking email."}</p>`;
+  }
   if (a.status === "Under review") card = `<p>Thanks for the call. You agreed on the <b>${tr}</b> track. Admissions is reviewing your application. You'll hear back within 3 working days.</p>`;
   if (a.status === "Waitlisted") card = `<p>You're on the <b>waitlist</b> for the ${tr} track. If a seat opens, we'll send you an offer.</p>`;
   if (a.status === "Not selected") card = `<p>Thank you for applying. We're not able to offer you a place this time. You're welcome to apply for the next batch.</p>`;
@@ -297,10 +324,11 @@ async function pageApplicant(ref, token, view) {
   let a;
   try { [a] = await Promise.all([rpc("applicant_view", { p_ref: ref, p_token: token }), info()]); }
   catch (e) {
-    app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="card verify"><h1>We couldn't open that application</h1><p>${esc(e.message)}</p><div><a class="btn" href="#/check">Check an application</a></div></div></section>`;
+    app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="card verify"><h1>We couldn't open that application</h1><p>${esc(e.message)}</p><div><a class="btn" href="#/check">Continue an application</a></div></div></section>`;
     return;
   }
   saveMyApp(a.ref, token);
+  if (a.status === "Call booked") { try { a.meet = (await rpc("applicant_call", { p_ref: ref, p_token: token }))?.meet || ""; } catch { a.meet = ""; } }
   const base = `#/a/${encodeURIComponent(a.ref)}/${encodeURIComponent(token)}`;
   if (view === "assess" && a.status === "Assessment pending") return a.assessment_started ? pageAssess(a, token, base) : pageAssessIntro(a, token, base);
   if (view === "book" && a.status === "Call to book") return pageBook(a, token, base);
@@ -310,15 +338,16 @@ async function pageApplicant(ref, token, view) {
   app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="status-wrap">
     <div class="card"><div class="ch"><div><span class="eyebrow">Application ${esc(a.ref)}</span><h2 style="margin-top:.3rem">${esc(a.first_name)} ${esc(a.surname)}${a.track ? ` · ${esc(a.track)}` : ""}</h2>${a.track || a.wanted ? "" : `<span class="note">Track: agreed on Discovery Call 1</span>`}</div>${pill(a.status)}</div>
       ${tracker(a)}<div class="status-body">${view === "paid" && a.status === "Admitted" ? `<div class="notice ok-n">✓ Payment received. Thank you! A receipt and your admission email are on their way.</div>` : ""}${view === "payfail" ? `<div class="notice warn">Your payment wasn't completed, so you haven't been charged. You can try again below.</div>` : ""}${view === "paycheck" ? `<div class="notice warn">We couldn't confirm your payment automatically. If you were charged, Admissions will sort it out: reply to your offer email with your payment receipt.</div>` : ""}${statusCard(a, base)}</div></div>
-    <div class="card"><h3>Keep this link</h3><p class="note">This private link opens your application on any device. Don't share it.</p>
-      <div class="verify-f"><input readonly id="my-link" value="${esc(location.origin + location.pathname + base)}"><button class="btn sm ghost" data-act="copy-link">Copy</button></div></div>
+    <div class="card appno"><h3>Your application number</h3><div class="appno-row"><b class="mono" id="my-ref">${esc(a.ref)}</b><button class="btn sm ghost" data-act="copy-link">Copy</button></div>
+      <p class="note">Keep it safe. To come back on any device, choose <b>Continue an application</b> and enter it with your surname. It's also in every email we send you.</p></div>
   </div></section>`;
 }
 
 function pageAssessIntro(a, token, base) {
   const m = INFO.cohort?.assess_minutes || 5, n = INFO.cohort?.questions || 10;
   app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="card form app-form">
-    ${stepBar(1)}<h1>Readiness check</h1>
+    ${stepBar(1)}<div class="appno-new"><span>Your application number</span><div class="appno-row"><b class="mono" id="my-ref">${esc(a.ref)}</b><button class="btn sm ghost" data-act="copy-link" type="button">Copy</button></div><small>Keep it safe. You'll need it with your surname to come back. We've also emailed it to you.</small></div>
+    <h1>Readiness check</h1>
     <p>Hi ${esc(a.first_name)}, this checks your <b>basic digital skills</b> and <b>clear communication</b>.</p>
     <div class="as-stats"><div><b>${n}</b><span>questions</span></div><div><b>${m}:00</b><span>minutes</span></div><div><b>${a.pass_mark}%</b><span>to pass</span></div><div><b>1</b><span>attempt</span></div></div>
     <p class="note">The timer starts when you press Start and keeps running if you leave the page. Answers save as you go, and submit when time runs out. Find a quiet spot with good internet first.</p>
@@ -515,7 +544,8 @@ function appRow(a, mode, tracks) {
   const ini = ((a.first_name[0] || "") + (a.surname[0] || "")).toUpperCase();
   const g = groupOf(a), dec = ["Under review", "Waitlisted"].includes(a.status);
   let acts = "";
-  if (a.status === "Call booked" && ["adm_officer", "super"].includes(ME.role) && (ME.role === "super" || a.officer_email === ME.email)) acts = callForm(a, tracks);
+  const calLink = a.status === "Call booked" && a.dc1_at ? `<p><a class="link sm" href="${esc(gcalUrl(a.dc1_at, 15, `Discovery Call: ${a.first_name} ${a.surname} (${a.ref})`, `Jobnest Academy Discovery Call with ${a.first_name} ${a.surname}, ${a.ref}.`, "Microsoft Teams"))}" target="_blank" rel="noopener">Add to Google Calendar ↗</a></p>` : "";
+  if (a.status === "Call booked" && ["adm_officer", "super"].includes(ME.role) && (ME.role === "super" || a.officer_email === ME.email)) acts = calLink + callForm(a, tracks);
   else if (a.status === "Call booked") acts = `<p class="note">Booked with ${esc(a.officer_name || "")}. The Admissions Officer holds the call and recommends.</p>`;
   else if (dec && ["adm_admin", "super"].includes(ME.role)) acts = decideButtons(a);
   else if (dec) acts = `<p class="note">${a.status === "Under review" ? "Waiting for the Admissions Admin to decide." : "The Admissions Admin can send an offer when a seat frees up."}</p>`;
@@ -650,7 +680,7 @@ async function tabSettings() {
         <div class="grid2">${f("st-days", "Days to accept and pay", c.offer_days, 'type="number" min="1" max="30"')}${f("st-due", "2nd instalment due before week", c.inst_due_week, 'type="number" min="2" max="17"')}</div></div>
       <div class="card"><h3>Fee</h3><div class="grid2">${f("st-fee", "Full fee (₦)", p.fee, 'type="number" min="0" step="1000"')}${f("st-pct", "Extra for 2 instalments (%)", p.inst_pct, 'type="number" min="0" max="50"')}</div><p class="note">2 instalments total: ${naira(p.inst_total)}</p></div>
       <div class="card"><h3>Seats by track</h3>${s.tracks.map((t) => `<div class="grid2" style="align-items:end"><div class="field"><label for="seat-${t.code}">${esc(t.name)}</label><input id="seat-${t.code}" type="number" min="0" value="${t.seats}" data-track="${t.code}"></div><label class="consent"><input type="checkbox" id="pause-${t.code}" ${t.paused ? "checked" : ""}> Paused</label></div>`).join("")}</div>
-      <div class="card"><h3>Links</h3>${f("st-site", "Academy address", s.site.site_url, 'type="url"')}${f("st-web", "Jobnest website", s.site.website_url, 'type="url"')}${f("st-zuri", "Zuri chat link", s.site.zuri_url, 'type="url"')}</div>
+      <div class="card"><h3>Links</h3>${f("st-site", "Academy address", s.site.site_url, 'type="url"')}${f("st-web", "Jobnest website", s.site.website_url, 'type="url"')}${f("st-call", "Discovery Call meeting link (Teams)", s.site.call_link, 'type="url"')}${f("st-zuri", "Zuri chat link", s.site.zuri_url, 'type="url"')}</div>
       <div class="card"><h3>Testing</h3><p class="note">Opens every week of the student portal now, so the team can test lessons and tasks before the start date. Turn it off before launch.</p>
         <label class="consent"><input type="checkbox" id="st-unlock" ${unlocked ? "checked" : ""}> <span>Open all portal weeks for testing</span></label>
         <p class="note" id="st-unlock-msg" style="color:var(--danger,#B42318);font-weight:600">${unlocked ? "On: students can see every week right now." : ""}</p></div>
@@ -966,7 +996,7 @@ document.addEventListener("click", async (e) => {
   if (a === "eye") { const i = t.parentNode.querySelector("input"); const show = i.type === "password"; i.type = show ? "text" : "password"; t.innerHTML = show ? EYE_OFF : EYE; t.setAttribute("aria-label", show ? "Hide password" : "Show password"); return; }
   if (a === "jump") { e.preventDefault(); document.getElementById(k)?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (a === "signout") { await auth.signOut(); ME = null; return go("#/staff"); }
-  if (a === "copy-link") { const i = $("#my-link"); i.select(); try { await navigator.clipboard.writeText(i.value); } catch { document.execCommand("copy"); } return toast("Link copied"); }
+  if (a === "copy-link") { const v = $("#my-ref")?.textContent || ""; try { await navigator.clipboard.writeText(v); } catch { const t = document.createElement("textarea"); t.value = v; document.body.append(t); t.select(); document.execCommand("copy"); t.remove(); } return toast("Application number copied"); }
   if (a === "pick-day") { ui.pick = { day: k, slot: null }; return route(); }
   if (a === "pick-slot") { ui.pick.slot = +k; return route(); }
   if (a === "book") {
@@ -1053,6 +1083,8 @@ document.addEventListener("change", (e) => {
   const el = e.target, k = el.dataset.k;
   if (el.dataset.actChange === "track") { const none = el.value === "NONE"; $("#wi-" + k).hidden = !none; $("#ri-" + k).hidden = none; }
   if (el.dataset.actChange === "interest") { $("#wo-" + k).hidden = el.value !== "Other"; }
+  if (el.id === "g-state") fillTowns();
+  if (el.id === "g-town") { const o = $("#g-town-o"); o.hidden = el.value !== "Other"; if (!o.hidden) o.focus(); }
   if (el.id === "st-unlock") {
     const on = el.checked; el.disabled = true;
     rpc("admin_test_unlock", { p_on: on }).then((r) => { el.checked = r; $("#st-unlock-msg").textContent = r ? "On: students can see every week right now." : ""; toast(r ? "All portal weeks are open for testing" : "Portal weeks are back to their dates"); })
@@ -1067,10 +1099,13 @@ document.addEventListener("submit", async (e) => {
   if (f.id === "apply-form") return submitApply(f);
   if (f.id === "ready-form") { try { await submitAssess(f); } catch { /* shown */ } return; }
   if (f.id === "find-form") {
-    const ref = $("#f-ref").value.trim(), em = $("#f-email").value.trim(), err = $("#f-err");
-    if (!ref || !em) { err.textContent = "Enter your reference and email."; return; }
-    const r = await busy(f.querySelector("button"), () => rpc("applicant_find", { p_ref: ref, p_email: em }));
-    if (!r) { err.textContent = "No application matches that reference and email."; return; }
+    const ref = $("#f-ref").value.trim(), sur = $("#f-sur").value.trim(), err = $("#f-err");
+    if (!ref || !sur) { err.textContent = "Enter your application number and surname."; return; }
+    let r;
+    try { r = await busy(f.querySelector("button"), () => rpc("applicant_continue", { p_ref: ref, p_surname: sur })); }
+    catch (x) { err.textContent = x.message; return; }
+    if (!r || !r.ref) { err.textContent = "That application number and surname don't match. Check both and try again."; return; }
+    saveMyApp(r.ref, r.token);
     return go(`#/a/${r.ref}/${r.token}`);
   }
   if (f.id === "signin-form") {
@@ -1128,7 +1163,7 @@ document.addEventListener("submit", async (e) => {
     const v = (id) => $("#" + id).value;
     const p = { cohort: { name: v("st-name"), start_date: v("st-start"), year2: v("st-year"), batch: v("st-batch"), applications_open: $("#st-open").checked, pass_mark: +v("st-pass"), ready_n: +v("st-n"), assess_minutes: +v("st-mins"), offer_days: +v("st-days"), inst_due_week: +v("st-due") },
       programme: { fee: +v("st-fee"), inst_pct: +v("st-pct") }, tracks: $$("[data-track]").map((i) => ({ code: i.dataset.track, seats: +i.value, paused: $("#pause-" + i.dataset.track).checked })),
-      site: { site_url: v("st-site"), website_url: v("st-web"), zuri_url: v("st-zuri"), signer_name: v("st-sname"), signer_title: v("st-stitle") } };
+      site: { site_url: v("st-site"), website_url: v("st-web"), zuri_url: v("st-zuri"), call_link: v("st-call"), signer_name: v("st-sname"), signer_title: v("st-stitle") } };
     try { await busy(f.querySelector("button[type=submit]"), () => rpc("admin_save_settings", { p })); INFO = null; toast("Settings saved"); route(); } catch (x) { $("#st-err").textContent = x.message; }
     return;
   }
