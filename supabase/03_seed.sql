@@ -70,7 +70,7 @@ insert into email_templates(key, subject, body, cta) values
 
 Thank you for applying to the {programme}. Your application reference is {ref}.
 
-Your next step is a 10-minute readiness assessment on basic digital skills and communication. You can take it now or any time in the next 3 days.', 'Take the readiness assessment'),
+Your next step is a 5-minute readiness assessment on basic digital skills and communication. You can take it now or any time in the next 3 days.', 'Take the readiness assessment'),
   ('passed', 'You passed! Book your Discovery Call', 'Hi {first},
 
 Well done: you scored {score}% on the readiness assessment.

@@ -16,7 +16,7 @@ with sync_playwright() as p:
     def shot(n): pg.wait_for_timeout(250); pg.screenshot(path=f"/var/tmp/shots/{TAG}-{n}.png", full_page=True); ov = pg.evaluate("document.documentElement.scrollWidth - innerWidth"); (ov > 1) and log.append(f"OVERFLOW {n} {ov}")
     def wait_text(t): pg.locator(f":text(\"{t}\"):visible").first.wait_for(timeout=8000)
     # --- staff setup
-    pg.goto(U + "#/staff/signup"); wait_text("Set up your staff account")
+    pg.wait_for_timeout(500); pg.goto(U + "#/staff/signup"); pg.reload(); wait_text("Set up your staff account")
     pg.fill("#u-email", "owner@test.ng"); pg.fill("#u-pass", "Owner1234"); pg.fill("#u-pass2", "Owner1234"); pg.click("#signup-form button[type=submit]")
     wait_text("Staff accounts"); shot("super-staff")
     for em, nm, role in [("kemi@test.ng", "Kemi Adeyemi", "adm_officer"), ("bayo@test.ng", "Bayo Okon", "adm_admin")]:
@@ -24,7 +24,7 @@ with sync_playwright() as p:
     log.append("staff rows: " + str(pg.locator(".tbl tbody tr").count()))
     pg.locator("[data-act=signout]:visible").first.click(); wait_text("Sign in")
     # officer: sign up, add times
-    pg.goto(U + "#/staff/signup"); wait_text("Set up your staff account")
+    pg.wait_for_timeout(500); pg.goto(U + "#/staff/signup"); pg.reload(); wait_text("Set up your staff account")
     pg.fill("#u-email", "kemi@test.ng"); pg.fill("#u-pass", "Kemi12345"); pg.fill("#u-pass2", "Kemi12345"); pg.click("#signup-form button[type=submit]")
     wait_text("Your to-do list"); shot("officer-home")
     pg.goto(U + "#/portal/times"); wait_text("Add times")
@@ -65,7 +65,7 @@ with sync_playwright() as p:
     log.append("after call: " + sql(f"select status from applications where ref='{ref}'"))
     pg.locator("[data-act=signout]:visible").first.click(); wait_text("Sign in")
     # admin decides
-    pg.goto(U + "#/staff/signup"); wait_text("Set up your staff account")
+    pg.wait_for_timeout(500); pg.goto(U + "#/staff/signup"); pg.reload(); wait_text("Set up your staff account")
     pg.fill("#u-email", "bayo@test.ng"); pg.fill("#u-pass", "Bayo12345"); pg.fill("#u-pass2", "Bayo12345"); pg.click("#signup-form button[type=submit]")
     wait_text("Admission decisions"); shot("admin-decide")
     pg.click("text=Approve: Offer a place"); pg.wait_for_timeout(800)

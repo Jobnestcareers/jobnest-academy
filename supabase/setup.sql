@@ -801,7 +801,7 @@ insert into email_templates(key, subject, body, cta) values
 
 Thank you for applying to the {programme}. Your application reference is {ref}.
 
-Your next step is a 10-minute readiness assessment on basic digital skills and communication. You can take it now or any time in the next 3 days.', 'Take the readiness assessment'),
+Your next step is a 5-minute readiness assessment on basic digital skills and communication. You can take it now or any time in the next 3 days.', 'Take the readiness assessment'),
   ('passed', 'You passed! Book your Discovery Call', 'Hi {first},
 
 Well done: you scored {score}% on the readiness assessment.
@@ -2148,3 +2148,10 @@ revoke execute on function public.assessment_start(text, uuid), public.assessmen
 grant execute on function public.assessment_start(text, uuid), public.assessment_save(text, uuid, jsonb) to anon, authenticated;
 revoke execute on function public.student_tour_done(), public.student_campus_extra() from public, anon;
 grant execute on function public.student_tour_done(), public.student_campus_extra() to authenticated;
+
+
+-- Jobnest Academy: readiness assessment takes 5 minutes (run once in Supabase → SQL Editor). Safe to run again.
+alter table cohorts alter column assess_minutes set default 5;
+update cohorts set assess_minutes = 5 where is_current;
+update email_templates set body = replace(body, '10-minute readiness assessment', '5-minute readiness assessment') where key = 'received';
+select name, assess_minutes from cohorts where is_current;

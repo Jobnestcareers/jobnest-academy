@@ -124,7 +124,7 @@ function pageGep() {
     <section class="wrap lp-sec"><dl class="lp-facts"><div><dt>Starts</dt><dd>${start}</dd></div><div><dt>Fee</dt><dd>${naira(p.fee || 0)}<small>or 2 payments of ${naira((p.inst_total || 0) / 2)} (${naira((p.inst_total || 0) - (p.fee || 0))} more in total)</small></dd></div><div><dt>Time</dt><dd>15 hours a week<small>live online classes plus your own time</small></dd></div></dl></section>
     ${INFO.zuri_url ? `<section class="lp-zuri"><div class="wrap"><div><p>Not sure what you want to do yet?</p><span class="lp-zuri-s">Chat with Zuri for about 10 minutes. She'll help you find what you're drawn to, and we'll pick it up on your call.</span></div><a class="btn gold" href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Talk to Zuri</a></div></section>` : ""}
     <section class="wrap lp-sec lp-two"><div><h2>How to get in</h2><p class="note">For final-year students, recent graduates and NYSC members with a laptop and internet.</p></div>
-      <ol class="lp-steps">${[["Apply", "5 minutes"], ["Readiness check", "10 minutes"], ["Call with us", "15 minutes"], ["Offer and payment", "in full or 2 parts"]].map(([a, b]) => `<li><b>${a}</b><span class="note">${b}</span></li>`).join("")}</ol></section>` + pubFoot();
+      <ol class="lp-steps">${[["Apply", "5 minutes"], ["Readiness check", `${INFO.cohort?.assess_minutes || 5} minutes`], ["Call with us", "15 minutes"], ["Offer and payment", "in full or 2 parts"]].map(([a, b]) => `<li><b>${a}</b><span class="note">${b}</span></li>`).join("")}</ol></section>` + pubFoot();
 }
 
 function pageStart() {
@@ -159,7 +159,7 @@ function pageApply() {
     <div class="field"><label for="g-zuri">Your Zuri summary <span class="note" style="font-weight:400">Optional. If you chatted with Zuri, paste the summary here.</span></label><textarea id="g-zuri" rows="3" maxlength="4000"></textarea></div>
     <label class="consent"><input type="checkbox" id="g-consent"> I agree that Jobnest Academy may use these details to process my application, as set out in the <a href="${esc(INFO.website_url || "https://jobnestcareers.com")}/#privacy" target="_blank" rel="noopener">Privacy Policy</a>.</label>
     <p class="err" id="g-err" role="alert"></p>
-    <div class="actions"><button class="btn gold" type="submit">Submit application</button><span class="note">Next: a 10-minute readiness assessment.</span></div>
+    <div class="actions"><button class="btn gold" type="submit">Submit application</button><span class="note">Next: a ${INFO.cohort?.assess_minutes || 5}-minute readiness assessment.</span></div>
   </form></section>`;
 }
 
@@ -208,7 +208,7 @@ const communityNote = () => `<p class="note">Meanwhile, you can join the Jobnest
 function statusCard(a, base) {
   let card = "";
   const tr = esc(a.track || "");
-  if (a.status === "Assessment pending") card = `<p>Your application is in. Next, take the ${INFO.cohort?.assess_minutes || 10}-minute readiness assessment.</p><div><a class="btn gold" href="${base}/assess">${a.assessment_started ? "Continue assessment" : "Go to the assessment"}</a></div>`;
+  if (a.status === "Assessment pending") card = `<p>Your application is in. Next, take the ${INFO.cohort?.assess_minutes || 5}-minute readiness assessment.</p><div><a class="btn gold" href="${base}/assess">${a.assessment_started ? "Continue assessment" : "Go to the assessment"}</a></div>`;
   if (a.status === "Assessment failed") card = `<p>Thank you for applying. Your assessment score was <b>${a.score}%</b>, and the pass mark is ${a.pass_mark}%. You can apply again for the next batch.</p>${communityNote()}`;
   if (a.status === "Call to book") card = `<p>You passed the assessment with <b>${a.score}%</b>. Book your 15-minute Discovery Call.</p><div><a class="btn gold" href="${base}/book">Book Discovery Call 1</a></div>`;
   if (a.status === "Call booked") card = `<p>Your Discovery Call is booked for <b>${fmtLong(a.dc1_at)} at ${fmtTime(a.dc1_at)} WAT</b>${a.officer ? ` with ${esc(a.officer)}` : ""}. The video link will be sent to ${esc(a.email)}. This is where we agree your track together.</p>`;
@@ -308,7 +308,7 @@ async function pageApplicant(ref, token, view) {
 }
 
 function pageAssessIntro(a, token, base) {
-  const m = INFO.cohort?.assess_minutes || 10, n = INFO.cohort?.questions || 10;
+  const m = INFO.cohort?.assess_minutes || 5, n = INFO.cohort?.questions || 10;
   app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><div class="card form app-form">
     <span class="eyebrow">Step 2 of 6 · Readiness assessment</span><h1>Before you start</h1>
     <p>Hi ${esc(a.first_name)}, this checks two things you'll use every day on the programme: <b>basic digital skills</b> and <b>clear communication</b>.</p>
@@ -640,6 +640,7 @@ async function tabSettings() {
         <div class="grid2">${f("st-year", "Matric year (2 digits)", c.year2, 'maxlength="2" inputmode="numeric"')}${f("st-batch", "Batch letter", c.batch, 'maxlength="1"')}</div>
         <label class="consent"><input type="checkbox" id="st-open" ${c.applications_open ? "checked" : ""}> Applications are open</label></div>
       <div class="card"><h3>Admissions rules</h3><div class="grid2">${f("st-pass", "Readiness pass mark (%)", c.pass_mark, 'type="number" min="0" max="100"')}${f("st-n", "Questions per category", c.ready_n, 'type="number" min="1" max="6"')}</div>
+        <div class="grid2">${f("st-mins", "Assessment time (minutes)", c.assess_minutes, 'type="number" min="3" max="60"')}</div>
         <div class="grid2">${f("st-days", "Days to accept and pay", c.offer_days, 'type="number" min="1" max="30"')}${f("st-due", "2nd instalment due before week", c.inst_due_week, 'type="number" min="2" max="17"')}</div></div>
       <div class="card"><h3>Fee</h3><div class="grid2">${f("st-fee", "Full fee (₦)", p.fee, 'type="number" min="0" step="1000"')}${f("st-pct", "Extra for 2 instalments (%)", p.inst_pct, 'type="number" min="0" max="50"')}</div><p class="note">2 instalments total: ${naira(p.inst_total)}</p></div>
       <div class="card"><h3>Seats by track</h3>${s.tracks.map((t) => `<div class="grid2" style="align-items:end"><div class="field"><label for="seat-${t.code}">${esc(t.name)}</label><input id="seat-${t.code}" type="number" min="0" value="${t.seats}" data-track="${t.code}"></div><label class="consent"><input type="checkbox" id="pause-${t.code}" ${t.paused ? "checked" : ""}> Paused</label></div>`).join("")}</div>
@@ -1110,7 +1111,7 @@ document.addEventListener("submit", async (e) => {
   }
   if (f.id === "settings-form") {
     const v = (id) => $("#" + id).value;
-    const p = { cohort: { name: v("st-name"), start_date: v("st-start"), year2: v("st-year"), batch: v("st-batch"), applications_open: $("#st-open").checked, pass_mark: +v("st-pass"), ready_n: +v("st-n"), offer_days: +v("st-days"), inst_due_week: +v("st-due") },
+    const p = { cohort: { name: v("st-name"), start_date: v("st-start"), year2: v("st-year"), batch: v("st-batch"), applications_open: $("#st-open").checked, pass_mark: +v("st-pass"), ready_n: +v("st-n"), assess_minutes: +v("st-mins"), offer_days: +v("st-days"), inst_due_week: +v("st-due") },
       programme: { fee: +v("st-fee"), inst_pct: +v("st-pct") }, tracks: $$("[data-track]").map((i) => ({ code: i.dataset.track, seats: +i.value, paused: $("#pause-" + i.dataset.track).checked })),
       site: { site_url: v("st-site"), website_url: v("st-web"), zuri_url: v("st-zuri"), signer_name: v("st-sname"), signer_title: v("st-stitle") } };
     try { await busy(f.querySelector("button[type=submit]"), () => rpc("admin_save_settings", { p })); INFO = null; toast("Settings saved"); route(); } catch (x) { $("#st-err").textContent = x.message; }
