@@ -308,3 +308,9 @@ a.fab{color:var(--brand-ink)}
 @media(max-width:520px){.oath-doc .sig-line{grid-template-columns:1fr}.pledge{gap:.6rem;padding:.7rem}}
 @media print{body.print-cv *{visibility:hidden!important}body.print-cv .cv-page,body.print-cv .cv-page *{visibility:visible!important}body.print-cv .cv-page{position:absolute;left:0;top:0;width:100%;box-shadow:none;border:0}body.print-cv .fab,body.print-cv .toast{display:none!important}}
 .place-card .kv{margin-top:.4rem}
+.grad-hero{background:var(--navy,#10263D);color:#fff;border:0}.grad-hero h2{color:#fff;margin:.3rem 0 .5rem}.grad-hero .eyebrow{color:#F4B740}.grad-hero p{color:#DCE6EE;max-width:60ch}
+.grad-list{list-style:none;margin:.6rem 0 0;padding:0;display:grid;gap:.6rem}.grad-list li{display:flex;gap:.7rem;align-items:flex-start}.grad-list .gl-ic{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;flex:none;border:2px solid var(--line);font-weight:700;font-size:.8rem}
+.grad-list li.ok .gl-ic{background:var(--ok);border-color:var(--ok);color:#fff}.grad-list li>span:last-child{display:grid}
+.grad-cks{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}@media(max-width:860px){.grad-cks{grid-template-columns:1fr}}
+.rate.nps{flex-wrap:wrap}.rate.nps label span{min-width:2.4rem;justify-content:center}
+.quotes{list-style:none;padding:0;margin:.6rem 0 0;display:grid;gap:.8rem}.quotes li{border-left:3px solid var(--accent,#F4B740);padding:.2rem 0 .2rem .9rem}.quotes p{margin:0 0 .2rem;font-style:italic}

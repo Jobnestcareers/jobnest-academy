@@ -519,6 +519,7 @@ function staffNav(role) {
   if (["director", "cohort_manager", "academy_admin", "coach", "facilitator", "super"].includes(role)) ac.push({ k: "intern", l: "Internships" });
   if (["director", "cohort_manager", "coach", "super"].includes(role)) ac.push({ k: "dc2", l: "Discovery Call 2" });
   if (["director", "cohort_manager", "academy_admin", "coach", "super"].includes(role)) ac.push({ k: "jobs", l: "Job search" });
+  if (["director", "cohort_manager", "academy_admin", "coach", "super"].includes(role)) ac.push({ k: "outcomes", l: "Outcomes" });
   ac.push({ k: "sessions", l: "Live sessions" }, { k: "news", l: "Announcements" });
   if (role === "super") return [{ g: "Jobnest" }, { k: "staff", l: "Staff accounts" }, { k: "audit", l: "Activity log" }, ...adm, ...ac];
   if (role === "adm_admin") return [...adm, { g: "Academy" }, { k: "students", l: "Students" }];
@@ -550,7 +551,7 @@ async function pagePortal(tab) {
   }
   const items = staffNav(ME.role).filter((x) => x.k);
   if (!items.some((x) => x.k === tab)) tab = items[0].k;
-  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, intern: tabIntern, dc2: tabDc2, jobs: tabJobs, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
+  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, intern: tabIntern, dc2: tabDc2, jobs: tabJobs, outcomes: tabOutcomes, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
   try { await pages[tab](); }
   catch (e) { shell(tab, "Something went wrong", "", `<div class="notice">${esc(e.message)}</div>`); }
 }
@@ -894,7 +895,7 @@ const LB_FIELDS = [
 ];
 const LB_FINAL = { k: "achievement", l: "What was your biggest achievement during this internship?", t: "area", req: 1 };
 const MORE_PAGES = [["assignments", "Assignments & Projects", "Submissions, grades and feedback"], ["cohort", "My Cohort", "Live sessions and announcements"],
-  ["profile", "Profile & Achievements", "Student ID, certificate, badges"], ["help", "Help & Support", "FAQs and how to get help"]];
+  ["profile", "Profile & Achievements", "Student ID, certificate, badges"], ["graduate", "Graduation & next steps", "Certificate, your job news, alumni check-ins"], ["help", "Help & Support", "FAQs and how to get help"]];
 
 /* ---------- derived state ---------- */
 const lsStart = () => new Date(LS.L.start_date + "T00:00:00+01:00");
@@ -986,13 +987,13 @@ function lsHome(cert) {
   const certCard = cert ? `<div class="card cert-card"><span class="eyebrow">Certificate of completion</span><h2>Your certificate is ready 🎓</h2><div class="actions"><a class="btn gold" href="#/learn/certificate">View and download</a></div></div>` : "";
   lsShell("home", pageHead(`Week ${cur + 1} of ${LS.W.length} · ${esc(C.me.track || "")}`, `${greeting()}, ${esc(C.me.first_name)}`, esc(before ? `The programme starts on ${fmtDateD(LS.L.start_date)}. You can start Week 1 now.` : encouragement(cur))) +
   `<section class="wrap home">${installCard()}${bal}${certCard}
-    <div class="card today" id="t-today"><div class="today-l">
+    ${allWeeksDone() ? gradHero() : `<div class="card today" id="t-today"><div class="today-l">
         ${cur === 0 ? "" : `<p class="cd-inline ${dl.c}">⏳ <b>${daysLeft} day${daysLeft === 1 ? "" : "s"} left</b> · due ${fmtD(weekDue(cur))}, 17:00</p>`}
         <p class="eyebrow">Today · Week ${cur + 1}: ${esc(wk.title)}</p>
         <h2>${nIt ? esc(nIt.title) : "You're all caught up"}</h2>
         <p class="note">${nIt ? `${LKIND[nIt.type] || "Activity"}${nIt.mins ? " · " + nIt.mins + " min" : ""} · ${nIt.opt ? "Optional" : "Mandatory"}` : "Open My Learning to look ahead"}</p>
         <div class="actions"><a class="btn gold" href="${nIt ? `#/learn/learning/${cur + 1}/${nIt.key}` : "#/learn/learning"}">Continue →</a></div></div>
-      <div class="countdown ${cur === 0 ? "" : dl.c}"><span class="eyebrow">Week due</span><b class="mono">${cur === 0 ? "—" : daysLeft}</b><span class="note">${cur === 0 ? "No deadline in Orientation" : daysLeft === 1 ? "day left" : "days left"}</span>${cur === 0 ? "" : `<span class="note">${fmtD(weekDue(cur))}, 17:00</span>`}</div></div>
+      <div class="countdown ${cur === 0 ? "" : dl.c}"><span class="eyebrow">Week due</span><b class="mono">${cur === 0 ? "—" : daysLeft}</b><span class="note">${cur === 0 ? "No deadline in Orientation" : daysLeft === 1 ? "day left" : "days left"}</span>${cur === 0 ? "" : `<span class="note">${fmtD(weekDue(cur))}, 17:00</span>`}</div></div>`}
     <div class="strip" id="t-strip">
       <a class="sti" href="#/learn/learning"><span class="eyebrow">This week</span><b class="mono">${p.d}/${p.n}</b><span class="note">required done</span></a>
       <a class="sti" href="#/learn/assignments"><span class="eyebrow">Due this week</span><b class="mono">${due.length}</b><span class="note">assignment${due.length === 1 ? "" : "s"}</span></a>
@@ -1371,6 +1372,77 @@ const ON_WEEK_PAGE = ["Book your 1-on-1 session", "Mock interview simulation", "
 let draftT = {};
 function saveDraft(k, data, now) { LS.X.drafts = { ...(LS.X.drafts || {}), [k]: data }; clearTimeout(draftT[k]); draftT[k] = setTimeout(() => rpc("learn_draft", { p_key: k, p_data: data }).then(() => { const s = $("#cv-saved"); if (s && k === "cv") s.textContent = "Saved"; }).catch((x) => toast(x.message)), now ? 0 : 600); }
 
+/* ---------- graduation & alumni ---------- */
+const OUT_ST = [["hired", "Hired (full-time or part-time job)"], ["internship", "Paid internship or graduate trainee"], ["freelance", "Freelance or contract work"], ["study", "Further study"], ["searching", "Still searching"]];
+const OUT_L = Object.fromEntries(OUT_ST.map(([k, l]) => [k, l.split(" (")[0]]));
+const VIA = [["jobnest", "Through Jobnest (an opportunity or introduction)"], ["own", "My own application"], ["referral", "A referral or my network"], ["other", "Other"]];
+const allWeeksDone = () => LS.W.every((_, i) => weekDone(i));
+function gradHero() {
+  return `<div class="card grad-hero" id="t-today"><div><p class="eyebrow">Programme complete</p><h2>You did it, ${esc(LS.C.me.first_name)}! 🎓</h2>
+    <p>You've finished all ${LS.W.length} weeks of Jobnest Academy. See what's left for your certificate, tell us where you land, and keep your job search going.</p>
+    <div class="actions"><a class="btn gold" href="#/learn/graduate">See your next steps →</a></div></div></div>`;
+}
+const optSel = (L, v, id, ph) => `<select id="${id}">${ph ? `<option value="">${ph}</option>` : ""}${L.map(([k, l]) => `<option value="${k}" ${k === v ? "selected" : ""}>${l}</option>`).join("")}</select>`;
+function lsGraduatePage() {
+  const G = LS.G || {}, me = LS.C.me, done = LS.W.filter((_, i) => weekDone(i)).length, all = done === LS.W.length, cert = LS.cert, o = G.outcome, sv = G.survey;
+  const apps = draft("apps", []), ints = apps.filter((a) => a.st === "Interviewing" || a.st === "Offer").length, avg = avgScore();
+  const ends = G.end_date ? new Date(G.end_date + "T12:00:00+01:00") : weekDue(LS.W.length - 1);
+  const chk = [[`All ${LS.W.length} weeks complete`, all, `${done} of ${LS.W.length} done`], ["Internship evaluation from your supervisor", !!G.eval, G.eval ? "Received" : "Your host supervisor completes this in Week 13"],
+    ["Exit survey", !!sv, sv ? "Thank you!" : "Below, 3 minutes"], ["Certificate issued", !!cert, cert ? "Ready to download" : "Jobnest issues it once the steps above are done"]];
+  const ck = (d) => { const c = (G.checkins || {})[d], opens = new Date(ends.getTime() + (d - 7) * DAY), open = LS.L.unlock_all || Date.now() >= opens.getTime();
+    return `<form class="card form grad-ck" data-day="${d}" novalidate><div class="ch"><h3>${d}-day check-in</h3>${c ? `<span class="pill ok">Sent ${fmtDay(c.at)}</span>` : open ? `<span class="pill now">Open</span>` : `<span class="pill">Opens ${fmtD(opens)}</span>`}</div>
+      ${open ? `<div class="field"><label for="ck${d}-st">What are you doing now?</label>${optSel(OUT_ST, c?.status || o?.status, `ck${d}-st`, "Choose one")}</div>
+        <div class="field"><label for="ck${d}-note">Anything we can help with? (optional)</label><input id="ck${d}-note" value="${esc(c?.note || "")}" placeholder="e.g. I have an interview next week and want to practise"></div>
+        <div><button class="btn sm" type="submit">${c ? "Update" : "Send check-in"}</button></div>` : `<p class="note">We'll check in ${d} days after the programme ends to see how you're doing.</p>`}</form>`; };
+  lsShell("graduate", pageHead("Graduation & next steps", all ? `Congratulations, ${esc(me.first_name)}! 🎓` : "Graduation & next steps", all ? "You've completed Jobnest Academy. Here's what's left, and how we stay with you after the programme." : "This page fills in as you finish the programme. Everything here opens after Week 17.") + `<section class="wrap pagebody">
+    <div class="strip"><div class="sti"><span class="eyebrow">Weeks done</span><b class="mono">${done}/${LS.W.length}</b></div><div class="sti"><span class="eyebrow">Average</span><b class="mono">${avg != null ? avg + "%" : "—"}</b></div>
+      <div class="sti"><span class="eyebrow">Applications</span><b class="mono">${apps.length}</b></div><div class="sti"><span class="eyebrow">Interviews</span><b class="mono">${ints}</b></div></div>
+    <div class="cols"><div class="stack">
+      <div class="card"><div class="ch"><h3>Your certificate</h3>${cert ? `<span class="pill ok">Issued</span>` : ""}</div>
+        <ul class="grad-list">${chk.map(([t, ok, n]) => `<li class="${ok ? "ok" : ""}"><span class="gl-ic">${ok ? "✓" : "○"}</span><span><b>${t}</b><span class="note">${n}</span></span></li>`).join("")}</ul>
+        ${cert ? `<div class="actions"><a class="btn gold" href="#/learn/certificate">View and download</a></div>` : ""}</div>
+      <form class="card form" id="grad-out" novalidate><div class="ch"><h3>Where are you now?</h3>${o ? `<span class="pill ok">Updated ${fmtDay(o.at)}</span>` : ""}</div>
+        <p class="note">Got a job, an internship or freelance work? Tell us, so we can celebrate you and track how Jobnest graduates do. Update it any time.</p>
+        <div class="field"><label for="go-st">What are you doing now?</label>${optSel(OUT_ST, o?.status, "go-st", "Choose one")}</div>
+        <div class="grid2"><div class="field"><label for="go-co">Company</label><input id="go-co" value="${esc(o?.company || "")}"></div><div class="field"><label for="go-role">Your role</label><input id="go-role" value="${esc(o?.role || "")}"></div></div>
+        <div class="grid2"><div class="field"><label for="go-start">Start date</label><input id="go-start" type="date" value="${esc(o?.start_date || "")}"></div><div class="field"><label for="go-via">How did you get it?</label>${optSel(VIA, o?.via, "go-via", "Choose one")}</div></div>
+        <p class="err" id="go-err" role="alert"></p><div><button class="btn" type="submit">${o ? "Update" : "Save"}</button></div></form>
+    </div><div class="stack">
+      ${sv ? `<div class="card"><div class="ch"><h3>Exit survey</h3><span class="pill ok">Sent</span></div><p class="note">Thank you for your feedback. It helps us make the next cohort better.</p></div>`
+        : `<form class="card form" id="grad-survey" novalidate><div class="ch"><h3>Exit survey</h3><span class="note">3 minutes</span></div>
+        <div class="field"><span class="lbl">How likely are you to recommend Jobnest Academy to a friend? (0 = not at all, 10 = definitely)</span><div class="rate nps">${[...Array(11)].map((_, n) => `<label><input type="radio" name="gs-rec" value="${n}"><span>${n}</span></label>`).join("")}</div></div>
+        <div class="field"><label for="gs-best">What helped you most?</label><textarea id="gs-best" rows="2"></textarea></div>
+        <div class="field"><label for="gs-imp">What should we improve?</label><textarea id="gs-imp" rows="2"></textarea></div>
+        <div class="field"><label for="gs-quote">A sentence about your experience (optional)</label><textarea id="gs-quote" rows="2" placeholder="e.g. Jobnest gave me real work experience and the confidence to apply."></textarea></div>
+        <label class="check"><input type="checkbox" id="gs-ok"> Jobnest may share this sentence with my first name and track on its website and social media.</label>
+        <p class="err" id="gs-err" role="alert"></p><div><button class="btn" type="submit">Send survey</button></div></form>`}
+      <div class="card"><h3>Keep your job search going</h3><p class="note">Your portal stays open after the programme. Keep using your tools:</p>
+        <div class="actions"><a class="btn sm ghost" href="#/learn/learning/${LS.W.length}">Applications board</a><a class="btn sm ghost" href="#/learn/learning/${LS.W.findIndex((w) => w.stage === 5) + 1}">CV builder</a><a class="btn sm ghost" href="#/learn/help">Help & Support</a></div></div>
+    </div></div>
+    <h2 style="margin:1.6rem 0 .8rem">Alumni check-ins</h2><p class="note" style="margin-bottom:1rem">We check in 30, 60 and 90 days after the programme. Tell us how you're doing, and ask for help if you need it.</p>
+    <div class="grad-cks">${[30, 60, 90].map(ck).join("")}</div></section>`);
+}
+
+/* ---------- staff: outcomes ---------- */
+async function tabOutcomes() {
+  const L = await rpc("acad_outcomes"), work = ["hired", "internship", "freelance"];
+  const rep = L.filter((x) => x.outcome), emp = rep.filter((x) => work.includes(x.outcome.status)), sv = L.filter((x) => x.survey);
+  const nps = sv.length ? Math.round(((sv.filter((x) => x.survey.recommend >= 9).length - sv.filter((x) => x.survey.recommend <= 6).length) / sv.length) * 100) : null;
+  const pill = (st) => st ? `<span class="pill ${work.includes(st) ? "ok" : st === "searching" ? "now" : "info"}">${esc(OUT_L[st] || st)}</span>` : `<span class="pill">Not reported</span>`;
+  const row5 = (x, i) => { const o = x.outcome, s = x.survey;
+    return `<details class="arow noav" data-id="oc${i}" ${ui.open === "oc" + i ? "open" : ""}><summary><span class="an"><b>${esc(x.name)}</b><span class="note">${esc(x.matric)} · ${esc(x.track || "")}${o && o.company ? ` · ${esc(o.role || "")} at ${esc(o.company)}` : ""}</span></span>
+      <span class="anext">${[30, 60, 90].map((d) => x.checkins[d] ? `${d}d ✓` : `${d}d –`).join(" · ")}${s ? ` · survey ${s.recommend}/10` : ""}</span>${pill(o?.status)}</summary>
+    <div class="abody"><dl class="kv">${o ? `<div><dt>Now</dt><dd>${esc(OUT_L[o.status])}${o.company ? ` · ${esc(o.role || "")} at ${esc(o.company)}` : ""}</dd></div>${o.start_date ? `<div><dt>Started</dt><dd>${fmtDateD(o.start_date)}</dd></div>` : ""}${o.via ? `<div><dt>How</dt><dd>${esc((VIA.find((v) => v[0] === o.via) || [])[1] || o.via)}</dd></div>` : ""}<div><dt>Updated</dt><dd>${fmtDay(o.at)}</dd></div>` : `<div><dt>Now</dt><dd>Not reported yet</dd></div>`}
+      ${[30, 60, 90].map((d) => x.checkins[d] ? `<div><dt>${d}-day check-in</dt><dd>${esc(OUT_L[x.checkins[d].status])}${x.checkins[d].note ? ` · “${esc(x.checkins[d].note)}”` : ""}</dd></div>` : "").join("")}
+      ${s ? `<div><dt>Would recommend</dt><dd>${s.recommend}/10</dd></div>${s.best ? `<div><dt>Helped most</dt><dd>${esc(s.best)}</dd></div>` : ""}${s.improve ? `<div><dt>Improve</dt><dd>${esc(s.improve)}</dd></div>` : ""}${s.testimonial ? `<div><dt>Testimonial</dt><dd>“${esc(s.testimonial)}” ${s.consent ? `<span class="pill ok">OK to share</span>` : `<span class="pill">Private</span>`}</dd></div>` : ""}` : ""}</dl>
+      ${x.phone ? `<div class="actions"><a class="link sm" href="https://wa.me/${esc(String(x.phone).replace(/\D/g, "").replace(/^0/, "234"))}" target="_blank" rel="noopener">WhatsApp ↗</a></div>` : ""}</div></details>`; };
+  const quotes = sv.filter((x) => x.survey.testimonial && x.survey.consent);
+  shell("outcomes", "Outcomes", "Where graduates land, 30/60/90-day check-ins and exit survey results.",
+    `<div class="kpis">${[["Certificates issued", L.filter((x) => x.cert).length], ["In work", `${emp.length}${L.length ? ` · ${Math.round((emp.length / L.length) * 100)}%` : ""}`], ["Reported so far", `${rep.length}/${L.length}`], ["Recommend score (NPS)", nps != null ? (nps > 0 ? "+" : "") + nps : "–"]].map(([l, v]) => `<div class="kpi card"><span class="eyebrow">${l}</span><b class="mono">${v}</b></div>`).join("")}</div>
+    <div class="card" style="margin-top:1rem">${L.length ? `<div class="arows">${L.map(row5).join("")}</div>` : empty("No admitted students yet.")}</div>
+    ${quotes.length ? `<div class="card" style="margin-top:1rem"><h3>Testimonials you can share</h3><p class="note">These students agreed to share their words with their first name and track.</p><ul class="quotes">${quotes.map((x) => `<li><p>“${esc(x.survey.testimonial)}”</p><span class="note">${esc(x.name.split(" ")[0])}, ${esc(x.track || "")}</span></li>`).join("")}</ul></div>` : ""}`);
+}
+
 /* ---------- More pages ---------- */
 function lsAssignmentsPage(key) {
   if (key) return lsAssignmentDetail(key);
@@ -1435,11 +1507,11 @@ async function pageLearn(p1, p2, p3) {
   if (!isStudent()) { app.innerHTML = learnCard(`<h1>You're signed in as staff</h1><p>Sign out first to use the student portal.</p><div class="actions"><a class="btn" href="#/portal">Go to the staff portal</a><button class="btn ghost" data-act="signout-learn">Sign out</button></div>`); return; }
   if (!LS) loading();
   try {
-    const [C, L, ex, ct, mod, X] = await Promise.all([rpc("student_campus"), rpc("learn_state"), rpc("student_campus_extra").catch(() => ({})), rpc("student_certificate").catch(() => null), COURSE_DATA ? null : import("./course.js"), rpc("learn_extra").catch(() => ({}))]);
+    const [C, L, ex, ct, mod, X, G] = await Promise.all([rpc("student_campus"), rpc("learn_state"), rpc("student_campus_extra").catch(() => ({})), rpc("student_certificate").catch(() => null), COURSE_DATA ? null : import("./course.js"), rpc("learn_extra").catch(() => ({})), rpc("grad_state").catch(() => ({}))]);
     if (mod) { COURSE_DATA = mod.COURSE; COURSE_STAGES = mod.COURSE.stages; }
     CAMPUS = C; CAMPUS.cert = ct;
     const cert = ct && ct.cert_id ? ct : null; CAMPUS.cert = cert;
-    LS = { C, L, X: X || {}, W: COURSE_DATA.tracks[L.track] || COURSE_DATA.tracks.DAT, cert, extra: ex || {} };
+    LS = { C, L, X: X || {}, G: G || {}, W: COURSE_DATA.tracks[L.track] || COURSE_DATA.tracks.DAT, cert, extra: ex || {} };
   } catch (e) { if (e.status === 401 || /sign in/i.test(e.message)) { await auth.signOut(); LS = null; return pageLearnSignIn("Please sign in again."); } throw e; }
   ui.lsMore = false;
   const wk = p1 === "learning" ? (p2 || "") + "|" + (p3 || "") : null;
@@ -1459,6 +1531,7 @@ async function lsRender(p1, p2, p3) {
   else if (["cohort", "sessions", "news"].includes(page)) lsCohortPage();
   else if (page === "profile") lsProfilePage(cert);
   else if (page === "help") lsHelpPage();
+  else if (page === "graduate") lsGraduatePage();
   else if (page === "certificate" && cert) {
     let c = null; try { c = await rpc("certificate_view", { p_cert: cert.cert_id }); } catch { c = null; }
     lsShell("profile", pageHead("Certificate", `Congratulations, ${esc(LS.C.me.first_name)}! 🎓`, "Download your certificate, add it to LinkedIn, or share the link with employers.") + `<section class="wrap pagebody">${c ? certBlock(c) : empty("Your certificate couldn't load. Please refresh.")}</section>`);
@@ -2003,6 +2076,21 @@ document.addEventListener("submit", async (e) => {
     if (!m) { $("#lf-err").textContent = "Enter your matric number."; return; }
     try { await busy(f.querySelector("button"), () => rpc("student_reset_request", { p_matric: m })); } catch { /* same message either way */ }
     app.innerHTML = learnCard(`<h1>Check your email</h1><p>If <b>${esc(m.toUpperCase())}</b> is a valid matric number, we've emailed a link to the address you applied with. It can take a couple of minutes.</p><div><a class="btn" href="#/learn/signin">Back to sign in</a></div>`);
+    return;
+  }
+  if (f.id === "grad-out") {
+    const st = $("#go-st").value; if (!st) { $("#go-err").textContent = "Choose what you're doing now."; return; }
+    try { const G = await busy(f.querySelector("button"), () => rpc("grad_outcome", { p_status: st, p_company: $("#go-co").value, p_role: $("#go-role").value, p_start: $("#go-start").value || null, p_via: $("#go-via").value })); if (G) { LS.G = G; toast(["hired", "internship", "freelance"].includes(st) ? "Congratulations! 🎉 Saved." : "Saved. We're here to help."); lsRender(); } } catch { /* shown */ }
+    return;
+  }
+  if (f.id === "grad-survey") {
+    const r = f.querySelector('input[name="gs-rec"]:checked'); if (!r) { $("#gs-err").textContent = "Choose a number from 0 to 10."; return; }
+    try { const G = await busy(f.querySelector("button"), () => rpc("grad_survey", { p_recommend: +r.value, p_best: $("#gs-best").value, p_improve: $("#gs-imp").value, p_testimonial: $("#gs-quote").value, p_consent: $("#gs-ok").checked })); if (G) { LS.G = G; toast("Thank you for your feedback"); lsRender(); } } catch { /* shown */ }
+    return;
+  }
+  if (f.classList.contains("grad-ck")) {
+    const d = +f.dataset.day, st = $(`#ck${d}-st`).value; if (!st) return toast("Choose what you're doing now");
+    try { const G = await busy(f.querySelector("button"), () => rpc("grad_checkin", { p_day: d, p_status: st, p_note: $(`#ck${d}-note`).value })); if (G) { LS.G = G; toast("Check-in sent. Thank you!"); lsRender(); } } catch { /* shown */ }
     return;
   }
   if (f.id === "sup-msg-form") {
