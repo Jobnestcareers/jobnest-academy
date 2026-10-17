@@ -1013,7 +1013,8 @@ function weekSelect(sel) {
   let out = "", last = -1;
   LS.W.forEach((w, i) => { if (w.stage !== last) { if (last >= 0) out += "</optgroup>"; last = w.stage; out += `<optgroup label="Stage ${w.stage + 1}: ${esc(COURSE_STAGES[w.stage].title)}">`; }
     out += `<option value="${i + 1}" ${i === sel ? "selected" : ""}>Week ${i + 1}: ${esc(w.title)}${weekDone(i) ? " ✓" : unlockedW(i) ? "" : " 🔒"}</option>`; });
-  return `<label class="wk-select-wrap" for="week-select"><span class="eyebrow">Jump to a week</span><select id="week-select" data-change="week-select">${out}</optgroup></select></label>`;
+  out += `</optgroup><option value="grad">🎓 Graduation${allWeeksDone() ? "" : " 🔒"}</option>`;
+  return `<label class="wk-select-wrap" for="week-select"><span class="eyebrow">Jump to a week</span><select id="week-select" data-change="week-select">${out}</select></label>`;
 }
 function lsLearning(wi, key) {
   let total = 0, done = 0; LS.W.forEach((_, i) => { const p = weekProgress(i); total += p.n; done += p.d; });
@@ -1029,7 +1030,7 @@ function lsLearning(wi, key) {
   const main = f && f.wi === wi ? lsItemView(wi, f.ii) : key === "brief" ? lsBrief(wi) : key === "logguide" ? lsLogGuide(wi) : lsWeekView(wi);
   lsShell("learning", `<div class="wrap lhead"><div><p class="eyebrow">${esc(LS.C.me.track || "")} · ${esc(LS.C.cohort.name)}</p><h1>My Learning</h1></div>
     <div class="lh-prog" id="tour-progress"><div class="lh-bar"><i style="width:${pct}%"></i></div><span><b class="mono">${pct}%</b> complete · Week ${current + 1} of ${LS.W.length}${avg != null ? ` · avg <b class="mono">${avg}%</b>` : ""}</span></div></div>
-    <section class="wrap campus"><aside>${weekSelect(wi)}<nav class="rail" id="tour-rail" aria-label="Programme stages and weeks">${groups}</nav></aside><div>${main}</div></section>`);
+    <section class="wrap campus"><aside>${weekSelect(wi)}<nav class="rail" id="tour-rail" aria-label="Programme stages and weeks">${groups}${allWeeksDone() ? `<a class="sg-grad" href="#/learn/graduate"><span class="sg-n">🎓</span><span class="sg-t"><small>Finish</small><b>Graduation</b></span><span class="sg-s">Open →</span></a>` : `<div class="sg-grad locked" title="Opens when you finish every week"><span class="sg-n">🎓</span><span class="sg-t"><small>Finish</small><b>Graduation</b></span><span class="sg-s">🔒</span></div>`}</nav></aside><div>${main}</div></section>`);
 }
 function gateCard(wi) {
   const g = weekGate(wi); if (!g) return "";
@@ -1058,7 +1059,13 @@ function itemRow(wi, it, un) {
 function lsWeekView(wi) {
   const wk = LS.W[wi], st = COURSE_STAGES[wk.stage], p = weekProgress(wi), un = unlockedW(wi), me = LS.C.me;
   const items = wk.items.map((it) => itemRow(wi, it, un)).join("");
-  const next = un && weekDone(wi) && wi < LS.W.length - 1 ? `<div class="celebrate"><div><b>Week ${wi + 1} complete.</b> <span class="note">${unlockedW(wi + 1) ? `Week ${wi + 2}: ${esc(LS.W[wi + 1].title)} is now unlocked.` : `Week ${wi + 2} opens on ${fmtD(new Date(weekStartAt(wi + 1).getTime() - 2 * DAY))}.`}</span></div>${unlockedW(wi + 1) ? `<a class="btn sm" href="#/learn/learning/${wi + 2}">Start Week ${wi + 2} →</a>` : ""}</div>` : "";
+  const isLast = wi === LS.W.length - 1;
+  const openLeft = [];
+  if (isLast && un && weekItemsDone(wi) && !allWeeksDone()) LS.W.forEach((w, i) => { if (i === wi) return; const L = w.items.filter((it) => !it.opt && !isDoneIt(it)); L.forEach((it) => openLeft.push({ it, i })); if (!L.length && !weekDone(i)) openLeft.push({ it: null, i }); });
+  const endCard = !isLast || !un ? "" : allWeeksDone() ? `<div class="card grad-hero end-card"><p class="eyebrow">Programme complete</p><h2>You've completed Jobnest Academy 🎓</h2><p>That's all ${LS.W.length} weeks done. Your next steps are waiting: your certificate, telling us where you land, and keeping your job search going.</p><div class="actions"><a class="btn gold" href="#/learn/graduate">See your next steps →</a></div></div>`
+    : weekItemsDone(wi) ? `<div class="card almost"><div class="ch"><h3>You're almost there</h3><span class="pill now">${openLeft.length} left</span></div><p class="note">You've finished Week ${wi + 1}. Complete these to finish the programme and unlock Graduation:</p>
+      <ul class="almost-l">${openLeft.slice(0, 10).map(({ it, i }) => it ? `<li><a class="link" href="#/learn/learning/${i + 1}/${it.key}">Week ${i + 1}: ${esc(it.title)}</a>${row(it)?.status === "submitted" ? ` <span class="pill info">Waiting for grading</span>` : row(it)?.status === "revise" ? ` <span class="pill bad">Revise</span>` : ""}</li>` : `<li><a class="link" href="#/learn/learning/${i + 1}">Week ${i + 1}: pass the week result</a></li>`).join("")}</ul></div>` : "";
+  const next = (un && weekDone(wi) && wi < LS.W.length - 1 ? `<div class="celebrate"><div><b>Week ${wi + 1} complete.</b> <span class="note">${unlockedW(wi + 1) ? `Week ${wi + 2}: ${esc(LS.W[wi + 1].title)} is now unlocked.` : `Week ${wi + 2} opens on ${fmtD(new Date(weekStartAt(wi + 1).getTime() - 2 * DAY))}.`}</span></div>${unlockedW(wi + 1) ? `<a class="btn sm" href="#/learn/learning/${wi + 2}">Start Week ${wi + 2} →</a>` : ""}</div>` : "");
   const head = (extra) => `<div class="stage-head wk-head" id="tour-head"><div class="row"><div><p class="eyebrow">Week ${wi + 1} of ${LS.W.length} · Stage ${wk.stage + 1}: ${esc(st.title)}</p><h2 style="margin-top:.45rem">${esc(wk.title)}</h2></div>${weekPill(wi, un)}</div>${extra}</div>`;
   if (st.welcome) return head(`<div class="welcome"><p class="big">Congratulations, ${esc(me.first_name)}. You took a bold step.</p>
       <p>Choosing to invest in yourself and your future takes courage, and you've already done the hardest part: you started. We're proud to have you in ${esc(LS.C.cohort.name)}.</p>
@@ -1076,7 +1083,7 @@ function lsWeekView(wi) {
   let body = "";
   if (tab === "tasks") { const ck = LS.L.checkins[wi + 1];
     const sp = un && SPECIAL[wk.stage] ? SPECIAL[wk.stage](wi, items) : null;
-    body = `${lockMsg}${sp ? "" : un ? gateCard(wi) : ""}${sp || `<div class="items" id="tour-items">${items}</div>`}${next}
+    body = `${lockMsg}${endCard}${sp ? "" : un ? gateCard(wi) : ""}${sp || `<div class="items" id="tour-items">${items}</div>`}${next}
     ${un && wi % 2 === 1 ? `<form class="card checkin" id="checkin" data-wk="${wi + 1}" novalidate><div class="ch"><h3>Weekly check-in</h3>${ck ? `<span class="pill ok">Sent ${fmtDay(ck.at)}</span>` : ""}</div>
       <p class="note">How confident do you feel about this week? Your facilitator reaches out if you need support.</p>
       <div class="rate conf" role="radiogroup" aria-label="Confidence this week">${[["1", "Lost"], ["2", "Unsure"], ["3", "Okay"], ["4", "Confident"], ["5", "Very confident"]].map(([n, t]) => `<label><input type="radio" name="conf" value="${n}" ${String(ck?.conf) === n ? "checked" : ""}><span>${n} · ${t}</span></label>`).join("")}</div>
@@ -1521,7 +1528,22 @@ async function pageLearn(p1, p2, p3) {
   if (!p1 || p1 === "home") setTimeout(() => { let seen = false; try { seen = localStorage.getItem("jn.tour." + LS.C.me.matric) === "1"; } catch { /* ignore */ } if ((ui.wantTour || (!LS.extra.tour_done && !seen)) && TOUR_I == null) { ui.wantTour = false; startTour(); } }, 400);
 }
 const lsParts = () => location.pathname.replace(/^\/+/, "").split("/").map(decodeURIComponent).slice(1);
+function gradCelebrate() {
+  if (!allWeeksDone() || TOUR_I != null) return;
+  if (!LS.gradSent) { LS.gradSent = true; rpc("grad_complete").catch(() => {}); }
+  const k = "jn.grad." + LS.C.me.matric; let seen = false; try { seen = localStorage.getItem(k) === "1"; } catch { /* ignore */ }
+  if (seen || $("#grad-modal")) return;
+  try { localStorage.setItem(k, "1"); } catch { /* ignore */ }
+  const n = LS.W.reduce((t, w) => t + w.items.filter((it) => !it.opt).length, 0), avg = avgScore();
+  const m = document.createElement("div"); m.id = "grad-modal";
+  m.innerHTML = `<div class="scrim"></div><div class="tour grad-pop" role="dialog" aria-modal="true" aria-labelledby="gp-t"><div class="hd"><span class="badge">Programme complete</span><button class="x" data-act="grad-close" aria-label="Close">✕</button></div>
+    <div class="gp-emoji" aria-hidden="true">🎓</div><h2 id="gp-t">You've completed Jobnest Academy, ${esc(LS.C.me.first_name)}!</h2>
+    <p>${LS.W.length} weeks · ${n} tasks${avg != null ? ` · ${avg}% average` : ""}. That took real commitment. We're proud of you.</p>
+    <div class="ft"><button class="skip" data-act="grad-close">Not now</button><button class="btn gold" data-act="grad-go">See your next steps →</button></div></div>`;
+  document.body.appendChild(m); m.querySelector("[data-act=grad-go]").focus({ preventScroll: true });
+}
 async function lsRender(p1, p2, p3) {
+  setTimeout(gradCelebrate, 300);
   if (p1 === undefined) [p1, p2, p3] = lsParts();
   const page = p1 || "home", cert = LS.cert;
   if (page === "learning") { const wi = Math.min(Math.max((parseInt(p2, 10) || curWeek() + 1) - 1, 0), LS.W.length - 1);
@@ -1865,6 +1887,7 @@ document.addEventListener("click", async (e) => {
   if (a === "copy-host") { try { await navigator.clipboard.writeText(k); } catch { const ta = document.createElement("textarea"); ta.value = k; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); } return toast("Link copied"); }
   if (a === "dc2-rm") { try { await busy(t, () => rpc("coach_remove_slot", { p_id: +k })); toast("Time removed"); route(); } catch { /* shown */ } return; }
   if (a === "msg-reply") { const tx = $("#mr-" + k).value.trim(); if (!tx) return toast("Write a reply first"); try { await busy(t, () => rpc("acad_message_reply", { p_app: ui.msgs[+k].app, p_body: tx })); toast("Reply sent"); route(); } catch { /* shown */ } return; }
+  if (a === "grad-close" || a === "grad-go") { $("#grad-modal")?.remove(); if (a === "grad-go") go("#/learn/graduate"); return; }
   if (a === "dc-day") { ui.dcDay = k; ui.dcSlot = null; return lsRender(); }
   if (a === "dc-slot") { ui.dcSlot = +k; return lsRender(); }
   if (a === "dc-book") { try { const X = await busy(t, () => rpc("dc2_book", { p_slot: +k, p_note: $("#bk-note")?.value || "" })); if (X) { LS.X = X; LS.L = await rpc("learn_state"); toast("Booked. Check your email for the link."); lsRender(); } } catch { LS.slots = await rpc("dc2_slots").catch(() => []); ui.dcSlot = null; lsRender(); } return; }
@@ -1884,7 +1907,7 @@ document.addEventListener("click", async (e) => {
     if (await lsCall("learn_done", { p_key: key, p_done: true, p_data: { sig } }, t, "Oath signed. Week 2 is on its way.")) window.scrollTo({ top: 0, behavior: "smooth" });
     return;
   }
-  if (a === "signout-learn") { TOUR_I = null; renderTour(); await auth.signOut(); CAMPUS = null; LS = null; return go("#/learn/signin"); }
+  if (a === "signout-learn") { $("#grad-modal")?.remove(); TOUR_I = null; renderTour(); await auth.signOut(); CAMPUS = null; LS = null; return go("#/learn/signin"); }
   if (a === "tour") { $$("details.snav-m").forEach((d) => (d.open = false)); return startTour(); }
   if (a === "tour-next") { TOUR_I++; return renderTour(); }
   if (a === "tour-back") { TOUR_I--; return renderTour(); }
@@ -1958,7 +1981,7 @@ document.addEventListener("change", (e) => {
   if (el.dataset.li && LS) { const d = { ...draft("li", {}), [el.dataset.li]: el.checked }; saveDraft("li", d); return; }
   if (el.dataset.prep && LS) { const d = { ...draft("prep", {}), [el.dataset.prep]: el.checked }; saveDraft("prep", d); return; }
   if (el.dataset.app != null && el.tagName === "SELECT" && LS) { const apps = draft("apps", []).map((a, i) => (i === +el.dataset.app ? { ...a, st: el.value } : a)); saveDraft("apps", apps, true); lsRender(); return; }
-  if (el.id === "week-select") { ui.wtab = "tasks"; return go("#/learn/learning/" + el.value); }
+  if (el.id === "week-select") { ui.wtab = "tasks"; return go(el.value === "grad" ? "#/learn/graduate" : "#/learn/learning/" + el.value); }
   if (el.id === "g-state") fillTowns();
   if (el.id === "g-town") { const o = $("#g-town-o"); o.hidden = el.value !== "Other"; if (!o.hidden) o.focus(); }
   if (el.id === "st-unlock") {

@@ -125,4 +125,30 @@ revoke execute on function public.grad_state(), public.grad_outcome(text, text, 
 grant execute on function public.grad_state(), public.grad_outcome(text, text, text, date, text), public.grad_checkin(int, text, text),
   public.grad_survey(int, text, text, text, boolean), public.acad_outcomes() to authenticated;
 
+
+-- Student: tell us the programme is complete (once). Checks every required step, then sends the email.
+create or replace function public.grad_complete() returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare a applications; n int;
+begin
+  a := private.require_student();
+  if exists (select 1 from learn_history where application_id = a.id and key = 'complete') then return jsonb_build_object('sent', false); end if;
+  select count(*) into n from course_items i
+  where i.track_code = a.track_code and not i.opt
+    and not exists (select 1 from learn_progress x where x.application_id = a.id and x.key = i.key and x.status in ('done','graded'));
+  if n > 0 then return jsonb_build_object('sent', false, 'left', n); end if;
+  insert into learn_history(application_id, key, action) values (a.id, 'complete', 'Completed the programme');
+  perform private.queue_mail(a, 'complete', '{}'::jsonb, private.site() || '/learn/graduate');
+  return jsonb_build_object('sent', true);
+end $$;
+
+insert into email_templates(key, subject, body, cta) values
+  ('complete', 'You''ve completed Jobnest Academy, {first}! 🎓',
+   E'Hi {first},\n\nYou''ve finished all 17 weeks of the {track} track. That took real commitment, and we''re proud of you.\n\nYour certificate: we check your final steps and issue it in the portal. We''ll email you when it''s ready to download and add to LinkedIn.\n\nThree things to do next on your Graduation page:\n\n1. Tell us where you are now. Got a job, an internship or freelance work? We want to celebrate you.\n2. Take the 3-minute exit survey so we can make the next cohort even better.\n3. Keep your job search going. Your applications board and CV builder stay open.\n\nWe''ll check in at 30, 60 and 90 days. You''re part of the Jobnest family now.',
+   'Go to my Graduation page')
+on conflict (key) do update set subject = excluded.subject, body = excluded.body, cta = excluded.cta;
+
+revoke execute on function public.grad_complete() from public, anon;
+grant execute on function public.grad_complete() to authenticated;
+
 notify pgrst, 'reload schema';
