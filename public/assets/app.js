@@ -1919,6 +1919,7 @@ async function route() {
       if (p1 === "signup") return pageStaffSignup();
       if (p1 === "reset") return pageStaffReset();
       if (p1 === "new-password") return pageNewPassword();
+      if (auth.session && isStudent()) { await auth.signOut(); CAMPUS = null; LS = null; return pageStaffSignIn("You were signed in to the student portal on this browser, so we signed you out. Sign in with your staff email."); }
       return auth.session ? go("#/portal") : pageStaffSignIn();
     }
     if (p0 === "portal") return pagePortal(p1 || "");

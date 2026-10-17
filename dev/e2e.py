@@ -173,9 +173,10 @@ with sync_playwright() as p:
     pg.goto(U + "#/learn/profile"); pg.wait_for_selector(".idcard"); shot("campus-profile")
     pg.goto(U + "#/learn/help"); pg.wait_for_selector(".faq-i"); shot("campus-help")
     pg.goto(U + "#/learn/learning"); pg.wait_for_selector("#tour-progress"); shot("learning-rail")
-    pg.locator(".ls-top [data-act=signout-learn]").click(); wait_text("Sign in")
+    # staff link while a student is still signed in
+    pg.goto(U + "#/staff"); pg.wait_for_selector("#signin-form"); log.append("staff link while student: " + pg.inner_text(".notice")[:60])
     # staff grades the week project
-    pg.goto(U + "#/staff"); wait_text("Sign in"); pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Staff accounts")
+    pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Staff accounts")
     pg.goto(U + "#/portal/grading"); wait_text("To grade"); pg.locator("details.arow summary").first.click()
     pg.locator('input[name="lg-0"][value="graded"]').check(force=True); pg.fill("#lgg-0", "90"); pg.fill("#lgf-0", "Clear and well written."); shot("staff-grading")
     pg.click('form.lgrade-form[data-i="0"] button'); wait_text("Nothing waiting")
