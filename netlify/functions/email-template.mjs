@@ -7,6 +7,8 @@ const htmlLinks = (escaped) => escaped.replace(LINK, (_, t, u) => /^https?:\/\//
 const textLinks = (p) => p.replace(LINK, (_, t, u) => /^https?:\/\//i.test(u) ? `${t}: ${u}` : "");
 
 export function buildEmail(m) {
+  // Links saved as https://site/#/path go out as clean https://site/path.
+  m = { ...m, link: m.link ? String(m.link).replace(/\/#\//, "/") : m.link, body: String(m.body || "").replace(/(https?:\/\/[^\s)]+?)\/#\//g, "$1/") };
   const paras = String(m.body || "").split(/\n\s*\n/).map((p) => p.trim()).filter((p) => p && textLinks(p).trim());
   // Applicant emails link to #/a/APP-XXXXXX/...: show the application number and how to come back without the link.
   const refM = String(m.link || "").match(/(?:#\/|\.[a-z]+\/)a\/(APP-[A-Z0-9]+)\//i);
