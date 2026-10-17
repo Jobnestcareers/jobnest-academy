@@ -140,6 +140,8 @@ const select = (id, opts) => `<select id="${id}">${["", ...opts].map((o) => `<op
 
 function pageApply() {
   if (!appsOpen()) return go("#/gep");
+  let zuri = ""; try { zuri = sessionStorage.getItem("jn_zuri") || ""; } catch (e) {}
+  const zGoal = (zuri.match(/^Goal[^:]*:\s*(.+)$/m) || [])[1] || "";
   app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><form class="card form app-form" id="apply-form" novalidate>
     <span class="eyebrow">Step 1 of 6 · Application · about 5 minutes</span><h1>Apply to the ${esc(prog().name)}</h1>
     <p class="note">You don't pick a track here. You'll agree it together on your Discovery Call.</p>
@@ -155,9 +157,9 @@ function pageApply() {
     <div class="field"><span class="lbl">Can you commit at least 15 hours a week for ${prog().weeks || 17} weeks?</span>${radios("g-hours", ["Yes", "Not sure", "No"])}</div>
     <div class="grid2"><div class="field"><span class="lbl">Do you have a laptop?</span>${radios("g-laptop", ["Yes", "No"])}</div>
     <div class="field"><span class="lbl">Reliable internet?</span>${radios("g-net", ["Yes", "Sometimes", "No"])}</div></div>
-    <div class="field"><label for="g-mot">What would you like to be doing in 6 months? <span class="note" style="font-weight:400">A sentence or two. “Not sure yet” is a fine answer.</span></label><textarea id="g-mot" rows="3" maxlength="2000"></textarea></div>
-    <div class="field"><label for="g-zuri">Your Zuri summary <span class="note" style="font-weight:400">Optional. If you chatted with Zuri, paste the summary here.</span></label><textarea id="g-zuri" rows="3" maxlength="4000"></textarea></div>
-    <label class="consent"><input type="checkbox" id="g-consent"> I agree that Jobnest Academy may use these details to process my application, as set out in the <a href="${esc(INFO.website_url || "https://jobnestcareers.com")}/#privacy" target="_blank" rel="noopener">Privacy Policy</a>.</label>
+    <div class="field"><label for="g-mot">What would you like to be doing in 6 months? <span class="note" style="font-weight:400">A sentence or two. “Not sure yet” is a fine answer.</span></label><textarea id="g-mot" rows="3" maxlength="2000">${esc(zGoal)}</textarea></div>
+    <div class="field"><label for="g-zuri">Your Zuri summary <span class="note" style="font-weight:400" id="g-zuri-note">${zuri ? "Filled in from your chat with Zuri. You can edit it." : "Optional. If you chatted with Zuri, paste the summary here."}</span></label><textarea id="g-zuri" rows="${zuri ? 7 : 3}" maxlength="4000">${esc(zuri)}</textarea></div>
+    <label class="consent"><input type="checkbox" id="g-consent"> <span>I agree that Jobnest Academy may use these details to process my application, as set out in the <a href="${esc(INFO.website_url || "https://jobnestcareers.com")}/#privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
     <p class="err" id="g-err" role="alert"></p>
     <div class="actions"><button class="btn gold" type="submit">Submit application</button><span class="note">Next: a ${INFO.cohort?.assess_minutes || 5}-minute readiness assessment.</span></div>
   </form></section>`;
@@ -178,6 +180,7 @@ async function submitApply(form) {
   err.textContent = "";
   try {
     const res = await busy(form.querySelector("button[type=submit]"), () => rpc("submit_application", { p: d }));
+    try { sessionStorage.removeItem("jn_zuri"); } catch (e) {}
     saveMyApp(res.ref, res.token);
     toast(`Application received · ref ${res.ref}`);
     go(`#/a/${res.ref}/${res.token}/assess`);
@@ -484,7 +487,7 @@ const details = (a) => `<dl class="kv app-kv"><div><dt>Contact</dt><dd>${esc(a.e
   <div><dt>Background</dt><dd>${esc(a.edu)} · NYSC: ${esc(a.nysc)} · ${esc(a.situation)}</dd></div>
   <div><dt>Readiness</dt><dd>15h/week: ${esc(a.hours)} · Laptop: ${esc(a.laptop)} · Internet: ${esc(a.internet)}${a.score != null ? ` · Assessment <b>${a.score}%</b>${a.score_digital != null ? ` (digital ${a.score_digital}%, communication ${a.score_comms}%)` : ""}` : ""}</dd></div>
   <div><dt>Motivation</dt><dd>${esc(a.motivation)}</dd></div>
-  <div><dt>Zuri summary</dt><dd>${a.zuri_summary ? esc(a.zuri_summary) : `<span class="note">None. Explore options on the call.</span>`}</dd></div>
+  <div><dt>Zuri summary</dt><dd style="white-space:pre-line">${a.zuri_summary ? esc(a.zuri_summary) : `<span class="note">None. Explore options on the call.</span>`}</dd></div>
   ${a.wanted ? `<div><dt>Interested in</dt><dd><b>${esc(a.wanted)}</b> · no matching track</dd></div>` : ""}
   ${a.dc1_at ? `<div><dt>Discovery Call 1</dt><dd>${fmtAt(a.dc1_at)} with ${esc(a.officer_name || "")}${a.dc1_note ? ` · “${esc(a.dc1_note)}”` : ""}</dd></div>` : ""}
   ${a.offer_deadline && a.status === "Offer sent" ? `<div><dt>Offer deadline</dt><dd>${fmtLong(a.offer_deadline)}</dd></div>` : ""}
@@ -1225,7 +1228,10 @@ async function route() {
     await info();
     if (p0 === "gep") return pageGep();
     if (p0 === "start") return pageStart();
-    if (p0 === "apply") return pageApply();
+    if (p0 === "apply") {
+      if (p1 === "zuri" && p2) { try { sessionStorage.setItem("jn_zuri", p2.slice(0, 4000)); } catch (e) {} history.replaceState(null, "", location.pathname + "#/apply"); }
+      return pageApply();
+    }
     if (p0 === "check") return pageCheck();
     if (p0 === "paycheck") return pagePayCheck();
     return pageHome();
