@@ -306,3 +306,5 @@ a.item b,a.cl .t{color:var(--ink)}
 a.fab{color:var(--brand-ink)}
 .oath-doc .sig-line{display:grid;height:auto;border:0;margin:0}
 @media(max-width:520px){.oath-doc .sig-line{grid-template-columns:1fr}.pledge{gap:.6rem;padding:.7rem}}
+@media print{body.print-cv *{visibility:hidden!important}body.print-cv .cv-page,body.print-cv .cv-page *{visibility:visible!important}body.print-cv .cv-page{position:absolute;left:0;top:0;width:100%;box-shadow:none;border:0}body.print-cv .fab,body.print-cv .toast{display:none!important}}
+.place-card .kv{margin-top:.4rem}

@@ -514,6 +514,8 @@ function staffNav(role) {
   if (["adm_admin", "super"].includes(role)) adm.push({ g: "Setup" }, { k: "emails", l: "Emails" }, { k: "settings", l: "Settings" });
   const ac = [{ g: "Academy" }, { k: "students", l: "Students" }];
   if (["director", "cohort_manager", "facilitator", "super"].includes(role)) ac.push({ k: "grading", l: "Grading" });
+  if (["director", "cohort_manager", "academy_admin", "coach", "facilitator", "super"].includes(role)) ac.push({ k: "intern", l: "Internships" });
+  if (["director", "cohort_manager", "coach", "super"].includes(role)) ac.push({ k: "dc2", l: "Discovery Call 2" });
   ac.push({ k: "sessions", l: "Live sessions" }, { k: "news", l: "Announcements" });
   if (role === "super") return [{ g: "Jobnest" }, { k: "staff", l: "Staff accounts" }, { k: "audit", l: "Activity log" }, ...adm, ...ac];
   if (role === "adm_admin") return [...adm, { g: "Academy" }, { k: "students", l: "Students" }];
@@ -545,7 +547,7 @@ async function pagePortal(tab) {
   }
   const items = staffNav(ME.role).filter((x) => x.k);
   if (!items.some((x) => x.k === tab)) tab = items[0].k;
-  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
+  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, intern: tabIntern, dc2: tabDc2, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
   try { await pages[tab](); }
   catch (e) { shell(tab, "Something went wrong", "", `<div class="notice">${esc(e.message)}</div>`); }
 }
@@ -932,10 +934,10 @@ function itemSub(it) {
     : it.type === "guide" ? "Platform guide · about 4 min" : STAFF_STEPS.includes(it.title) ? "Completed by staff" : LKIND.task + (it.link ? " · submit a link" : "");
 }
 function aStatus(it) {
-  const r = row(it); if (it.type === "logweek") return r ? "Submitted" : "Not Started";
+  const r = row(it); if (it.type === "logweek") return !r ? "Not Started" : r.status === "revise" ? "Revision Required" : r.data?.signed ? "Signed" : "Submitted";
   if (!r) return "Not Started"; return { submitted: "Submitted", graded: "Graded", revise: "Revision Required", done: "Submitted" }[r.status] || "Submitted";
 }
-const STATUS_CLS = { "Not Started": "", "In Progress": "now", Submitted: "info", "Revision Required": "bad", Graded: "ok" };
+const STATUS_CLS = { "Not Started": "", "In Progress": "now", Submitted: "info", "Revision Required": "bad", Graded: "ok", Signed: "ok" };
 const pillS = (s) => `<span class="pill ${STATUS_CLS[s] || ""}">${s}</span>`;
 const lsAssignments = () => { const out = []; LS.W.forEach((wk, wi) => wk.items.forEach((it, ii) => { if ((it.type === "task" && it.link) || it.type === "logweek") out.push({ wi, ii, it, wk }); })); return out; };
 const deadlineLine = (wi) => `<div class="deadlines"><span><b>Full marks</b> until ${fmtD(weekDue(wi))}, 17:00</span><span><b>80% max</b> until ${fmtD(graceDue(wi))}, 23:59</span><span><b>50% max</b> after that</span></div>`;
@@ -1020,7 +1022,7 @@ function lsLearning(wi, key) {
         <span class="n">${d ? "✓" : i + 1}</span><span><small>Week ${i + 1}</small><b>${esc(wk.title)}</b></span><span class="lk">${!un ? "🔒" : d ? "" : gg && gg.state === "fail" ? "Repeat" : gg && gg.state === "grading" ? "Grading" : p.d + "/" + p.n}</span></a>`; }).join("");
     return `<details class="sg ${all ? "done" : open ? "" : "locked"}" ${si === viewStage ? "open" : ""}><summary><span class="sg-n">${all ? "✓" : si + 1}</span><span class="sg-t"><small>Stage ${si + 1}</small><b>${esc(st.title)}</b></span><span class="sg-s">${all ? "Done" : open ? `${dn}/${idx.length}` : "🔒"}</span></summary><div class="sg-w">${wks}</div></details>`; }).join("");
   const f = key ? findItem(key) : null;
-  const main = f && f.wi === wi ? lsItemView(wi, f.ii) : key === "brief" ? lsBrief(wi) : lsWeekView(wi);
+  const main = f && f.wi === wi ? lsItemView(wi, f.ii) : key === "brief" ? lsBrief(wi) : key === "logguide" ? lsLogGuide(wi) : lsWeekView(wi);
   lsShell("learning", `<div class="wrap lhead"><div><p class="eyebrow">${esc(LS.C.me.track || "")} · ${esc(LS.C.cohort.name)}</p><h1>My Learning</h1></div>
     <div class="lh-prog" id="tour-progress"><div class="lh-bar"><i style="width:${pct}%"></i></div><span><b class="mono">${pct}%</b> complete · Week ${current + 1} of ${LS.W.length}${avg != null ? ` · avg <b class="mono">${avg}%</b>` : ""}</span></div></div>
     <section class="wrap campus"><aside>${weekSelect(wi)}<nav class="rail" id="tour-rail" aria-label="Programme stages and weeks">${groups}</nav></aside><div>${main}</div></section>`);
@@ -1043,12 +1045,15 @@ function weekPill(wi, un) {
   if (g && g.state !== "open") return `<span class="pill ${g.state === "pass" ? "ok" : g.state === "fail" ? "bad" : "info"}">${g.state === "pass" ? "Passed · " + g.avg + "%" : g.state === "fail" ? "Not passed · " + g.avg + "%" : g.state === "revise" ? "Revision requested" : "Awaiting grade"}</span>`;
   return `<span class="pill ${p.d === p.n ? "ok" : "now"}">${p.d === p.n ? "Complete" : p.d + " of " + p.n + " required done"}</span>`;
 }
+function itemRow(wi, it, un) {
+  const dn = isDoneIt(it), sc = itemScoreIt(it), r = row(it);
+  if (!un) return `<div class="item locked"><span class="ic">${LICON.lock}</span><div><b>${esc(it.title)}</b><small>${itemSub(it)}</small></div>${it.opt ? `<span class="req opt">Optional</span>` : ""}</div>`;
+  const pill = r?.status === "revise" ? `<span class="pill bad">Revise</span>` : r?.status === "submitted" ? `<span class="pill info">Grading</span>` : it.type === "logweek" && r ? (r.data?.signed ? `<span class="pill ok">Signed</span>` : `<span class="pill info">To sign</span>`) : dn ? `<span class="pill ok">${sc != null ? sc + "%" : "Done"}</span>` : `<span class="pill">Start</span>`;
+  return `<a class="item ${dn ? "done" : ""}" href="#/learn/learning/${wi + 1}/${it.key}"><span class="ic">${dn ? LICON.done : LICON[it.type] || LICON.task}</span><div><b>${esc(it.title)}</b><small>${itemSub(it)}</small></div><span class="item-r">${it.opt ? `<span class="req opt">Optional</span>` : ""}${pill}</span></a>`;
+}
 function lsWeekView(wi) {
   const wk = LS.W[wi], st = COURSE_STAGES[wk.stage], p = weekProgress(wi), un = unlockedW(wi), me = LS.C.me;
-  const items = wk.items.map((it) => { const dn = isDoneIt(it), s = itemScoreIt(it), r = row(it);
-    if (!un) return `<div class="item locked"><span class="ic">${LICON.lock}</span><div><b>${esc(it.title)}</b><small>${itemSub(it)}</small></div>${it.opt ? `<span class="req opt">Optional</span>` : ""}</div>`;
-    const pill = r?.status === "revise" ? `<span class="pill bad">Revise</span>` : r?.status === "submitted" ? `<span class="pill info">Grading</span>` : dn ? `<span class="pill ok">${s != null ? s + "%" : "Done"}</span>` : `<span class="pill">Start</span>`;
-    return `<a class="item ${dn ? "done" : ""}" href="#/learn/learning/${wi + 1}/${it.key}"><span class="ic">${dn ? LICON.done : LICON[it.type] || LICON.task}</span><div><b>${esc(it.title)}</b><small>${itemSub(it)}</small></div><span class="item-r">${it.opt ? `<span class="req opt">Optional</span>` : ""}${pill}</span></a>`; }).join("");
+  const items = wk.items.map((it) => itemRow(wi, it, un)).join("");
   const next = un && weekDone(wi) && wi < LS.W.length - 1 ? `<div class="celebrate"><div><b>Week ${wi + 1} complete.</b> <span class="note">${unlockedW(wi + 1) ? `Week ${wi + 2}: ${esc(LS.W[wi + 1].title)} is now unlocked.` : `Week ${wi + 2} opens on ${fmtD(new Date(weekStartAt(wi + 1).getTime() - 2 * DAY))}.`}</span></div>${unlockedW(wi + 1) ? `<a class="btn sm" href="#/learn/learning/${wi + 2}">Start Week ${wi + 2} →</a>` : ""}</div>` : "";
   const head = (extra) => `<div class="stage-head wk-head" id="tour-head"><div class="row"><div><p class="eyebrow">Week ${wi + 1} of ${LS.W.length} · Stage ${wk.stage + 1}: ${esc(st.title)}</p><h2 style="margin-top:.45rem">${esc(wk.title)}</h2></div>${weekPill(wi, un)}</div>${extra}</div>`;
   if (st.welcome) return head(`<div class="welcome"><p class="big">Congratulations, ${esc(me.first_name)}. You took a bold step.</p>
@@ -1066,7 +1071,8 @@ function lsWeekView(wi) {
     <div class="wtabs" role="tablist">${tabs.map(([k, l, c]) => `<button role="tab" data-act="ls-wtab" data-k="${k}" aria-selected="${tab === k}">${l}${c ? ` <span class="mono">${c}</span>` : ""}</button>`).join("")}</div>`;
   let body = "";
   if (tab === "tasks") { const ck = LS.L.checkins[wi + 1];
-    body = `${lockMsg}${un ? gateCard(wi) : ""}<div class="items" id="tour-items">${items}</div>${next}
+    const sp = un && SPECIAL[wk.stage] ? SPECIAL[wk.stage](wi, items) : null;
+    body = `${lockMsg}${sp ? "" : un ? gateCard(wi) : ""}${sp || `<div class="items" id="tour-items">${items}</div>`}${next}
     ${un && wi % 2 === 1 ? `<form class="card checkin" id="checkin" data-wk="${wi + 1}" novalidate><div class="ch"><h3>Weekly check-in</h3>${ck ? `<span class="pill ok">Sent ${fmtDay(ck.at)}</span>` : ""}</div>
       <p class="note">How confident do you feel about this week? Your facilitator reaches out if you need support.</p>
       <div class="rate conf" role="radiogroup" aria-label="Confidence this week">${[["1", "Lost"], ["2", "Unsure"], ["3", "Okay"], ["4", "Confident"], ["5", "Very confident"]].map(([n, t]) => `<label><input type="radio" name="conf" value="${n}" ${String(ck?.conf) === n ? "checked" : ""}><span>${n} · ${t}</span></label>`).join("")}</div>
@@ -1102,6 +1108,8 @@ function lsItemView(wi, ii) {
   const head = `<a class="back" href="#/learn/learning/${wi + 1}">← Week ${wi + 1}: ${esc(LS.W[wi].title)}</a><div><p class="eyebrow">${LKIND[it.type] || "Activity"}${it.mins ? " · " + it.mins + " min" : ""}${it.opt ? " · Optional" : ""}</p><h2 style="margin-top:.4rem">${esc(it.title)}</h2></div>`;
   const nav = seqNav(wi, ii), btn = (lbl, undo) => `<div><button class="btn ${dn ? "ghost" : ""}" data-act="ls-done" data-k="${it.key}" data-v="${dn ? 0 : 1}">${dn ? undo : lbl}</button></div>`;
   if (!un) return `<div class="view">${head}<div class="gate">${LICON.lock}<span><b>Locked.</b> This opens when Week ${wi + 1} unlocks.</span></div></div>`;
+  if (ON_WEEK_PAGE.includes(it.title)) return `<div class="view">${head}<p style="max-width:62ch">${esc(it.detail || "")}</p><div class="signoff ${dn ? "signed" : ""}"><b>${dn ? "Done ✓" : "Do this on the Week " + (wi + 1) + " page"}</b><p class="note">${it.title === "Mock interview simulation" ? "Your coach marks this after your call." : it.title === "Book your 1-on-1 session" ? "Pick a time on the Week 15 page. This ticks itself when you book." : "The tools for this step are on the week page."}</p></div><div><a class="btn" href="#/learn/learning/${wi + 1}">Open Week ${wi + 1}</a></div>${nav}</div>`;
+  if (it.title === "Confirm your placement") return `<div class="view">${head}${placementCard()}${LS.X.placement ? btn("I confirm my placement", "Confirmed ✓ · Undo") : ""}${nav}</div>`;
   if (it.type === "oath") return `<div class="view">${head}${oathView(dn, r)}${nav}</div>`;
   if (it.type === "guide") return `<div class="view">${head}${guideView()}<div class="actions"><button class="btn ghost" data-act="tour">Take the guided tour again</button><button class="btn ${dn ? "ghost" : ""}" data-act="ls-done" data-k="${it.key}" data-v="${dn ? 0 : 1}">${dn ? "Done ✓ · Mark as not done" : "I know my way around"}</button></div>${nav}</div>`;
   if (it.title === "Read the Student Handbook") return `<div class="view">${head}${handbookView()}${btn("I've read the handbook", "Read ✓ · Mark as not read")}${nav}</div>`;
@@ -1172,16 +1180,193 @@ function lsBrief(wi) {
     <h3>How to submit</h3><p>Put everything in one Google Drive or Notion folder, set sharing to “anyone with the link can view”, and paste the link into the Week 9 task “Submit your final project”.</p></div>`;
 }
 function logWeek(wi, it, r) {
-  const w = it.wk || wi - 8, e = r?.data || {}, ro = !!r, last = w === 4;
+  const w = it.wk || wi - 8, e = r?.data || {}, ro = !!r && r.status !== "revise", last = w === 4;
   const fld = (f) => { const v = esc(e[f.k] || ""), req = f.req ? " *" : "", ro2 = ro ? "readonly" : "";
     if (f.t === "area") return `<div class="field"><label for="lb-${f.k}">${f.l}${req}</label><textarea id="lb-${f.k}" ${ro2} placeholder="${esc(f.ph || "")}">${v}</textarea></div>`;
     return `<div class="field"><label for="lb-${f.k}">${f.l}${req}</label><input id="lb-${f.k}" type="${f.t}" ${f.min != null ? `min="${f.min}" max="${f.max}"` : ""} ${ro2} placeholder="${esc(f.ph || "")}" value="${v}"></div>`; };
   const sections = LB_FIELDS.map((s) => `<div class="lb-sec"><h3>${s.sec}</h3>${s.sec === "Week details" ? `<div class="grid2">${s.fields.map(fld).join("")}</div>` : s.fields.map(fld).join("")}${s.sec === "Learning & reflection" && last ? fld(LB_FINAL) : ""}</div>`).join("");
   const rating = `<div class="field"><span class="lbl" id="rate-l">How would you rate this week? *</span><div class="rate" role="radiogroup" aria-labelledby="rate-l">${[["1", "Tough"], ["2", "Okay"], ["3", "Good"], ["4", "Great"], ["5", "Excellent"]].map(([n, t]) => `<label><input type="radio" name="lb-rate" value="${n}" ${e.rate === n ? "checked" : ""} ${ro ? "disabled" : ""}><span>${n} · ${t}</span></label>`).join("")}</div></div>`;
-  return `<div class="lb-due"><span class="eyebrow">Due</span><b>${fmtD(weekDue(wi))}, 17:00</b><span class="note">Internship week ${w} of 4 · fill this entry at the end of the week</span></div>
+  return `${r?.status === "revise" ? `<div class="card fb bad"><div class="ch"><h3>Changes requested</h3></div><p>${esc(r.feedback || "")}</p><p class="note">${esc(r.graded_by || "Your supervisor")} · update the entry below and resubmit.</p></div>` : ""}<div class="lb-due"><span class="eyebrow">Due</span><b>${fmtD(weekDue(wi))}, 17:00</b><span class="note">Internship week ${w} of 4 · fill this entry at the end of the week</span></div>
     <form class="lb-form" id="lb-form" data-k="${it.key}" data-last="${last ? 1 : 0}" novalidate>${sections}<div class="lb-sec">${rating}</div><p class="err" id="lb-err" role="alert"></p>
-    ${ro ? `<div class="signoff"><b>Submitted</b><p class="note">Submitted on ${fmtDateD(String(r.at).slice(0, 10))}. Your supervisor reviews it.</p></div>` : `<div class="actions"><button class="btn" type="submit">Submit logbook entry</button></div>`}</form>`;
+    ${ro ? (e.signed ? `<div class="signoff signed"><b>Signed by ${esc(e.signed_by || "your supervisor")}</b>${e.sup_comment ? `<p class="note">“${esc(e.sup_comment)}”</p>` : ""}<p class="note">${e.signed_at ? fmtDateD(String(e.signed_at).slice(0, 10)) : ""}</p></div>`
+      : `<div class="signoff"><b>Submitted · waiting for sign-off</b><p class="note">Submitted on ${fmtDateD(String(r.at).slice(0, 10))}. ${LS.X.placement ? esc(LS.X.placement.sup_name) + " signs it from the secure link we send them." : "Your supervisor signs it from a secure link."}</p></div>`)
+      : `<div class="actions"><button class="btn" type="submit">${r ? "Resubmit logbook entry" : "Submit logbook entry"}</button></div>`}</form>`;
 }
+
+/* ---------- Phase 2: special weeks ---------- */
+const byTitle = (wi, t) => LS.W[wi].items.find((x) => x.title === t);
+const doneT = (t) => { for (let wi = 0; wi < LS.W.length; wi++) { const it = byTitle(wi, t); if (it) return isDoneIt(it); } return false; };
+const draft = (k, d) => (LS.X.drafts && LS.X.drafts[k]) ?? d;
+const stepsOl = (L) => `<ol class="dc-steps">${L.map(([t, ok], i) => `<li class="${ok ? "done" : ""}"><span class="mono">${ok ? "✓" : i + 1}</span>${t}</li>`).join("")}</ol>`;
+const PROJ_PHASES = [["Plan & build", "Read the brief, plan your project and check in with your supervisor."], ["Deliver", "Finish and submit your project, review it yourself and get graded."]];
+function projectView(wi, items) {
+  const projW = LS.W.map((w, i) => (w.stage === 3 ? i : -1)).filter((i) => i >= 0), ph = projW.indexOf(wi), finalWi = projW.at(-1);
+  const finalIt = LS.W[finalWi].items.find((x) => x.proj), fr = finalIt ? row(finalIt) : null, daysToFinal = Math.max(0, Math.ceil((weekDue(finalWi) - Date.now()) / DAY));
+  const brief = (byTitle(projW[0], "Read your project brief") || {}).detail || "";
+  const ms = []; projW.forEach((w) => LS.W[w].items.forEach((it) => ms.push({ t: it.title, w, ok: isDoneIt(it) })));
+  const firstOpen = ms.findIndex((m) => !m.ok), p = weekProgress(wi), msgs = LS.X.messages || [];
+  return `<div class="proj-hero"><p class="eyebrow">Client project · ${ph + 1} of ${projW.length}</p><h2>${esc(LS.W[wi].title.replace("Project: ", ""))}</h2>
+    <p class="ph-brief">${esc(brief)}</p>
+    <div class="ph-stats"><div><span>Final project due</span><b class="mono">${daysToFinal}<small> days</small></b><span>${fmtD(weekDue(finalWi))}, 17:00</span></div>
+      <div><span>This week</span><b class="mono">${p.d}<small>/${p.n}</small></b><span>tasks done</span></div>
+      <div><span>Grade</span><b class="mono">${fr?.status === "graded" ? fr.score + "<small>%</small>" : "—"}</b><span>${fr?.status === "graded" ? "graded by your supervisor" : fr ? "waiting for grading" : "after you submit"}</span></div></div>
+    <ol class="ph-steps">${PROJ_PHASES.map((x, i) => `<li class="${weekDone(projW[i]) ? "done" : i === ph ? "cur" : ""}"><span class="mono">Week ${projW[i] + 1}</span><b>${x[0]}</b><span>${x[1]}</span></li>`).join("")}</ol>
+    <div class="actions"><a class="btn gold sm" href="#/learn/learning/${projW[0] + 1}/brief">${LICON.file} Read the full brief & rubric</a><span class="ph-note">Individual project · you work on your own, with your supervisor's support</span></div></div>
+  <div style="margin-top:1rem">${gateCard(wi)}</div>
+  <div class="proj-grid"><div class="stack">
+    <div class="card"><div class="ch"><h3>This week's tasks</h3><span class="note">Due ${fmtD(weekDue(wi))}, 17:00</span></div><div class="items" id="tour-items" style="margin-top:.6rem">${items}</div></div>
+    <div class="card"><div class="ch"><h3>Project milestones</h3><span class="note">${ms.filter((m) => m.ok).length} of ${ms.length}</span></div>
+      <ol class="mstones">${ms.map((m, i) => `<li class="${m.ok ? "done" : i === firstOpen ? "cur" : ""}"><span class="dot"></span><div><b>${esc(m.t)}</b><span class="note">Week ${m.w + 1}${m.ok ? " · done" : i === firstOpen ? " · up next" : ""}</span></div></li>`).join("")}</ol></div></div>
+    <div class="stack"><div class="card supcard"><div class="sup-h"><span class="sup-av">${LICON.guide}</span><div><span class="eyebrow">Your project supervisor</span><b>Ask about your project</b><span class="note">Replies within 1 working day</span></div></div>
+      <dl class="kv sup-kv"><div><dt>Best for</dt><dd>Questions about the brief, feedback on your plan, getting unstuck</dd></div></dl>
+      ${msgs.length ? `<ul class="thread">${msgs.map((m) => `<li class="${m.staff ? "" : "me"}"><span>${esc(m.body)}</span><small>${m.staff ? esc(m.by || "Supervisor") : "You"} · ${fmtAt(m.at)}</small></li>`).join("")}</ul>` : ""}
+      <form id="sup-msg-form" class="form" novalidate><div class="field"><label for="sup-msg-txt">Message your supervisor</label><textarea id="sup-msg-txt" placeholder="e.g. Can you check if my plan covers everything in the brief?"></textarea></div>
+      <div><button class="btn sm" type="submit">Send message</button></div></form></div></div></div>`;
+}
+function placementCard() {
+  const pl = LS.X.placement;
+  return pl ? `<div class="card place-card"><div class="ch"><h3>Your placement</h3><span class="pill ok">Confirmed by Jobnest</span></div>
+      <dl class="kv"><div><dt>Company</dt><dd>${esc(pl.org)}</dd></div><div><dt>Your role</dt><dd>${esc(pl.role)}</dd></div><div><dt>Your supervisor</dt><dd>${esc(pl.sup_name)}</dd></div></dl>
+      <p class="note">Your supervisor signs your logbook each week from a secure link Jobnest sends them.</p></div>`
+    : `<div class="card place-card"><div class="ch"><h3>Your placement</h3><span class="pill">Not assigned yet</span></div><p class="note">Student Success will add your host company and supervisor here before your internship starts.</p></div>`;
+}
+function internView(wi, items) {
+  const entries = LS.W.map((w) => w.items.find((x) => x.type === "logweek")).filter(Boolean);
+  return `${placementCard()}<div class="lbtrack-card card"><div class="ch"><h3>Logbook</h3><a class="link sm" href="#/learn/learning/${wi + 1}/logguide">Logbook guide</a></div>
+    <ol class="lbtrack">${entries.map((it, i) => { const st = aStatus(it); return `<li class="${st === "Signed" ? "done" : st === "Submitted" ? "sub" : ""}"><span class="mono">Week ${i + 1}</span><small>${st === "Signed" ? "Signed" : st === "Submitted" ? "To sign" : st === "Revision Required" ? "Changes asked" : "Not yet"}</small></li>`; }).join("")}</ol></div>
+    <div class="items" id="tour-items">${items}</div>`;
+}
+function lsLogGuide(wi) {
+  const pl = LS.X.placement;
+  return `<div class="view guide-doc"><a class="back" href="#/learn/learning/${wi + 1}">← Week ${wi + 1}: ${esc(LS.W[wi].title)}</a>
+    <div><p class="eyebrow">Internship · Weeks 10–13</p><h2 style="margin-top:.4rem">Logbook guide</h2></div>
+    <p>Your logbook is the official record of your internship. Your supervisor signs every entry, and it becomes verified work experience for your CV and portfolio.</p>
+    <h3>When to fill it</h3><ul><li>Once a week, at the end of each internship week: 4 entries in total.</li><li>Submit by <b>Friday, 17:00</b>. Write notes during the week so Friday is quick.</li></ul>
+    <h3>What to write</h3><ul><li><b>Tasks:</b> list each task and what you delivered. Be specific.</li><li><b>Tools:</b> the software you used, e.g. Excel, Trello, Zendesk.</li><li><b>Skills:</b> what you learned or got better at.</li><li><b>Challenges:</b> one problem and how you solved it.</li><li><b>Next week:</b> two or three clear goals.</li></ul>
+    <div class="ex"><div class="ex-bad"><span class="eyebrow">Weak entry</span><p>"Did some work on reports and attended meetings."</p></div>
+      <div class="ex-good"><span class="eyebrow">Strong entry</span><p>"Cleaned the March sales export (2,400 rows) in Google Sheets, removed 130 duplicates and built a pivot table of sales by region. Presented the top 3 findings at Thursday's team stand-up."</p></div></div>
+    <h3>What your supervisor checks</h3><ul><li>The entry matches what you actually did that week.</li><li>Your hours and days are accurate.</li><li>You show initiative and reflect honestly on challenges.</li></ul>
+    ${pl ? `<p class="note">Your supervisor: <b>${esc(pl.sup_name)}</b>, ${esc(pl.org)}. If anything in your placement isn't going well, tell Student Success early.</p>` : ""}</div>`;
+}
+
+/* CV builder */
+const TRACK_SKILLS = { ADM: ["Calendar management", "Google Workspace", "Microsoft Office", "Meeting minutes", "Expense tracking"], CSP: ["Zendesk", "Live chat support", "Ticket triage", "CSAT", "De-escalation"],
+  DAT: ["Excel", "Google Sheets", "Pivot tables", "Data cleaning", "Looker Studio"], DMK: ["Canva", "Meta Ads Manager", "Content calendars", "Copywriting", "Social media analytics"] };
+function cvData() {
+  const me = LS.C.me, pl = LS.X.placement, d = draft("cv", null); if (d) return d;
+  const brief = (LS.W.flatMap((w) => w.items).find((x) => x.title === "Read your project brief") || {}).detail || "";
+  return { name: `${me.first_name} ${me.surname || ""}`.trim(), email: me.email || "", phone: "", city: "Lagos, Nigeria", linkedin: "", summary: "",
+    skills: [...(TRACK_SKILLS[LS.L.track] || []), "Communication", "Time management"].join(", "),
+    exp: `${pl ? `${pl.role} · ${pl.org}` : "Intern · Host company"} · 4 weeks\n- \n- \n- `, proj: `Client project · Jobnest Academy\n- ${brief}`, edu: "", cert: `Jobnest Academy Career Accelerator · ${me.track || ""} (${new Date().getFullYear() + (new Date().getMonth() > 8 ? 1 : 0)})` };
+}
+const atsChecks = (c) => [["Contact details complete", !!(c.email && c.phone)], ["Summary is 2–3 sentences", (c.summary || "").trim().length >= 80], ["At least 6 skills", (c.skills || "").split(",").filter((x) => x.trim()).length >= 6],
+  ["Experience shows results with numbers", /\d/.test((c.exp || "").replace(/4 weeks/, ""))], ["Education added", (c.edu || "").trim().length > 2]];
+function cvPreview(c) {
+  const ln = (t) => esc(t || "").split("\n").map((l) => l.trim().startsWith("-") ? `<li>${l.replace(/^-\s*/, "") || "&nbsp;"}</li>` : `<p><b>${l}</b></p>`).join("").replace(/(<li>.*?<\/li>)+/g, (m) => `<ul>${m}</ul>`);
+  return `<div class="cv-page"><h3>${esc(c.name)}</h3><p class="cv-contact">${[c.city, c.email, c.phone, c.linkedin].filter(Boolean).map(esc).join(" · ")}</p>
+    ${c.summary ? `<h4>Summary</h4><p>${esc(c.summary)}</p>` : ""}<h4>Skills</h4><p>${esc(c.skills)}</p><h4>Experience</h4>${ln(c.exp)}<h4>Projects</h4>${ln(c.proj)}${c.edu ? `<h4>Education</h4>${ln(c.edu)}` : ""}${c.cert ? `<h4>Certifications</h4><p>${esc(c.cert)}</p>` : ""}</div>`;
+}
+const atsList = (ch) => ch.map(([t, ok]) => `<li class="${ok ? "ok" : ""}">${ok ? "✓" : "○"} ${t}</li>`).join("");
+const linkBox = (it, id, label, ph, btn) => { const r = row(it), dn = isDoneIt(it);
+  return `<form class="form ls-tool-link" data-k="${it.key}" data-inp="${id}" novalidate><div class="field"><label for="${id}">${label}</label><input id="${id}" inputmode="url" placeholder="${ph}" value="${esc(r?.link || "")}"></div><p class="err" id="${id}-err" role="alert"></p><div><button class="btn sm" type="submit">${dn ? "Update link" : btn}</button></div></form>`; };
+function cvView(wi, items) {
+  const wk = LS.W[wi], c = cvData(), ch = atsChecks(c), score = ch.filter((x) => x[1]).length;
+  const cvI = byTitle(wi, "ATS-compliant resume"), liI = byTitle(wi, "LinkedIn profile makeover"), pfI = byTitle(wi, "Publish your portfolio"), li = draft("li", {}), pl = LS.X.placement;
+  const LI = [["photo", "Professional photo, face clearly visible"], ["head", "Headline with your target role, e.g. “Data Analyst | Excel · Dashboards”"], ["about", "About section: 3 short paragraphs"], ["feat", "Client project added to Featured"], ["skills", "At least 5 skills added"]];
+  const f = (k, l, ta, ph) => `<div class="field"><label for="cv-${k}">${l}</label>${ta ? `<textarea id="cv-${k}" data-cv="${k}" rows="${ta}" placeholder="${esc(ph || "")}">${esc(c[k] || "")}</textarea>` : `<input id="cv-${k}" data-cv="${k}" value="${esc(c[k] || "")}" placeholder="${esc(ph || "")}">`}</div>`;
+  const cvDone = cvI && isDoneIt(cvI);
+  return `${stepsOl([["Build your CV", cvDone], ["Update LinkedIn", liI && isDoneIt(liI)], ["Publish portfolio", pfI && isDoneIt(pfI)]])}
+  <div class="card cv-card"><div class="ch"><h3>CV builder</h3><span class="pill ${score >= 4 ? "ok" : "now"}" id="ats-pill">ATS check ${score}/5</span></div>
+    <div class="cv-grid"><form class="form" id="cv-form" novalidate>
+      <div class="grid2">${f("name", "Full name")}${f("city", "City")}${f("email", "Email")}${f("phone", "Phone", "", "e.g. 0803 000 0000")}</div>
+      ${f("linkedin", "LinkedIn URL", "", "linkedin.com/in/your-name")}${f("summary", "Professional summary", 3, "Who you are, what you're good at and the role you want, in 2–3 sentences")}
+      ${f("skills", "Skills (comma separated)", 2)}${f("exp", "Experience", 5, "Start each result with “-” and include numbers")}${f("proj", "Projects", 3)}
+      ${f("edu", "Education", 2, "e.g. B.Sc Economics · University of Lagos · 2024")}${f("cert", "Certifications", 2)}<p class="note" id="cv-saved" aria-live="polite">Saves as you type.</p></form>
+    <div class="cv-side"><div id="cv-preview">${cvPreview(c)}</div><ul class="mini" id="ats-list">${atsList(ch)}</ul>
+      <div class="actions"><button class="btn ghost" data-act="cv-print" type="button">Download PDF</button>${cvI ? `<button class="btn" data-act="ls-done" data-k="${cvI.key}" data-v="${cvDone ? 0 : 1}" type="button">${cvDone ? "CV submitted ✓ · Undo" : "Submit CV for review"}</button>` : ""}</div>
+      <p class="note">Download PDF opens your browser's print window. Choose “Save as PDF”.</p></div></div></div>
+  <div class="cols"><div class="card"><div class="ch"><h3>LinkedIn makeover</h3>${liI && isDoneIt(liI) ? `<span class="pill ok">Done</span>` : ""}</div>
+      <div class="li-list">${LI.map(([k, t]) => `<label class="check"><input type="checkbox" data-li="${k}" ${li[k] ? "checked" : ""}> ${t}</label>`).join("")}</div>
+      ${liI ? linkBox(liI, "li-url", "Your LinkedIn profile URL", "https://linkedin.com/in/...", "Submit LinkedIn") : ""}</div>
+    <div class="card"><div class="ch"><h3>Portfolio</h3>${pfI && isDoneIt(pfI) ? `<span class="pill ok">Published</span>` : ""}</div>
+      <p class="note">Include these, with a short description of the result for each:</p>
+      <ul class="reqs"><li>Your client project</li><li>Your internship${pl ? ` at ${esc(pl.org)}` : ""}</li><li>Your best practice exercise from Weeks 4–7</li><li>Your CV</li></ul>
+      ${pfI ? linkBox(pfI, "pf-url", "Portfolio link (Canva, Notion or Google Sites)", "https://", "Publish portfolio") : ""}</div></div>
+  <div class="items">${wk.items.filter((it) => it.opt).map((it) => itemRow(wi, it, true)).join("")}</div>`;
+}
+
+/* Discovery Call 2 */
+function bookingUI() {
+  const b = LS.X.booking;
+  if (b) { const at = new Date(b.at), end = new Date(at.getTime() + 40 * 6e4);
+    return `<div class="card booked"><div class="ch"><h3>Your call is booked</h3><span class="pill ok">Confirmed</span></div>
+      <div class="bk-sum"><span class="date"><b>${fmt(at, { day: "numeric" })}</b><small>${fmt(at, { month: "short" })}</small></span>
+      <div><b>${fmt(at, { weekday: "long", day: "numeric", month: "long" })}</b><span class="note">${fmtTime(at)}–${fmtTime(end)} WAT · 40 minutes · Video call</span><span class="note">With ${esc(b.coach)}, Career Coach</span>${b.note ? `<span class="note">Your note: “${esc(b.note)}”</span>` : ""}</div></div>
+      <div class="actions">${LS.X.call_link ? `<a class="btn sm gold" href="${esc(LS.X.call_link)}" target="_blank" rel="noopener">Join the call</a>` : ""}${LS.X.result ? "" : `<button class="btn sm ghost" data-act="dc2-cancel">Cancel or change time</button>`}</div>
+      <p class="note">Join from a quiet place with your CV and portfolio open.</p></div>`; }
+  const S2 = LS.slots || [], days = [...new Set(S2.map((s) => fmt(s.at, { year: "numeric", month: "2-digit", day: "2-digit" })))];
+  const day = ui.dcDay && days.includes(ui.dcDay) ? ui.dcDay : days[0], pick = S2.find((s) => s.id === ui.dcSlot);
+  if (!S2.length) return `<div class="card booker"><div class="ch"><h3>Book your call</h3></div><p class="empty">No times are open yet. Your career coaches add times before Week 15. Check back soon.</p></div>`;
+  return `<div class="card booker"><div class="ch"><h3>Book your call</h3><span class="note">40 minutes · All times WAT (Lagos)</span></div>
+    <div class="bk-step"><span class="bk-n">1</span><b>Pick a day</b></div>
+    <div class="days">${days.map((d) => { const s0 = S2.find((s) => fmt(s.at, { year: "numeric", month: "2-digit", day: "2-digit" }) === d); const n = S2.filter((s) => fmt(s.at, { year: "numeric", month: "2-digit", day: "2-digit" }) === d).length;
+      return `<button class="day" data-act="dc-day" data-k="${d}" aria-pressed="${d === day}"><small>${fmt(s0.at, { weekday: "short" })}</small><b class="mono">${fmt(s0.at, { day: "numeric" })}</b><small>${fmt(s0.at, { month: "short" })}</small><span class="free">${n} free</span></button>`; }).join("")}</div>
+    <div class="bk-step"><span class="bk-n">2</span><b>Pick a time</b></div>
+    <div class="slots">${S2.filter((s) => fmt(s.at, { year: "numeric", month: "2-digit", day: "2-digit" }) === day).map((s) => `<button class="slot" data-act="dc-slot" data-k="${s.id}" aria-pressed="${ui.dcSlot === s.id}">${fmtTime(s.at)}<small style="display:block;font-size:.7rem;opacity:.8">${esc(s.coach)}</small></button>`).join("")}</div>
+    ${pick ? `<div class="bk-confirm"><div><span class="eyebrow">You're booking</span><b>${fmt(pick.at, { weekday: "long", day: "numeric", month: "long" })} at ${fmtTime(pick.at)} WAT</b><span class="note">with ${esc(pick.coach)}</span></div>
+      <div class="field"><label for="bk-note">Anything you'd like your coach to know? (optional)</label><input id="bk-note" placeholder="e.g. I'm aiming for junior data analyst roles in fintech"></div>
+      <div><button class="btn gold" data-act="dc-book" data-k="${pick.id}">Confirm booking</button></div></div>` : ""}</div>`;
+}
+function dcView(wi) {
+  const prep = [["cv", "Your updated CV from Week 14"], ["port", "Your portfolio link"], ["roles", "3 roles you're targeting"], ["pitch", "Your 60-second introduction"]], pd = draft("prep", {});
+  const apI = byTitle(wi, "Finalise your Job Search Action Plan"), callDone = doneT("Mock interview simulation"), r = LS.X.result;
+  return `<p style="max-width:64ch">A 40-minute, 1-on-1 video call with a Career Coach. You'll do a short <b>mock interview</b>, sharpen your pitch and leave with a <b>Job Search Action Plan</b>.</p>
+    ${stepsOl([["Book your call", doneT("Book your 1-on-1 session")], ["Have your call", callDone], ["Submit your action plan", apI && isDoneIt(apI)]])}
+    <div class="prep"><span class="eyebrow">Have these ready</span><div class="prep-l">${prep.map(([k, t]) => `<label class="check"><input type="checkbox" data-prep="${k}" ${pd[k] ? "checked" : ""}> ${t}</label>`).join("")}</div></div>
+    <div class="dc-col">${bookingUI()}
+    ${r ? `<div class="card result-card"><div class="ch"><h3>Your call results</h3><span class="pill ok">From ${esc(r.by || "your coach")}</span></div>
+      <div class="conf-score"><b class="mono">${r.score}<small>/10</small></b><span><b>Interview Confidence Score</b><span class="note">${esc(r.note || "")}</span></span></div>
+      ${(r.next || []).length ? `<ul class="reqs">${r.next.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}</div>` : ""}
+    ${apI ? `<div class="card ${isDoneIt(apI) ? "booked" : ""}"><div class="ch"><h3>Your Job Search Action Plan</h3>${isDoneIt(apI) ? `<span class="pill ok">Submitted</span>` : callDone ? `<span class="pill now">Due ${fmtD(weekDue(wi))}</span>` : `<span class="pill">After your call</span>`}</div>
+      <p class="note">Write up the plan you agreed with your coach: target roles, target companies and your weekly application goal. Share the link here.</p>
+      ${callDone || isDoneIt(apI) ? linkBox(apI, "ap-link", "Link to your action plan", "https://", "Submit action plan") : ""}</div>` : ""}</div>`;
+}
+
+/* Job search */
+const APP_ST = ["Applied", "Interviewing", "Offer", "Not selected"];
+function jobView(wi) {
+  const stW = LS.W.map((w, i) => (w.stage === 7 ? i : -1)).filter((i) => i >= 0), first = wi === stW[0];
+  const outs = draft("outreach", []), apps = draft("apps", []), pt = draft("pitch", {});
+  const words = [pt.a, pt.b, pt.c].join(" ").trim().split(/\s+/).filter(Boolean).length;
+  const stats = `<div class="ph-stats js-stats"><div><span>Outreach sent</span><b class="mono">${outs.length}<small>/10</small></b></div><div><span>Applications</span><b class="mono">${apps.length}</b></div><div><span>Interviews</span><b class="mono">${apps.filter((a) => a.st === "Interviewing" || a.st === "Offer").length}</b></div></div>`;
+  if (first) { const pI = byTitle(wi, "Record your elevator pitch"), oI = byTitle(wi, "Send 10 cold outreach messages");
+    return stats + `<div class="cols"><div class="card"><div class="ch"><h3>Your 60-second pitch</h3>${pI && isDoneIt(pI) ? `<span class="pill ok">Recorded</span>` : ""}</div>
+      <form class="form" novalidate>
+        <div class="field"><label for="pt-a">Who you are</label><textarea id="pt-a" data-pitch="a" rows="2" placeholder="I'm a ${esc(LS.C.me.track || "")} professional who…">${esc(pt.a || "")}</textarea></div>
+        <div class="field"><label for="pt-b">What you've done (with a result)</label><textarea id="pt-b" data-pitch="b" rows="2" placeholder="At my internship I…">${esc(pt.b || "")}</textarea></div>
+        <div class="field"><label for="pt-c">What you're looking for</label><textarea id="pt-c" data-pitch="c" rows="2" placeholder="I'm looking for a junior role where…">${esc(pt.c || "")}</textarea></div></form>
+      <p class="note" id="pitch-count">${words} words · about ${Math.round(words / 2.3)} seconds spoken (aim for 120–150 words)</p>
+      ${pI ? linkBox(pI, "pt-link", "Link to your recorded pitch (Loom, YouTube unlisted, Google Drive)", "https://", "Submit pitch recording") : ""}</div>
+    <div class="card"><div class="ch"><h3>Outreach log</h3><span class="pill ${outs.length >= 10 ? "ok" : "now"}">${outs.length} of 10</span></div><div class="bar"><i style="width:${Math.min(100, outs.length * 10)}%"></i></div>
+      <form id="out-form" class="form" style="margin-top:.8rem" novalidate><div class="grid2"><div class="field"><label for="o-name">Person</label><input id="o-name" placeholder="e.g. Head of Data"></div><div class="field"><label for="o-co">Company</label><input id="o-co"></div></div>
+        <div class="grid2"><div class="field"><label for="o-ch">Channel</label><select id="o-ch"><option>LinkedIn</option><option>Email</option><option>WhatsApp</option><option>In person</option></select></div><div class="field"><label for="o-st">Status</label><select id="o-st"><option>Sent</option><option>Replied</option><option>Meeting booked</option></select></div></div>
+        <div><button class="btn sm" type="submit">Log message</button></div></form>
+      ${outs.length ? `<ul class="roles">${outs.slice().reverse().map((o) => `<li><b>${esc(o.name)} · ${esc(o.co)}</b><span class="note">${esc(o.ch)} · ${esc(o.on)}</span><span class="pill ${o.st === "Sent" ? "" : "ok"}">${esc(o.st)}</span></li>`).join("")}</ul>` : `<p class="empty">No messages logged yet. Aim for 2 a day.</p>`}
+      ${oI ? `<div class="actions" style="margin-top:.8rem"><button class="btn sm ${isDoneIt(oI) ? "ghost" : ""}" data-act="ls-done" data-k="${oI.key}" data-v="${isDoneIt(oI) ? 0 : 1}" ${outs.length < 10 && !isDoneIt(oI) ? "disabled" : ""}>${isDoneIt(oI) ? "Done ✓ · Undo" : `Mark outreach done (${outs.length}/10)`}</button></div>` : ""}</div></div>`; }
+  const tI = byTitle(wi, "Weekly job application tracker"), rI = byTitle(wi, "Report your first interview invite"), hasInt = apps.some((a) => a.st === "Interviewing" || a.st === "Offer");
+  return stats + `<div class="card"><div class="ch"><h3>Add an application</h3></div>
+    <form id="app-form" class="form" novalidate><div class="app-row"><div class="field"><label for="a-role">Role</label><input id="a-role" placeholder="e.g. Junior Data Analyst"></div><div class="field"><label for="a-co">Company</label><input id="a-co"></div><div class="field"><label for="a-st">Status</label><select id="a-st">${APP_ST.map((x) => `<option>${x}</option>`).join("")}</select></div><div class="field"><span class="lbl">&nbsp;</span><button class="btn sm" type="submit">Add</button></div></div></form></div>
+  <div class="board">${APP_ST.map((st) => `<div class="col"><div class="col-h"><b>${st}</b><span class="mono">${apps.filter((a) => a.st === st).length}</span></div>${apps.map((a, i) => a.st !== st ? "" : `<div class="app-card"><b>${esc(a.role)}</b><span class="note">${esc(a.co)} · ${esc(a.on)}</span><label class="sr-only" for="as-${i}">Status</label><select id="as-${i}" data-app="${i}">${APP_ST.map((x) => `<option ${x === a.st ? "selected" : ""}>${x}</option>`).join("")}</select></div>`).join("") || `<p class="note">None yet</p>`}</div>`).join("")}</div>
+  <div class="cols"><div class="card"><div class="ch"><h3>This week's tracker</h3>${tI && isDoneIt(tI) ? `<span class="pill ok">Submitted</span>` : ""}</div><p class="note">Submit your tracker every Friday. Aim for at least 5 targeted applications a week (minimum 3 to submit).</p>
+      ${tI ? `<div><button class="btn sm" data-act="ls-done" data-k="${tI.key}" data-v="${isDoneIt(tI) ? 0 : 1}" ${apps.length < 3 && !isDoneIt(tI) ? "disabled" : ""}>${isDoneIt(tI) ? "Submitted ✓ · Undo" : `Submit tracker (${apps.length} applications)`}</button></div>` : ""}</div>
+    <div class="card"><div class="ch"><h3>Got an interview?</h3>${rI && isDoneIt(rI) ? `<span class="pill ok">Reported</span>` : ""}</div><p class="note">Move an application to Interviewing, then tell your coach so they can help you prepare.</p>
+      ${rI ? `<div><button class="btn sm gold" data-act="ls-done" data-k="${rI.key}" data-v="1" ${!hasInt || isDoneIt(rI) ? "disabled" : ""}>${isDoneIt(rI) ? "Coach notified ✓" : "Report interview to my coach"}</button></div>` : ""}</div></div>`;
+}
+const SPECIAL = { 3: projectView, 4: internView, 5: cvView, 6: dcView, 7: jobView };
+// Items that are done from their week page rather than their own page.
+const ON_WEEK_PAGE = ["Book your 1-on-1 session", "Mock interview simulation", "ATS-compliant resume", "Weekly job application tracker", "Send 10 cold outreach messages", "Report your first interview invite"];
+let draftT = {};
+function saveDraft(k, data, now) { LS.X.drafts = { ...(LS.X.drafts || {}), [k]: data }; clearTimeout(draftT[k]); draftT[k] = setTimeout(() => rpc("learn_draft", { p_key: k, p_data: data }).then(() => { const s = $("#cv-saved"); if (s && k === "cv") s.textContent = "Saved"; }).catch((x) => toast(x.message)), now ? 0 : 600); }
 
 /* ---------- More pages ---------- */
 function lsAssignmentsPage(key) {
@@ -1247,11 +1432,11 @@ async function pageLearn(p1, p2, p3) {
   if (!isStudent()) { app.innerHTML = learnCard(`<h1>You're signed in as staff</h1><p>Sign out first to use the student portal.</p><div class="actions"><a class="btn" href="#/portal">Go to the staff portal</a><button class="btn ghost" data-act="signout-learn">Sign out</button></div>`); return; }
   if (!LS) loading();
   try {
-    const [C, L, ex, ct, mod] = await Promise.all([rpc("student_campus"), rpc("learn_state"), rpc("student_campus_extra").catch(() => ({})), rpc("student_certificate").catch(() => null), COURSE_DATA ? null : import("./course.js")]);
+    const [C, L, ex, ct, mod, X] = await Promise.all([rpc("student_campus"), rpc("learn_state"), rpc("student_campus_extra").catch(() => ({})), rpc("student_certificate").catch(() => null), COURSE_DATA ? null : import("./course.js"), rpc("learn_extra").catch(() => ({}))]);
     if (mod) { COURSE_DATA = mod.COURSE; COURSE_STAGES = mod.COURSE.stages; }
     CAMPUS = C; CAMPUS.cert = ct;
     const cert = ct && ct.cert_id ? ct : null; CAMPUS.cert = cert;
-    LS = { C, L, W: COURSE_DATA.tracks[L.track] || COURSE_DATA.tracks.DAT, cert, extra: ex || {} };
+    LS = { C, L, X: X || {}, W: COURSE_DATA.tracks[L.track] || COURSE_DATA.tracks.DAT, cert, extra: ex || {} };
   } catch (e) { if (e.status === 401 || /sign in/i.test(e.message)) { await auth.signOut(); LS = null; return pageLearnSignIn("Please sign in again."); } throw e; }
   ui.lsMore = false;
   const wk = p1 === "learning" ? (p2 || "") + "|" + (p3 || "") : null;
@@ -1264,7 +1449,9 @@ const lsParts = () => location.hash.replace(/^#\/?/, "").split("/").map(decodeUR
 async function lsRender(p1, p2, p3) {
   if (p1 === undefined) [p1, p2, p3] = lsParts();
   const page = p1 || "home", cert = LS.cert;
-  if (page === "learning") { const wi = Math.min(Math.max((parseInt(p2, 10) || curWeek() + 1) - 1, 0), LS.W.length - 1); lsLearning(wi, p3 || null); }
+  if (page === "learning") { const wi = Math.min(Math.max((parseInt(p2, 10) || curWeek() + 1) - 1, 0), LS.W.length - 1);
+    if (LS.W[wi].stage === 6 && !LS.X.booking && !p3 && unlockedW(wi) && !LS.slots) { try { LS.slots = await rpc("dc2_slots"); } catch { LS.slots = []; } }
+    lsLearning(wi, p3 || null); }
   else if (page === "assignments") lsAssignmentsPage(p2 || null);
   else if (["cohort", "sessions", "news"].includes(page)) lsCohortPage();
   else if (page === "profile") lsProfilePage(cert);
@@ -1318,6 +1505,77 @@ function endTour() {
   TOUR_I = null; renderTour(); window.scrollTo({ top: 0, behavior: "smooth" });
   try { localStorage.setItem("jn.tour." + (CAMPUS?.me?.matric || ""), "1"); } catch { /* ignore */ }
   rpc("student_tour_done").catch(() => {});
+}
+
+/* ---------- host supervisor link (no login) ---------- */
+const EVAL_CRIT = ["Quality of work", "Reliability & punctuality", "Communication", "Initiative", "Teamwork"];
+let HOST = null;
+async function pageHost(token, fresh) {
+  if (!HOST || HOST.token !== token || !fresh) { loading(); try { HOST = { token, d: await rpc("host_view", { p_token: token }) }; } catch (e) {
+    app.innerHTML = `<section class="wrap pub-wrap"><div class="card verify"><h1>This link isn't working</h1><p>${esc(e.message)}</p></div></section>`; return; } }
+  const d = HOST.d, pl = d.placement, E = d.entries, allSigned = E.length && E.every((e) => e.data?.signed);
+  const row2 = (l, v) => v ? `<div><dt>${l}</dt><dd>${lines(String(v))}</dd></div>` : "";
+  app.innerHTML = `<header class="top"><div class="wrap"><div class="logo">${LOGO}Jobnest Academy</div></div></header>
+  <section class="wrap host-wrap">
+    <div class="card host-intro"><span class="eyebrow">Internship logbook · secure link</span><h1>Hello ${esc(pl.sup_name)},</h1>
+      <p>${esc(d.student)} is interning with you at <b>${esc(pl.org)}</b> as a ${esc(pl.role)}. Each week they fill a logbook entry. Please read it, add a short comment and sign it off. It takes about 2 minutes.</p>
+      <p class="note">No account or password is needed. This link only opens ${esc(d.first)}'s logbook, so please don't share it.</p>
+      <ol class="lbtrack">${E.map((e, i) => `<li class="${e.data?.signed ? "done" : e.status === "done" ? "sub" : ""}"><span class="mono">Week ${i + 1}</span><small>${e.data?.signed ? "Signed" : e.status === "done" ? "To sign" : e.status === "revise" ? "Changes asked" : "Not yet"}</small></li>`).join("")}</ol></div>
+    ${E.map((e, i) => { const x = e.data || {}, w = i + 1;
+      if (!e.status) return `<div class="card"><div class="ch"><h3>Week ${w}</h3><span class="pill">Not submitted yet</span></div><p class="note">This entry appears here once ${esc(d.first)} submits it. Open this link again then.</p></div>`;
+      if (e.status === "revise") return `<div class="card"><div class="ch"><h3>Week ${w}</h3><span class="pill bad">Changes requested</span></div><p class="note">You asked for: “${esc(e.feedback || "")}”. It comes back here when ${esc(d.first)} resubmits.</p></div>`;
+      return `<div class="card host-entry"><div class="ch"><h3>Week ${w}${x.from ? ` · ${fmtDay(x.from + "T12:00:00Z")} to ${fmtDay(x.to + "T12:00:00Z")}` : ""}</h3>${x.signed ? `<span class="pill ok">Signed ${fmtDay(x.signed_at)}</span>` : `<span class="pill now">Waiting for your sign-off</span>`}</div>
+        <dl class="kv">${row2("Days / hours", `${x.days || "–"} days · ${x.hours || "–"} hours`)}${row2("Tasks completed", x.tasks)}${row2("Tools", x.tools)}${row2("Meetings", x.meetings)}${x.evidence ? `<div><dt>Evidence</dt><dd><a class="link" href="${esc(x.evidence)}" target="_blank" rel="noopener">Open ↗</a></dd></div>` : ""}${row2("Skills learned", x.skills)}${row2("Challenges", x.challenges)}${row2("Feedback received", x.feedback)}${row2("Next week", x.next)}${row2("Biggest achievement", x.achievement)}${row2("Their rating of the week", x.rate ? x.rate + "/5" : "")}</dl>
+        ${x.signed ? `<div class="signoff signed"><b>Your comment</b><p class="note">${esc(x.sup_comment || "No comment")}</p></div>`
+          : `<div class="field"><label for="hc-${w}">Your comment</label><textarea id="hc-${w}" rows="2" placeholder="e.g. Reliable and quick to learn. Keep asking questions early."></textarea></div>
+          <label class="check"><input type="checkbox" id="hok-${w}"> I confirm this entry is an accurate record of ${esc(d.first)}'s week.</label>
+          <div class="actions"><button class="btn" data-act="host-sign" data-k="${esc(e.key)}" data-w="${w}">Sign off Week ${w}</button><button class="btn ghost" data-act="host-revise" data-k="${esc(e.key)}" data-w="${w}">Ask for changes</button></div>`}</div>`; }).join("")}
+    <div class="card"><div class="ch"><h3>Final performance evaluation</h3>${d.eval ? `<span class="pill ok">Submitted ${fmtDay(d.eval.at)}</span>` : allSigned ? `<span class="pill now">Ready</span>` : `<span class="pill">After all 4 weeks are signed</span>`}</div>
+      ${d.eval ? `<ul class="roles">${EVAL_CRIT.map((c, i) => `<li><b>${c}</b><span class="mono">${d.eval.ratings[i]}/5</span></li>`).join("")}</ul><p class="note">${esc(d.eval.comment || "")}</p>`
+        : allSigned ? `${EVAL_CRIT.map((c, i) => `<div class="field"><span class="lbl">${c}</span><div class="rate">${[1, 2, 3, 4, 5].map((n) => `<label><input type="radio" name="ev-${i}" value="${n}"><span>${n}</span></label>`).join("")}</div></div>`).join("")}
+          <div class="field"><label for="ev-c">Overall comment</label><textarea id="ev-c" rows="3" placeholder="What did they do well? What should they work on next?"></textarea></div><p class="err" id="ev-err" role="alert"></p><div><button class="btn" data-act="host-eval">Submit evaluation</button></div>`
+        : `<p class="note">Available once all four weekly entries are signed off.</p>`}</div>
+    <p class="note" style="text-align:center">Questions? Email <a href="mailto:info@jobnestcareers.com">info@jobnestcareers.com</a>.</p></section>`;
+}
+
+/* ---------- staff: internships ---------- */
+async function tabIntern() {
+  const L = await rpc("acad_placements"); ui.places = L;
+  const can = ["director", "cohort_manager", "academy_admin", "super"].includes(ME.role), base = location.origin + location.pathname;
+  const row3 = (x, i) => { const p = x.placement, link = x.token ? `${base}#/host/${x.token}` : "";
+    return `<details class="arow noav" data-id="pl${i}" ${ui.open === "pl" + i ? "open" : ""}><summary><span class="an"><b>${esc(x.name)}</b><span class="note">${esc(x.matric)} · ${esc(x.track || "")}${p ? ` · ${esc(p.org)}` : ""}</span></span>
+      <span class="anext">${p ? `${x.signed}/4 signed${x.to_sign ? ` · ${x.to_sign} waiting` : ""}${x.eval ? " · evaluated" : ""}` : "No placement yet"}</span>${p ? (x.eval ? `<span class="pill ok">Done</span>` : `<span class="pill now">Placed</span>`) : `<span class="pill">To place</span>`}</summary>
+      <div class="abody">${link ? `<div class="notice"><span><b>Supervisor's link</b> · share it with ${esc(p.sup_name)} by WhatsApp or email. Anyone with it can sign this logbook.</span>
+          <span class="actions"><button class="btn sm" data-act="copy-host" data-k="${esc(link)}">Copy link</button>${p.sup_phone ? `<a class="btn sm ghost" target="_blank" rel="noopener" href="https://wa.me/${esc(p.sup_phone.replace(/\D/g, "").replace(/^0/, "234"))}?text=${encodeURIComponent(`Hello ${p.sup_name}, this is Jobnest Academy. Please use this link each Friday to sign ${x.name}'s internship logbook: ${link}`)}">WhatsApp</a>` : ""}</span></div>` : ""}
+        ${can ? `<form class="form place-form" data-i="${i}" novalidate><div class="grid2"><div class="field"><label for="po-${i}">Company</label><input id="po-${i}" value="${esc(p?.org || "")}"></div><div class="field"><label for="pr-${i}">Role</label><input id="pr-${i}" value="${esc(p?.role || "")}" placeholder="e.g. Data Analyst Intern"></div></div>
+          <div class="grid2"><div class="field"><label for="ps-${i}">Supervisor's name</label><input id="ps-${i}" value="${esc(p?.sup_name || "")}"></div><div class="field"><label for="pp-${i}">Supervisor's WhatsApp</label><input id="pp-${i}" value="${esc(p?.sup_phone || "")}" inputmode="tel"></div></div>
+          <div class="field"><label for="pe-${i}">Supervisor's email (optional)</label><input id="pe-${i}" type="email" value="${esc(p?.sup_email || "")}"></div>
+          <div class="actions"><button class="btn sm" type="submit">${p ? "Save changes" : "Save placement"}</button></div></form>` : ""}</div></details>`; };
+  shell("intern", "Internships", "Weeks 10–13. Add each student's placement, then share the supervisor's link so they can sign the weekly logbook and give the final evaluation.",
+    `<div class="card">${L.length ? `<div class="arows">${L.map(row3).join("")}</div>` : empty("No admitted students yet.")}</div>`);
+}
+
+/* ---------- staff: Discovery Call 2 ---------- */
+async function tabDc2() {
+  const L = await rpc("coach_calls"); ui.dc2 = L;
+  const isCoach = ["coach", "super"].includes(ME.role), mine = L.filter((x) => x.mine || !isCoach);
+  const days = [...Array(28)].map((_, i) => fmt(new Date(Date.now() + (i + 1) * 864e5), { year: "numeric", month: "2-digit", day: "2-digit" }).split("/").reverse().join("-"))
+    .filter((iso) => { const wd = new Date(iso + "T12:00:00Z").getUTCDay(); return wd !== 0 && wd !== 6; });
+  const booked = L.filter((x) => x.app), open = mine.filter((x) => !x.app && new Date(x.at) > new Date());
+  const call = (x, i) => `<details class="arow noav" data-id="dc${x.id}" ${ui.open === "dc" + x.id ? "open" : ""}><summary><span class="an"><b>${esc(x.name)}</b><span class="note">${fmtAt(x.at)} WAT · ${esc(x.track || "")}${isCoach ? "" : ` · ${esc(x.coach)}`}</span></span>
+      <span class="anext">${x.result ? `Score ${x.result.score}/10` : new Date(x.at) < new Date() ? "Add the result" : "Booked"}</span>${x.result ? `<span class="pill ok">Done</span>` : `<span class="pill now">${new Date(x.at) < new Date() ? "To complete" : "Upcoming"}</span>`}</summary>
+    <div class="abody">${x.note ? `<p class="note">Their note: “${esc(x.note)}”</p>` : ""}${x.cv ? `<details><summary class="link sm">See their CV</summary><div style="margin-top:.6rem">${cvPreview(x.cv)}</div></details>` : `<p class="note">No CV saved yet.</p>`}
+      <form class="form dc2-form" data-i="${i}" novalidate><div class="grid2"><div class="field"><label for="dsc-${i}">Interview Confidence Score (1–10)</label><input id="dsc-${i}" type="number" min="1" max="10" value="${x.result?.score ?? ""}"></div></div>
+        <div class="field"><label for="dno-${i}">Summary for the student</label><textarea id="dno-${i}" rows="2">${esc(x.result?.note || "")}</textarea></div>
+        <div class="field"><label for="dnx-${i}">Next steps (one per line)</label><textarea id="dnx-${i}" rows="3">${esc((x.result?.next || []).join("\n"))}</textarea></div>
+        <div class="actions"><button class="btn sm" type="submit">${x.result ? "Update result" : "Save result"}</button></div></form></div></details>`;
+  shell("dc2", "Discovery Call 2", "Week 15. Students book a 40-minute call with a career coach, then you record their Interview Confidence Score and next steps.",
+    `<div class="grid2">${isCoach ? `<form class="card form" id="dc2-times" novalidate><h3>Add times</h3><p class="note">Each call is 40 minutes. Times are in WAT.</p>
+      <div class="field"><span class="lbl">Days</span><div class="chips-row">${days.map((d) => `<label class="chip-cb"><input type="checkbox" name="dday" value="${d}"><span>${fmt(d + "T12:00:00Z", { weekday: "short", day: "numeric", month: "short" })}</span></label>`).join("")}</div></div>
+      <div class="field"><span class="lbl">Times</span><div class="chips-row">${CALL_TIMES.map((t) => `<label class="chip-cb"><input type="checkbox" name="dtime" value="${t}"><span>${t}</span></label>`).join("")}</div></div>
+      <div><button class="btn" type="submit">Add these times</button></div></form>` : ""}
+    <div class="card"><div class="ch"><h3>Open times</h3><span class="note">${open.length}</span></div>${open.length ? `<ul class="slot-list">${open.map((s) => `<li><span class="mono">${fmtAt(s.at)}</span>${isCoach ? `<button class="link sm" data-act="dc2-rm" data-k="${s.id}">Remove</button>` : `<span class="note">${esc(s.coach)}</span>`}</li>`).join("")}</ul>` : empty("No open times.")}</div></div>
+    <div class="card" style="margin-top:1rem"><div class="ch"><h3>Booked calls</h3><span class="note">${booked.length}</span></div>${booked.length ? `<div class="arows">${booked.map((x) => call(x, L.indexOf(x))).join("")}</div>` : empty("No calls booked yet.")}</div>`);
 }
 
 /* ---------- staff: academy ---------- */
@@ -1374,7 +1632,7 @@ async function tabContent() {
 }
 
 async function tabGrading() {
-  const d = await rpc("acad_learn_queue"); ui.lq = d;
+  const [d, M] = await Promise.all([rpc("acad_learn_queue"), rpc("acad_messages").catch(() => [])]); ui.lq = d; ui.msgs = M;
   const wait = d.work.filter((x) => x.status === "submitted"), done = d.work.filter((x) => x.status !== "submitted");
   const canGrade = ["cohort_manager", "facilitator", "director", "super"].includes(ME.role);
   const row = (x) => { const i = d.work.indexOf(x), late = x.cap != null && x.cap < 1;
@@ -1390,6 +1648,10 @@ async function tabGrading() {
   const steps = d.staff_steps, open = steps.filter((x) => !x.done);
   shell("grading", "Grading", "Week projects students have submitted. Students get an email with your grade and feedback.",
     `<div class="card"><div class="ch"><h3>To grade</h3><span class="note">${wait.length}</span></div>${wait.length ? `<div class="arows">${wait.map(row).join("")}</div>` : empty("Nothing waiting. 🎉")}</div>
+    <div class="card" style="margin-top:1rem"><div class="ch"><h3>Project messages</h3><span class="note">${M.filter((m) => m.waiting).length} waiting for a reply</span></div>
+      ${M.length ? `<div class="arows">${M.map((m, i) => `<details class="arow noav" data-id="mg${i}" ${ui.open === "mg" + i ? "open" : ""}><summary><span class="an"><b>${esc(m.name)}</b><span class="note">${esc(m.matric)} · ${esc(m.track)} · ${ago(m.last_at)}</span></span>${m.waiting ? `<span class="pill now">Reply</span>` : `<span class="pill ok">Answered</span>`}</summary>
+        <div class="abody"><ul class="thread">${m.messages.map((x) => `<li class="${x.staff ? "me" : ""}"><span>${esc(x.body)}</span><small>${x.staff ? esc(x.by || "Staff") : esc(m.name)} · ${fmtAt(x.at)}</small></li>`).join("")}</ul>
+        <div class="field"><label for="mr-${i}">Your reply</label><textarea id="mr-${i}" rows="2"></textarea></div><div><button class="btn sm" data-act="msg-reply" data-k="${i}">Send reply</button></div></div></details>`).join("")}</div>` : empty("No messages yet.")}</div>
     <div class="card" style="margin-top:1rem"><div class="ch"><h3>Supervisor steps</h3><span class="note">${open.length} open</span></div><p class="note">Internship steps staff complete for each student. Tick them when done.</p>
       ${steps.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Student</th><th>Week</th><th>Step</th><th></th></tr></thead><tbody>${steps.map((x) => `<tr><td data-label="Student"><b>${esc(x.name)}</b><span class="note" style="display:block">${esc(x.matric)}</span></td><td data-label="Week" class="mono">W${x.week}</td><td data-label="Step">${esc(x.title)}</td>
         <td>${canGrade ? `<label class="consent" style="margin:0"><input type="checkbox" data-change="lmark" data-app="${x.app}" data-key="${esc(x.key)}" ${x.done ? "checked" : ""}> Done</label>` : x.done ? `<span class="pill ok">Done</span>` : ""}</td></tr>`).join("")}</tbody></table></div>` : empty("No admitted students yet.")}</div>
@@ -1489,6 +1751,27 @@ document.addEventListener("click", async (e) => {
   if (a === "mark-sent") { await busy(t, () => rpc("admin_mark_sent", { p_id: +k })); toast("Marked as sent"); return route(); }
   if (a === "pay") { try { await startPay(t); } catch { /* shown */ } return; }
   if (a === "start-assess") { t.disabled = true; t.textContent = "Starting…"; const base = `#/a/${t.dataset.ref}/${t.dataset.token}`; return pageAssess({ ref: t.dataset.ref }, t.dataset.token, base); }
+  if (a === "host-sign" || a === "host-revise") {
+    const w = t.dataset.w, ok = a === "host-sign", c = $("#hc-" + w).value.trim();
+    if (ok && !$("#hok-" + w).checked) return toast("Tick the box to confirm the entry is accurate");
+    if (!ok && !c) { $("#hc-" + w).focus(); return toast("Write what they should change in the comment box"); }
+    try { const d = await busy(t, () => rpc("host_sign", { p_token: HOST.token, p_key: k, p_ok: ok, p_comment: c })); if (d) { HOST.d = d; toast(ok ? `Week ${w} signed. Thank you!` : "Sent back with your comment"); pageHost(HOST.token, true); } } catch { /* shown */ }
+    return;
+  }
+  if (a === "host-eval") {
+    const r = EVAL_CRIT.map((_, i) => +($(`input[name="ev-${i}"]:checked`)?.value || 0));
+    if (r.some((x) => !x)) { $("#ev-err").textContent = "Rate each area from 1 to 5."; return; }
+    try { const d = await busy(t, () => rpc("host_eval", { p_token: HOST.token, p_ratings: r, p_comment: $("#ev-c").value })); if (d) { HOST.d = d; toast("Evaluation submitted. Thank you!"); pageHost(HOST.token, true); } } catch { /* shown */ }
+    return;
+  }
+  if (a === "copy-host") { try { await navigator.clipboard.writeText(k); } catch { const ta = document.createElement("textarea"); ta.value = k; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); } return toast("Link copied"); }
+  if (a === "dc2-rm") { try { await busy(t, () => rpc("coach_remove_slot", { p_id: +k })); toast("Time removed"); route(); } catch { /* shown */ } return; }
+  if (a === "msg-reply") { const tx = $("#mr-" + k).value.trim(); if (!tx) return toast("Write a reply first"); try { await busy(t, () => rpc("acad_message_reply", { p_app: ui.msgs[+k].app, p_body: tx })); toast("Reply sent"); route(); } catch { /* shown */ } return; }
+  if (a === "dc-day") { ui.dcDay = k; ui.dcSlot = null; return lsRender(); }
+  if (a === "dc-slot") { ui.dcSlot = +k; return lsRender(); }
+  if (a === "dc-book") { try { const X = await busy(t, () => rpc("dc2_book", { p_slot: +k, p_note: $("#bk-note")?.value || "" })); if (X) { LS.X = X; LS.L = await rpc("learn_state"); toast("Booked. Check your email for the link."); lsRender(); } } catch { LS.slots = await rpc("dc2_slots").catch(() => []); ui.dcSlot = null; lsRender(); } return; }
+  if (a === "dc2-cancel") { if (!confirm("Cancel this booking? Your time will be released for other students.")) return; try { const X = await busy(t, () => rpc("dc2_cancel")); if (X) { LS.X = X; LS.L = await rpc("learn_state"); LS.slots = await rpc("dc2_slots").catch(() => []); toast("Booking cancelled. Pick a new time."); lsRender(); } } catch { /* shown */ } return; }
+  if (a === "cv-print") { document.body.classList.add("print-cv"); window.print(); setTimeout(() => document.body.classList.remove("print-cv"), 500); return; }
   if (a === "ls-more") { ui.lsMore = !ui.lsMore; return lsRender(); }
   if (a === "ls-wtab") { ui.wtab = k; return lsRender(); }
   if (a === "ls-asf") { ui.asf = k; return lsRender(); }
@@ -1558,6 +1841,10 @@ function applyFilter() {
   filterRows();
 }
 document.addEventListener("input", (e) => {
+  if (e.target.dataset?.cv && LS) { const c = { ...cvData() }; $$("[data-cv]").forEach((x) => (c[x.dataset.cv] = x.value)); saveDraft("cv", c); const s0 = $("#cv-saved"); if (s0) s0.textContent = "Saving…";
+    $("#cv-preview").innerHTML = cvPreview(c); const ch = atsChecks(c), sc = ch.filter((x) => x[1]).length; $("#ats-list").innerHTML = atsList(ch); const pl = $("#ats-pill"); pl.textContent = `ATS check ${sc}/5`; pl.className = `pill ${sc >= 4 ? "ok" : "now"}`; return; }
+  if (e.target.dataset?.pitch && LS) { const pt = { ...draft("pitch", {}) }; $$("[data-pitch]").forEach((x) => (pt[x.dataset.pitch] = x.value)); saveDraft("pitch", pt);
+    const w = [pt.a, pt.b, pt.c].join(" ").trim().split(/\s+/).filter(Boolean).length; $("#pitch-count").textContent = `${w} words · about ${Math.round(w / 2.3)} seconds spoken (aim for 120–150 words)`; return; }
   if (e.target.id === "adm-q") { ui.q = e.target.value.trim().toLowerCase(); applyFilter(); }
 });
 document.addEventListener("change", (e) => {
@@ -1570,6 +1857,9 @@ document.addEventListener("change", (e) => {
       .catch((x) => { el.checked = !el.checked; toast(x.message); }).finally(() => { el.disabled = false; });
     return;
   }
+  if (el.dataset.li && LS) { const d = { ...draft("li", {}), [el.dataset.li]: el.checked }; saveDraft("li", d); return; }
+  if (el.dataset.prep && LS) { const d = { ...draft("prep", {}), [el.dataset.prep]: el.checked }; saveDraft("prep", d); return; }
+  if (el.dataset.app != null && el.tagName === "SELECT" && LS) { const apps = draft("apps", []).map((a, i) => (i === +el.dataset.app ? { ...a, st: el.value } : a)); saveDraft("apps", apps, true); lsRender(); return; }
   if (el.id === "week-select") { ui.wtab = "tasks"; return go("#/learn/learning/" + el.value); }
   if (el.id === "g-state") fillTowns();
   if (el.id === "g-town") { const o = $("#g-town-o"); o.hidden = el.value !== "Other"; if (!o.hidden) o.focus(); }
@@ -1690,6 +1980,25 @@ document.addEventListener("submit", async (e) => {
     app.innerHTML = learnCard(`<h1>Check your email</h1><p>If <b>${esc(m.toUpperCase())}</b> is a valid matric number, we've emailed a link to the address you applied with. It can take a couple of minutes.</p><div><a class="btn" href="#/learn/signin">Back to sign in</a></div>`);
     return;
   }
+  if (f.id === "sup-msg-form") {
+    const v = $("#sup-msg-txt").value.trim(); if (!v) return toast("Write a message first");
+    try { const X = await busy(f.querySelector("button"), () => rpc("learn_message", { p_body: v })); if (X) { LS.X = X; toast("Message sent"); lsRender(); } } catch { /* shown */ }
+    return;
+  }
+  if (f.classList.contains("ls-tool-link")) {
+    const id = f.dataset.inp, u = $("#" + id).value.trim();
+    if (!/^https?:\/\/\S+\.\S+/i.test(u)) { $("#" + id + "-err").textContent = "Paste the full link, starting with https://"; return; }
+    await lsCall("learn_submit", { p_key: f.dataset.k, p_link: u }, f.querySelector("button[type=submit]"), "Submitted");
+    return;
+  }
+  if (f.id === "out-form") {
+    const n = $("#o-name").value.trim(), co = $("#o-co").value.trim(); if (!n || !co) return toast("Add the person and the company");
+    saveDraft("outreach", [...draft("outreach", []), { name: n, co, ch: $("#o-ch").value, st: $("#o-st").value, on: fmtDay(new Date()) }], true); toast("Logged"); lsRender(); return;
+  }
+  if (f.id === "app-form") {
+    const r0 = $("#a-role").value.trim(), co = $("#a-co").value.trim(); if (!r0 || !co) return toast("Add the role and the company");
+    saveDraft("apps", [...draft("apps", []), { role: r0, co, st: $("#a-st").value, on: fmtDay(new Date()) }], true); toast("Application added"); lsRender(); return;
+  }
   if (f.id === "ls-quiz") {
     const it = findItem(f.dataset.k)?.it, n = (it?.qs || []).length, ans = [];
     for (let i = 0; i < n; i++) { const c = f.querySelector(`input[name="q${i}"]:checked`); if (!c) { $("#quiz-err").textContent = `Answer question ${i + 1} first.`; return; } ans.push(+c.value); }
@@ -1734,6 +2043,22 @@ document.addEventListener("submit", async (e) => {
     const i = +f.dataset.i, x = ui.lq.work[i], st = $(`input[name="lg-${i}"]:checked`)?.value, g = $("#lgg-" + i).value;
     if (st === "graded" && g === "") return toast("Enter a grade from 0 to 100");
     try { await busy(f.querySelector("button"), () => rpc("acad_learn_grade", { p_app: x.app, p_key: x.key, p_status: st, p_grade: g === "" ? null : +g, p_feedback: $("#lgf-" + i).value })); toast(st === "graded" ? "Grade sent" : "Changes requested"); ui.open = null; route(); } catch { /* shown */ }
+    return;
+  }
+  if (f.classList.contains("place-form")) {
+    const i = +f.dataset.i, x = ui.places[i], v = (id) => $(`#${id}-${i}`).value;
+    try { await busy(f.querySelector("button"), () => rpc("acad_placement_save", { p_app: x.app, p_org: v("po"), p_role: v("pr"), p_sup_name: v("ps"), p_sup_email: v("pe"), p_sup_phone: v("pp") })); toast("Placement saved"); ui.open = "pl" + i; route(); } catch { /* shown */ }
+    return;
+  }
+  if (f.id === "dc2-times") {
+    const ds = $$('input[name="dday"]:checked').map((x) => x.value), ts = $$('input[name="dtime"]:checked').map((x) => x.value);
+    if (!ds.length || !ts.length) return toast("Pick at least one day and one time");
+    try { const n = await busy(f.querySelector("button"), () => rpc("coach_add_slots", { p_times: ds.flatMap((d) => ts.map((t2) => `${d}T${t2}:00+01:00`)) })); toast(`${n} time${n === 1 ? "" : "s"} added`); route(); } catch { /* shown */ }
+    return;
+  }
+  if (f.classList.contains("dc2-form")) {
+    const i = +f.dataset.i, x = ui.dc2[i];
+    try { await busy(f.querySelector("button"), () => rpc("coach_result", { p_app: x.app, p_score: +$("#dsc-" + i).value || null, p_note: $("#dno-" + i).value, p_next: $("#dnx-" + i).value })); toast("Result sent to the student"); route(); } catch { /* shown */ }
     return;
   }
   if (f.id === "session-form") {
@@ -1928,6 +2253,7 @@ async function route() {
       if (p1 === "forgot") return pageLearnForgot();
       return pageLearn(p1 || "home", p2, p3);
     }
+    if (p0 === "host" && p1) return pageHost(p1);
     if (p0 === "a" && p1 && p2) return pageApplicant(p1, p2, p3 || "");
     await info();
     if (p0 === "gep") return pageHome();
