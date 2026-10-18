@@ -27,7 +27,7 @@ SHARED = {
  ("Why use a checklist for repeatable work?", ["So steps aren't missed and quality stays consistent", "To make the task take longer", "Because managers like long lists", "So nobody needs to think"]),
  ("A weekly review of your task board is for:", ["Clearing finished cards, updating dates and planning next week", "Deleting tasks you don't like", "Showing off to colleagues", "Changing the board's colours"]),
  ("Three urgent requests arrive at once. A good first step is to:", ["Check priorities and deadlines, then confirm the order with your manager if unsure", "Do the easiest one and ignore the rest", "Start all three at the same time", "Wait for someone to follow up"]),
- ("You realise you will miss a deadline. When should you tell your manager?", ["As soon as you know, with a new date and what you need", "After the deadline has passed", "Only if they ask", "Never; just submit late"]),
+ ("You realise you will miss a deadline. When should you tell your manager?", ["As soon as you know, with a new date and what you need", "After the deadline has passed", "Only if they ask", "Never, just submit it late"]),
  ("Which habit best shows you are workplace-ready?", ["Arriving on time and keeping people updated on your progress", "Replying only when it suits you", "Avoiding questions so you look confident", "Working only on tasks you enjoy"]),
  ("When you finish a task, a good habit is to:", ["Check your work, share it, and update your task board", "Move on without telling anyone", "Wait for someone to discover it", "Delete your notes"]),
 ],
@@ -79,7 +79,7 @@ TRACK = {
  ],
  "w7-2": [  # Travel, expenses & vendors
   ("A good travel itinerary includes:", ["Flights, times, addresses, booking references and contacts in one place", "Only the destination city", "Just the hotel name", "A list of restaurants"]),
-  ("When booking travel for a manager, you should first confirm:", ["Dates, budget and preferences", "Their favourite colour", "What the client is wearing", "Nothing; just book"]),
+  ("When booking travel for a manager, you should first confirm:", ["Dates, budget and preferences", "Their favourite colour", "What the client is wearing", "Nothing, just book"]),
   ("An expense report needs:", ["Each cost with a receipt, date, purpose and amount", "A total only", "Photos of the trip", "No receipts"]),
   ("A receipt is missing for a business expense. You should:", ["Follow your company's missing-receipt process and explain it", "Make up a receipt", "Leave it out and say nothing", "Double another receipt"]),
   ("Why keep a vendor contact list?", ["So anyone on the team can reach suppliers quickly", "To share on social media", "To avoid paying vendors", "It isn't useful"]),
@@ -101,7 +101,7 @@ TRACK = {
   ("Before replying to a customer, you should:", ["Read the whole message and check their history", "Reply with a template without reading", "Close the ticket", "Ask them to repeat everything"]),
   ("A customer's problem is caused by a known bug. You should:", ["Explain clearly, share any workaround and say when you'll update them", "Pretend it's their fault", "Ignore the ticket", "Promise a fix today without checking"]),
   ("Good support writing is:", ["Clear, friendly and step-by-step", "Full of technical jargon", "In capital letters", "As short as “ok”"]),
-  ("When escalating, you should include:", ["A summary, what you've tried, and the customer's details", "Only “please help”", "Nothing; the next tier will ask", "Your opinion of the customer"]),
+  ("When escalating, you should include:", ["A summary, what you've tried, and the customer's details", "Only “please help”", "Nothing, the next tier will ask", "Your opinion of the customer"]),
   ("A customer asks for something against policy. The best response:", ["Explain the policy kindly and offer what you can do", "Say yes anyway", "Ignore the request", "Tell them they're wrong"]),
   ("Why log every customer interaction?", ["So anyone can see the full history and help quickly", "To count how many emails you sent", "To avoid replying", "It isn't necessary"]),
   ("Personalising a reply means:", ["Using the customer's name and responding to their exact situation", "Adding emojis everywhere", "Sharing your personal phone number", "Writing a long story about yourself"]),
@@ -201,7 +201,7 @@ TRACK = {
   ("Where should the most important KPI go on a dashboard?", ["Top left or top, where people look first", "Hidden at the bottom", "On a separate page", "Nowhere"]),
   ("Connecting a dashboard to a live data source means:", ["It updates when the data changes", "It can never change", "It becomes a PDF", "It deletes old data"]),
   ("When presenting insights in five minutes, start with:", ["The key finding and why it matters", "How you cleaned the data", "Your software settings", "A list of every column"]),
-  ("A good insight is:", ["Specific and actionable, e.g. “Weekend sales are 30% lower; test a weekend promo”", "“The data is interesting”", "“Sales exist”", "A chart with no explanation"]),
+  ("A good insight is:", ["Specific and actionable, e.g. “Weekend sales are 30% lower, so test a weekend promo”", "“The data is interesting”", "“Sales exist”", "A chart with no explanation"]),
   ("Too many colours and charts on one dashboard:", ["Make it harder to understand", "Make it more professional", "Are always required", "Speed it up"]),
   ("Before sharing a dashboard, you should:", ["Check the numbers against the source data", "Change all the colours", "Remove the title", "Share the raw file only"]),
   ("Showing a KPI against a target or last month helps:", ["Readers judge whether performance is good or bad", "Hide bad results", "Make the dashboard longer", "Nothing"]),
@@ -260,7 +260,7 @@ TRACK = {
   ("CTR (click-through rate) is:", ["Clicks divided by impressions", "Total spend", "Number of followers", "Cost per sale"]),
   ("CPC means:", ["Cost per click", "Clicks per campaign", "Content per channel", "Customers per city"]),
   ("Running two versions of an ad to see which performs better is called:", ["A/B testing (split testing)", "Boosting", "Retargeting", "Scheduling"]),
-  ("If an ad has many clicks but no sales, you should check:", ["The landing page, offer and audience match", "Only the ad colour", "Nothing; it's working", "The number of hashtags"]),
+  ("If an ad has many clicks but no sales, you should check:", ["The landing page, offer and audience match", "Only the ad colour", "Nothing, it's working", "The number of hashtags"]),
   ("ROAS stands for:", ["Return on ad spend", "Rate of audience size", "Reach on all stories", "Results of a survey"]),
   ("Before judging results, an ad should usually:", ["Run long enough to gather data and exit the learning phase", "Be stopped after one hour", "Be edited every few minutes", "Run without a goal"]),
   ("A good campaign results report includes:", ["Goal, spend, key results, what worked and next steps", "Only screenshots", "Only the total spend", "The ad images only"]),
@@ -281,7 +281,9 @@ for track in ["ADM", "CSP", "DAT", "DMK"]:
             order = list(range(4)); rnd.shuffle(order)
             o = [opts[j] for j in order]; a = order.index(0)
             rows.append((track, key, i, q, o, a))
-def lit(s): return "'" + s.replace("'", "''") + "'"
+def lit(s):
+    assert ";" not in s and "$q$" not in s, s
+    return "$q$" + s + "$q$"
 out = ["-- Question banks (generated by dev/quiz_bank.py). Each quiz draws 5 questions per student.",
        "delete from quiz_bank;",
        "insert into quiz_bank(track_code, key, qid, q, o, a) values"]
