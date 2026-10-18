@@ -1041,6 +1041,7 @@ function lsHome(cert) {
         <ul class="checklist">${wk.items.map((it) => { const dn = isDoneIt(it); return `<li><a class="cl ${dn ? "done" : ""}" href="#/learn/learning/${cur + 1}/${it.key}"><span class="box">${dn ? LICON.done.replace(/20/g, "14") : ""}</span><span class="t">${esc(it.title)}</span>${it.opt ? `<span class="req opt">Optional</span>` : ""}</a></li>`; }).join("")}</ul></div>
       <div class="stack">
         <div class="card"><div class="ch"><h3>Next live session</h3><a class="link" href="#/learn/cohort">Full schedule</a></div>${sess ? `<ul class="sess-list">${sessionRow(sess)}</ul>` : `<p class="empty">No upcoming sessions.</p>`}</div>
+        ${LS.pod ? `<div class="card"><div class="ch"><h3>Your pod</h3><a class="link" href="#/learn/cohort">See pod</a></div><div class="pod">${LS.pod.members.map((m) => `<span class="pm ${m.me ? "me" : ""}"><span class="pa">${esc(m.initials)}</span></span>`).join("")}</div><p class="note">${esc(LS.pod.name)}${LS.pod.meet ? ` · check-in ${esc(LS.pod.meet)}` : ""}</p></div>` : ""}
         <div class="card"><div class="ch"><h3>Latest announcement</h3><a class="link" href="#/learn/cohort">All</a></div>${ann ? `<div class="ann" style="border:0;padding:0"><b>${esc(ann.title)}</b><p class="note">${lines(ann.body).slice(0, 400)}</p><small class="note">${fmtAt(ann.at)}</small></div>` : `<p class="empty">No announcements yet.</p>`}</div>
       </div></div></section>`);
 }
@@ -1596,11 +1597,11 @@ async function pageLearn(p1, p2, p3) {
   if (!isStudent()) { app.innerHTML = learnCard(`<h1>You're signed in as staff</h1><p>Sign out first to use the student portal.</p><div class="actions"><a class="btn" href="#/portal">Go to the staff portal</a><button class="btn ghost" data-act="signout-learn">Sign out</button></div>`); return; }
   if (!LS) loading();
   try {
-    const [C, L, ex, ct, mod, X, G] = await Promise.all([rpc("student_campus"), rpc("learn_state"), rpc("student_campus_extra").catch(() => ({})), rpc("student_certificate").catch(() => null), COURSE_DATA ? null : import("./course.js"), rpc("learn_extra").catch(() => ({})), rpc("grad_state").catch(() => ({}))]);
+    const [C, L, ex, ct, mod, X, G, POD] = await Promise.all([rpc("student_campus"), rpc("learn_state"), rpc("student_campus_extra").catch(() => ({})), rpc("student_certificate").catch(() => null), COURSE_DATA ? null : import("./course.js"), rpc("learn_extra").catch(() => ({})), rpc("grad_state").catch(() => ({})), rpc("student_pod").catch(() => null)]);
     if (mod) { COURSE_DATA = mod.COURSE; COURSE_STAGES = mod.COURSE.stages; }
     CAMPUS = C; CAMPUS.cert = ct;
     const cert = ct && ct.cert_id ? ct : null; CAMPUS.cert = cert;
-    LS = { C, L, X: X || {}, G: G || {}, W: COURSE_DATA.tracks[L.track] || COURSE_DATA.tracks.DAT, cert, extra: ex || {} };
+    LS = { C, L, X: X || {}, G: G || {}, pod: POD && POD.name ? POD : null, W: COURSE_DATA.tracks[L.track] || COURSE_DATA.tracks.DAT, cert, extra: ex || {} };
   } catch (e) { if (e.status === 401 || /sign in/i.test(e.message)) { await auth.signOut(); LS = null; return pageLearnSignIn("Please sign in again."); } throw e; }
   ui.lsMore = false;
   const wk = p1 === "learning" ? (p2 || "") + "|" + (p3 || "") : null;
@@ -1633,7 +1634,7 @@ async function lsRender(p1, p2, p3) {
     if (LS.W[wi].stage === 6 && !LS.X.booking && !p3 && unlockedW(wi) && !LS.slots) { try { LS.slots = await rpc("dc2_slots"); } catch { LS.slots = []; } }
     lsLearning(wi, p3 || null); }
   else if (page === "assignments") lsAssignmentsPage(p2 || null);
-  else if (["cohort", "sessions", "news"].includes(page)) { if (LS.pod === undefined) LS.pod = await rpc("student_pod").catch(() => null); lsCohortPage(); }
+  else if (["cohort", "sessions", "news"].includes(page)) lsCohortPage();
   else if (page === "profile") lsProfilePage(cert);
   else if (page === "help") lsHelpPage();
   else if (page === "graduate") lsGraduatePage();

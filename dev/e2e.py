@@ -173,7 +173,9 @@ with sync_playwright() as p:
     log.append("checkin: " + sql("select conf||' '||note from learn_checkins"))
     pg.goto(U + "#/learn/assignments"); pg.wait_for_selector(".tbl"); shot("assignments")
     pg.goto(U + "#/learn/assignments/w2-5"); pg.wait_for_selector(".rub"); shot("assignment-detail")
-    pg.goto(U + "#/learn/cohort"); wait_text("Coming up")
+    pid = sql("insert into pods(name, track_code, meet) values ('Data Analysis pod 1', 'DAT', 'Thursdays, 19:00 WAT') returning id").split()[0]
+    sql(f"insert into pod_members select id, {pid} from applications where matric is not null on conflict do nothing")
+    pg.goto(U + "#/learn/cohort"); wait_text("Coming up"); log.append("pod card: " + pg.locator(".pod .pm").first.inner_text().replace("\n", " "))
     with pg.context.expect_page() as newp: pg.click("[data-act=join]")
     np_ = newp.value; np_.wait_for_timeout(500); log.append("join opened: " + np_.url[:40]); np_.close()
     shot("campus-cohort")
