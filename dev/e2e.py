@@ -13,6 +13,7 @@ with sync_playwright() as p:
     pg = ctx.new_page()
     pg.on("pageerror", lambda e: errs.append(str(e)))
     pg.on("console", lambda m: errs.append("console: " + m.text) if m.type == "error" and "fonts" not in m.text and "ERR_" not in m.text else None)
+    pg.on("dialog", lambda d: d.accept())
     def shot(n): pg.wait_for_timeout(250); pg.screenshot(path=f"/var/tmp/shots/{TAG}-{n}.png", full_page=True); ov = pg.evaluate("document.documentElement.scrollWidth - innerWidth"); (ov > 1) and log.append(f"OVERFLOW {n} {ov}")
     def wait_text(t): pg.locator(f":text(\"{t}\"):visible").first.wait_for(timeout=8000)
     # --- staff setup
@@ -147,16 +148,22 @@ with sync_playwright() as p:
     pg.goto(U + "#/learn/learning/1/w1-3"); pg.wait_for_selector("[data-act=ls-done][data-k='w1-3']"); pg.click("[data-act=ls-done][data-k='w1-3']"); pg.wait_for_selector("[data-act=ls-done][data-k='w1-3'][data-v='0']")
     pg.goto(U + "#/learn/learning/1"); pg.wait_for_selector(".celebrate"); shot("week1-done")
     pg.goto(U + "#/learn/learning/2"); pg.wait_for_selector(".gate-card"); shot("week2")
-    for k in ("w2-1", "w2-2", "w2-3"):
-        pg.goto(U + f"#/learn/learning/2/{k}"); pg.wait_for_selector(f"[data-act=ls-done][data-k='{k}'][data-v='1']")
-        if k == "w2-1": shot("item-lesson")
-        pg.click(f"[data-act=ls-done][data-k='{k}']"); pg.wait_for_selector(f"[data-act=ls-done][data-k='{k}'][data-v='0']")
-    pg.goto(U + "#/learn/learning/2/w2-4"); pg.wait_for_selector("#ls-quiz[data-k='w2-4']")
     track = sql(f"select track_code from applications where ref='{ref}'")
-    ans = [int(x) for x in sql(f"select array_to_string(answers, ',') from course_items where track_code='{track}' and key='w2-4'").split(",")]
-    pg.click("#ls-quiz button[type=submit]"); log.append("quiz unanswered: " + pg.inner_text("#quiz-err"))
-    for i, v in enumerate(ans): pg.locator(f'input[name="q{i}"][value="{v if i else (v + 1) % 4}"]').check(force=True)
-    pg.click("#ls-quiz button[type=submit]"); pg.wait_for_selector(".result"); log.append("quiz: " + pg.inner_text(".result")); shot("item-quiz-result")
+    pg.goto(U + "#/learn/learning/2/w2-3"); pg.wait_for_selector("text=Do the steps in order"); log.append("lesson order enforced")
+    def lessons():
+        for k in ("w2-1", "w2-2", "w2-3"):
+            pg.goto(U + f"#/learn/learning/2/{k}"); pg.wait_for_selector(f"[data-act=ls-done][data-k='{k}'][data-v='1']")
+            if k == "w2-1": shot("item-lesson")
+            pg.click(f"[data-act=ls-done][data-k='{k}']"); pg.wait_for_selector(f"[data-act=ls-done][data-k='{k}'][data-v='0']")
+    def take_quiz(wrong):
+        pg.goto(U + "#/learn/learning/2/w2-4"); pg.wait_for_selector("[data-act=ls-qstart]"); shot("quiz-start"); pg.click("[data-act=ls-qstart]"); pg.wait_for_selector("#qt-left")
+        pg.wait_for_timeout(1200); log.append("timer: " + pg.inner_text("#qt-left"))
+        ans = [int(x) for x in sql(f"select array_to_string(array(select b.a from quiz_draws w, unnest(w.qids) with ordinality u(q, n) join quiz_bank b on b.track_code='{track}' and b.key='w2-4' and b.qid=u.q where w.key='w2-4' and w.submitted_at is null order by n), ',')").split(",")]
+        for i, v in enumerate(ans): pg.locator(f'input[name="q{i}"][value="{(v + 1) % 4 if i < wrong else v}"]').check(force=True)
+        shot("quiz-running"); pg.click("#ls-quiz button[type=submit]"); pg.wait_for_selector(".result")
+    lessons(); take_quiz(2); log.append("quiz 1: " + pg.inner_text(".result")); shot("item-quiz-fail")
+    pg.click("[data-act=ls-retry]"); pg.wait_for_timeout(1200); log.append("lessons reset: " + sql("select count(*) from learn_progress where key in ('w2-1','w2-2','w2-3')"))
+    lessons(); take_quiz(0); log.append("retake: " + pg.inner_text(".result")); shot("item-quiz-result")
     pg.goto(U + "#/learn/learning/2/w2-5"); pg.wait_for_selector("#ls-link[data-k='w2-5']")
     pg.fill("#ls-url", "not a link"); pg.click("#ls-link button[type=submit]"); log.append("bad link: " + pg.inner_text("#ls-err"))
     pg.fill("#ls-url", "https://docs.google.com/document/d/123"); pg.click("#ls-link button[type=submit]"); pg.wait_for_selector("text=Waiting for your facilitator"); shot("item-project")
@@ -235,7 +242,8 @@ with sync_playwright() as p:
     pg.goto(U + "#/learn/learning/15"); pg.wait_for_selector(".booker"); pg.locator("[data-act=dc-slot]").first.click(); pg.wait_for_selector("[data-act=dc-book]"); shot("p2-dc-pick")
     pg.fill("#bk-note", "Junior analyst roles in fintech"); pg.click("[data-act=dc-book]"); pg.wait_for_selector(".booked"); shot("p2-dc-booked")
     pg.goto(U + "#/learn/learning/16"); pg.wait_for_selector("#out-form")
-    pg.fill("#pt-a", "I'm a data analyst who loves clean spreadsheets."); pg.fill("#o-name", "Head of Data"); pg.fill("#o-co", "Paystack"); pg.click("#out-form button"); pg.wait_for_selector(".roles"); pg.wait_for_timeout(1000)
+    pg.fill("#pt-a", "I'm a data analyst who loves clean spreadsheets."); pg.fill("#pt-link", "https://loom.com/share/pitch"); pg.click(".ls-tool-link button"); pg.wait_for_selector("text=Update link")
+    pg.fill("#o-name", "Head of Data"); pg.fill("#o-co", "Paystack"); pg.click("#out-form button"); pg.wait_for_selector(".roles"); pg.wait_for_timeout(1000)
     sql("update learn_drafts set data = data || (select jsonb_agg(jsonb_build_object('name','HR','co','Co '||g,'ch','Email','st','Sent','on','Mon')) from generate_series(1,9) g) where key='outreach'")
     pg.reload(); pg.wait_for_selector("#out-form"); ok = sql(f"select key from course_items where track_code='{track}' and title='Send 10 cold outreach messages'")
     pg.click(f"[data-act=ls-done][data-k='{ok}']"); pg.wait_for_selector(f"[data-act=ls-done][data-k='{ok}'][data-v='0']"); shot("p2-job16")

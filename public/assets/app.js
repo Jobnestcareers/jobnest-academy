@@ -1,6 +1,7 @@
 // Jobnest Academy web app: public Academy site, applicant journey, staff portals.
 import { rpc, auth } from "./api.js";
 import { NG } from "./ng.js";
+import { COUNTRIES, flag } from "./countries.js";
 
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -109,7 +110,7 @@ function pubHeader(kind = "academy") {
     <nav class="pub-nav ac-nav" aria-label="Jobnest Academy">${links}</nav>
     <details class="ac-mnav"><summary aria-label="Open menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>Menu</summary><nav class="ac-mlist">${links}</nav></details></div></header>`;
 }
-const pubFoot = () => `<footer class="wrap lp-foot"><a class="link" href="#/check">Continue an application</a><a class="link" href="#/staff">Staff sign-in</a><span class="note">© ${new Date().getFullYear()} Jobnest Services</span></footer>`;
+const pubFoot = () => `<footer class="wrap lp-foot"><a class="link" href="#/check">Continue an application</a><a class="link" href="#/verify">Verify a certificate</a><a class="link" href="#/staff">Staff sign-in</a><span class="note">© ${new Date().getFullYear()} Jobnest Services</span></footer>`;
 
 const TEAM = [["Admissions", "Guides you from application to your first day."], ["Programme Director", "Leads the programme and its standards."],
   ["Cohort Manager", "Keeps you on track, week by week."], ["Facilitators", "Teach your track and mark your work."], ["Career Coach", "CV, LinkedIn and your job search."]];
@@ -183,7 +184,7 @@ function pageHome() {
       <div>${p.fee ? `<details id="faq-cost" open><summary>How much does it cost?</summary><p>${naira(p.fee)} in full, or 2 payments of ${naira(part1Of(p))}. You only pay after you're offered a place. Need help with fees? Email <a href="mailto:info@jobnestcareers.com">info@jobnestcareers.com</a> and tell us your situation.</p></details>` : ""}${FAQ.map(([q, a], i) => `<details ${i || p.fee ? "" : "open"}><summary>${q}</summary><p>${a}</p></details>`).join("")}</div></section>
     ${open ? `<section class="nl-band"><div class="wrap"><div><h2 class="nl-h2">Ready to become work-ready?</h2><p>Applying takes 5 minutes.</p></div><a class="btn gold lg" href="#/apply">Apply now →</a></div></section>` : ""}
     <footer class="nl-foot"><div class="wrap"><span>© ${new Date().getFullYear()} Jobnest Services</span>
-      <nav aria-label="Footer"><a href="#/check">Continue an application</a><a href="#/learn/signin">Student sign-in</a><a href="#/staff">Staff sign-in</a><a href="${esc(INFO.website_url || "https://jobnestcareers.com")}">Jobnest.com ↗</a></nav></div></footer>`;
+      <nav aria-label="Footer"><a href="#/check">Continue an application</a><a href="#/learn/signin">Student sign-in</a><a href="#/verify">Verify a certificate</a><a href="#/staff">Staff sign-in</a><a href="${esc(INFO.website_url || "https://jobnestcareers.com")}">Jobnest.com ↗</a></nav></div></footer>`;
   fitCert();
 }
 
@@ -202,11 +203,14 @@ function pageApply() {
     <p class="note">You don't pick a track here. You'll agree it together on your Discovery Call.</p>
     ${!zuri && INFO.zuri_url ? `<p class="zuri-hint">Not sure what you want to do yet? <a href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Chat with Zuri first ↗</a> She'll fill this form in for you at the end.</p>` : ""}
     <h3>About you</h3>
-    <div class="grid2"><div class="field"><label for="g-first">First name</label><input id="g-first" autocomplete="given-name" maxlength="80"></div><div class="field"><label for="g-sur">Surname</label><input id="g-sur" autocomplete="family-name" maxlength="80"></div></div>
-    <div class="grid2"><div class="field"><label for="g-email">Email</label><input id="g-email" type="email" autocomplete="email"></div><div class="field"><label for="g-phone">WhatsApp number</label><input id="g-phone" inputmode="tel" autocomplete="tel" placeholder="0803 000 0000"></div></div>
-    <div class="grid2"><div class="field"><label for="g-state">State</label>${select("g-state", Object.keys(NG))}</div>
+    <div class="grid2"><div class="field"><label for="g-first">First name</label><input id="g-first" autocomplete="given-name" maxlength="80" placeholder="e.g. Ada" autocapitalize="words"></div><div class="field"><label for="g-sur">Surname</label><input id="g-sur" autocomplete="family-name" maxlength="80" placeholder="e.g. Obi" autocapitalize="words"></div></div>
+    <div class="field"><label for="g-email">Email</label><input id="g-email" type="email" autocomplete="email" placeholder="e.g. ada.obi@gmail.com"></div>
+    <div class="field"><label for="g-phone">WhatsApp number</label><div class="phone-in"><label class="sr-only" for="g-cc">Country code</label><select id="g-cc" autocomplete="tel-country-code">${ccOptions()}</select><input id="g-phone" type="tel" inputmode="tel" autocomplete="tel-national" placeholder="803 000 0000"></div><span class="note">Pick the country code, then your number. We'll message you on WhatsApp.</span></div>
+    <div class="field"><label for="g-country">Country you live in</label><select id="g-country" autocomplete="country">${countryOptions("NG")}</select></div>
+    <div class="grid2" id="g-ng"><div class="field"><label for="g-state">State</label>${select("g-state", Object.keys(NG))}</div>
     <div class="field"><label for="g-town">City or town</label><select id="g-town" disabled><option value="">Choose your state first</option></select>
       <input id="g-town-o" placeholder="Type your city or town" maxlength="80" hidden style="margin-top:.5rem"></div></div>
+    <div class="field" id="g-abroad" hidden><label for="g-city">City or town</label><input id="g-city" maxlength="80" placeholder="e.g. Accra"></div>
     <h3>Your background</h3>
     <div class="grid2"><div class="field"><label for="g-edu">Highest education</label>${select("g-edu", ["OND / NCE", "HND", "B.Sc / B.A.", "Master's", "Other"])}</div>
     <div class="field"><label for="g-nysc">NYSC status</label>${select("g-nysc", ["Completed", "Currently serving", "Exempted", "Not yet"])}</div></div>
@@ -215,40 +219,61 @@ function pageApply() {
     <div class="field"><span class="lbl">Can you commit at least 15 hours a week for ${prog().weeks || 17} weeks?</span>${radios("g-hours", ["Yes", "Not sure", "No"])}</div>
     <div class="grid2"><div class="field"><span class="lbl">Do you have a laptop?</span>${radios("g-laptop", ["Yes", "No"])}</div>
     <div class="field"><span class="lbl">Reliable internet?</span>${radios("g-net", ["Yes", "Sometimes", "No"])}</div></div>
-    <div class="field"><label for="g-mot">What would you like to be doing in 6 months? <span class="note" style="font-weight:400">A sentence or two. “Not sure yet” is a fine answer.</span></label><textarea id="g-mot" rows="3" maxlength="2000">${esc(zGoal)}</textarea></div>
-    <div class="field"><label for="g-zuri">Your Zuri summary <span class="note" style="font-weight:400" id="g-zuri-note">${zuri ? "Filled in from your chat with Zuri. You can edit it." : "Optional. If you chatted with Zuri, paste the summary here."}</span></label><textarea id="g-zuri" rows="${zuri ? 7 : 3}" maxlength="4000">${esc(zuri)}</textarea></div>
+    <div class="field"><label for="g-mot">What would you like to be doing in 6 months? <span class="note" style="font-weight:400">A sentence or two. “Not sure yet” is a fine answer.</span></label><textarea id="g-mot" placeholder="e.g. Working as a junior data analyst in a fintech company" rows="3" maxlength="2000">${esc(zGoal)}</textarea></div>
+    <div class="field"><label for="g-zuri">Your Zuri summary <span class="note" style="font-weight:400" id="g-zuri-note">${zuri ? "Filled in from your chat with Zuri. You can edit it." : "Optional. If you chatted with Zuri, paste the summary here."}</span></label><textarea id="g-zuri" placeholder="Paste your Zuri summary here" rows="${zuri ? 7 : 3}" maxlength="4000">${esc(zuri)}</textarea></div>
     <label class="consent"><input type="checkbox" id="g-consent"> <span>I agree that Jobnest Academy may use these details to process my application, as set out in the <a href="${esc(INFO.website_url || "https://jobnestcareers.com")}/#privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
     <p class="err" id="g-err" role="alert"></p>
     <div class="actions"><button class="btn gold" type="submit">Submit application</button><span class="note">Next: a ${INFO.cohort?.assess_minutes || 5}-minute readiness assessment.</span></div>
   </form></section>`;
 }
 
+const TOP_C = ["NG", "GH", "GB", "US", "CA", "KE", "ZA"];
+function countryOptions(sel) {
+  const o = (x) => `<option value="${x.c}" ${x.c === sel ? "selected" : ""}>${flag(x.c)} ${esc(x.n)}</option>`;
+  return COUNTRIES.filter((x) => TOP_C.includes(x.c)).sort((a, b) => TOP_C.indexOf(a.c) - TOP_C.indexOf(b.c)).map(o).join("") + `<option disabled>──────────</option>` + COUNTRIES.map(o).join("");
+}
+function ccOptions() {
+  const o = (x, sel) => `<option value="${x.p}" data-c="${x.c}" ${sel ? "selected" : ""}>${flag(x.c)} +${x.p} ${esc(x.n)}</option>`;
+  return COUNTRIES.filter((x) => TOP_C.includes(x.c)).sort((a, b) => TOP_C.indexOf(a.c) - TOP_C.indexOf(b.c)).map((x) => o(x, x.c === "NG")).join("") + `<option disabled>──────────</option>` + COUNTRIES.map((x) => o(x, false)).join("");
+}
+const countryName = (c) => (COUNTRIES.find((x) => x.c === c) || {}).n || c;
 function cityValue() {
+  const cn = $("#g-country")?.value || "NG";
+  if (cn !== "NG") { const c = ($("#g-city")?.value || "").trim(); return c ? `${c}, ${countryName(cn)}` : ""; }
   const st = $("#g-state")?.value || "", t = $("#g-town")?.value || "", o = ($("#g-town-o")?.value || "").trim();
   if (!st) return "";
-  if (st === "Outside Nigeria") return o ? `${o} (outside Nigeria)` : "";
   const town = t === "Other" ? o : t;
   return town ? `${town}, ${st}` : "";
+}
+function phoneValue() {
+  const cc = $("#g-cc")?.value || "234", n = ($("#g-phone")?.value || "").replace(/\D/g, "").replace(/^0+/, "");
+  return n ? `+${cc}${n}` : "";
 }
 function fillTowns() {
   const st = $("#g-state").value, sel = $("#g-town"), other = $("#g-town-o");
   const list = NG[st] || [];
-  if (st === "Outside Nigeria") { sel.hidden = true; sel.innerHTML = ""; other.hidden = false; other.placeholder = "City and country"; return; }
-  sel.hidden = false; sel.disabled = !st; other.hidden = true; other.value = ""; other.placeholder = "Type your city or town";
+  sel.hidden = false; sel.disabled = !st; other.hidden = true; other.value = "";
   sel.innerHTML = st ? `<option value="">Choose one</option>${list.map((c) => `<option>${esc(c)}</option>`).join("")}<option value="Other">Other (type it)</option>` : `<option value="">Choose your state first</option>`;
 }
+function setCountry() {
+  const cn = $("#g-country").value, ng = cn === "NG";
+  $("#g-ng").hidden = !ng; $("#g-abroad").hidden = ng;
+  const cc = $("#g-cc"); if (cc && !cc.dataset.touched) { const opt = [...cc.options].find((o) => o.dataset.c === cn); if (opt) cc.value = opt.value, opt.selected = true; }
+}
+const nameCase = (v) => { v = v.trim().replace(/\s+/g, " "); return v === v.toLowerCase() || v === v.toUpperCase() ? v.toLowerCase().replace(/(^|[\s'’-])(\p{L})/gu, (m, a, b) => a + b.toUpperCase()) : v.charAt(0).toUpperCase() + v.slice(1); };
 
 async function submitApply(form) {
   const v = (id) => ($("#" + id)?.value || "").trim();
   const r = (n) => $(`input[name="${n}"]:checked`)?.value || "";
-  const d = { first_name: v("g-first"), surname: v("g-sur"), email: v("g-email"), phone: v("g-phone"), city: cityValue(), edu: v("g-edu"), nysc: v("g-nysc"),
+  const d = { first_name: nameCase(v("g-first")), surname: nameCase(v("g-sur")), email: v("g-email"), phone: phoneValue(), city: cityValue(), edu: v("g-edu"), nysc: v("g-nysc"),
     situation: v("g-sit"), hours: r("g-hours"), laptop: r("g-laptop"), internet: r("g-net"), motivation: v("g-mot"), zuri_summary: v("g-zuri") };
-  const miss = [["first_name", "first name"], ["surname", "surname"], ["email", "email"], ["phone", "WhatsApp number"], ["city", "state and city"], ["edu", "education"], ["nysc", "NYSC status"],
+  const miss = [["first_name", "first name"], ["surname", "surname"], ["email", "email"], ["phone", "WhatsApp number"], ["city", "where you live"], ["edu", "education"], ["nysc", "NYSC status"],
     ["situation", "current situation"], ["hours", "weekly hours"], ["laptop", "laptop"], ["internet", "internet"], ["motivation", "6-month answer"]].filter(([k]) => !d[k]).map(([, l]) => l);
   const err = $("#g-err");
   if (miss.length) { err.textContent = "Please complete: " + miss.join(", ") + "."; return; }
   if (!/^\S+@\S+\.\S+$/.test(d.email)) { err.textContent = "Add a valid email address, e.g. name@gmail.com."; return; }
-  if (d.phone.replace(/\D/g, "").length < 10) { err.textContent = "Add your WhatsApp number, e.g. 0803 000 0000."; return; }
+  const pn = ($("#g-phone").value || "").replace(/\D/g, "").replace(/^0+/, "");
+  if (pn.length < 6 || pn.length > 14 || ($("#g-cc").value === "234" && pn.length !== 10)) { err.textContent = $("#g-cc").value === "234" ? "Add your WhatsApp number, e.g. 803 000 0000 (10 digits after +234)." : "Add your full WhatsApp number after the country code."; return; }
   if (!$("#g-consent").checked) { err.textContent = "Please tick the box to agree to how we use your details."; return; }
   err.textContent = "";
   try {
@@ -266,7 +291,7 @@ function pageCheck() {
     ${mine ? `<div class="notice">You applied on this device. <a class="link" href="#/a/${esc(mine.ref)}/${esc(mine.token)}">Continue application ${esc(mine.ref)} →</a></div>` : ""}
     <p>Enter your application number and the surname you applied with. Your application number is in every email we've sent you.</p>
     <form id="find-form" class="form" novalidate><div class="grid2"><div class="field"><label for="f-ref">Application number</label><input id="f-ref" placeholder="APP-1A2B3C" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase"></div>
-      <div class="field"><label for="f-sur">Surname</label><input id="f-sur" autocomplete="family-name"></div></div><p class="err" id="f-err" role="alert"></p><div><button class="btn gold" type="submit">Continue</button></div></form>
+      <div class="field"><label for="f-sur">Surname</label><input id="f-sur" placeholder="e.g. Obi" autocomplete="family-name"></div></div><p class="err" id="f-err" role="alert"></p><div><button class="btn gold" type="submit">Continue</button></div></form>
     <p class="note" style="margin-top:1rem">New here? <a class="link" href="#/apply">Start an application</a></p></div></section>` + pubFoot();
 }
 
@@ -476,29 +501,29 @@ function staffCard(inner) {
 }
 function pageStaffSignIn(msg) {
   app.innerHTML = staffCard(`<span class="eyebrow">Staff</span><h1>Sign in</h1>${msg ? `<div class="notice">${msg}</div>` : ""}
-    <form id="signin-form" class="form" novalidate><div class="field"><label for="s-email">Work email</label><input id="s-email" type="email" autocomplete="username"></div>
-    <div class="field"><label for="s-pass">Password</label><input id="s-pass" type="password" autocomplete="current-password"></div>
+    <form id="signin-form" class="form" novalidate><div class="field"><label for="s-email">Work email</label><input id="s-email" placeholder="you@jobnestcareers.com" type="email" autocomplete="username"></div>
+    <div class="field"><label for="s-pass">Password</label><input id="s-pass" placeholder="Your password" type="password" autocomplete="current-password"></div>
     <p class="err" id="s-err" role="alert"></p><div><button class="btn" type="submit">Sign in</button></div></form>
     <p class="note" style="margin-top:1rem"><a class="link" href="#/staff/reset">Forgot your password?</a> · <a class="link" href="#/staff/signup">First time? Set up your account</a></p>`);
 }
 function pageStaffSignup() {
   app.innerHTML = staffCard(`<span class="eyebrow">Staff</span><h1>Set up your staff account</h1><p class="note">Use the email the Super Admin added for you.</p>
-    <form id="signup-form" class="form" novalidate><div class="field"><label for="u-email">Work email</label><input id="u-email" type="email" autocomplete="username"></div>
-    <div class="field"><label for="u-pass">Choose a password</label><input id="u-pass" type="password" autocomplete="new-password"><span class="note">At least 8 characters, including a number.</span></div>
-    <div class="field"><label for="u-pass2">Confirm password</label><input id="u-pass2" type="password" autocomplete="new-password"></div>
+    <form id="signup-form" class="form" novalidate><div class="field"><label for="u-email">Work email</label><input id="u-email" placeholder="you@jobnestcareers.com" type="email" autocomplete="username"></div>
+    <div class="field"><label for="u-pass">Choose a password</label><input id="u-pass" placeholder="At least 8 characters" type="password" autocomplete="new-password"><span class="note">At least 8 characters, including a number.</span></div>
+    <div class="field"><label for="u-pass2">Confirm password</label><input id="u-pass2" placeholder="Type it again" type="password" autocomplete="new-password"></div>
     <p class="err" id="u-err" role="alert"></p><div><button class="btn" type="submit">Create account</button></div></form>
     <p class="note" style="margin-top:1rem"><a class="link" href="#/staff">Back to sign in</a></p>`);
 }
 function pageStaffReset() {
   app.innerHTML = staffCard(`<span class="eyebrow">Staff</span><h1>Reset your password</h1><p class="note">We'll email you a link to choose a new password.</p>
-    <form id="reset-form" class="form" novalidate><div class="field"><label for="r-email">Work email</label><input id="r-email" type="email" autocomplete="username"></div>
+    <form id="reset-form" class="form" novalidate><div class="field"><label for="r-email">Work email</label><input id="r-email" placeholder="you@jobnestcareers.com" type="email" autocomplete="username"></div>
     <p class="err" id="r-err" role="alert"></p><div><button class="btn" type="submit">Email me a reset link</button></div></form>
     <p class="note" style="margin-top:1rem"><a class="link" href="#/staff">Back to sign in</a></p>`);
 }
 function pageNewPassword() {
   app.innerHTML = staffCard(`<span class="eyebrow">Staff</span><h1>Choose a new password</h1>
-    <form id="newpw-form" class="form" novalidate><div class="field"><label for="n-pass">New password</label><input id="n-pass" type="password" autocomplete="new-password"><span class="note">At least 8 characters, including a number.</span></div>
-    <div class="field"><label for="n-pass2">Confirm new password</label><input id="n-pass2" type="password" autocomplete="new-password"></div>
+    <form id="newpw-form" class="form" novalidate><div class="field"><label for="n-pass">New password</label><input id="n-pass" placeholder="At least 8 characters" type="password" autocomplete="new-password"><span class="note">At least 8 characters, including a number.</span></div>
+    <div class="field"><label for="n-pass2">Confirm new password</label><input id="n-pass2" placeholder="Type it again" type="password" autocomplete="new-password"></div>
     <p class="err" id="n-err" role="alert"></p><div><button class="btn" type="submit">Save password</button></div></form>`);
 }
 const pwOk = (a, b, err) => {
@@ -518,6 +543,7 @@ function staffNav(role) {
   if (["director", "cohort_manager", "facilitator", "super"].includes(role)) ac.push({ k: "grading", l: "Grading" });
   if (["director", "cohort_manager", "academy_admin", "coach", "facilitator", "super"].includes(role)) ac.push({ k: "intern", l: "Internships" });
   if (["director", "cohort_manager", "coach", "super"].includes(role)) ac.push({ k: "dc2", l: "Discovery Call 2" });
+  if (["director", "cohort_manager", "academy_admin", "facilitator", "coach", "super"].includes(role)) ac.push({ k: "pods", l: "Pods" });
   if (["director", "cohort_manager", "academy_admin", "coach", "super"].includes(role)) ac.push({ k: "jobs", l: "Job search" });
   if (["director", "cohort_manager", "academy_admin", "coach", "super"].includes(role)) ac.push({ k: "outcomes", l: "Outcomes" });
   ac.push({ k: "sessions", l: "Live sessions" }, { k: "news", l: "Announcements" });
@@ -525,6 +551,14 @@ function staffNav(role) {
   if (role === "adm_admin") return [...adm, { g: "Academy" }, { k: "students", l: "Students" }];
   if (role === "adm_officer") return adm;
   return ac;
+}
+// Number badges in the staff menu: how many things are waiting in each section.
+const BADGE_HELP = { grading: "to grade or reply", intern: "students without a placement", dc2: "calls without a result", decide: "to decide", calls: "calls to complete", pods: "students not in a pod" };
+function paintBadges() {
+  const c = ui.counts || {}; let total = 0;
+  $$(".snav-i[href^='#/portal/']").forEach((a) => { const k = a.getAttribute("href").split("/").pop(), n = +c[k] || 0; a.querySelector(".cnt-b")?.remove();
+    if (n > 0) { total += n; a.insertAdjacentHTML("beforeend", `<b class="cnt-b mono" title="${n} ${BADGE_HELP[k] || "waiting"}">${n}</b>`); } });
+  $$(".snav-m summary").forEach((sm) => { sm.querySelector(".cnt-b")?.remove(); if (total) sm.insertAdjacentHTML("beforeend", `<b class="cnt-b mono">${total}</b>`); });
 }
 function shell(tab, title, sub, body) {
   const items = staffNav(ME.role);
@@ -538,6 +572,7 @@ function shell(tab, title, sub, body) {
     <main class="shell-main"><details class="snav-m"><summary><span>Menu</span><b>${cur ? cur.l : ""}</b></summary><nav class="snav-m-list">${nav}</nav></details>
     <div class="wrap greet"><div><p class="eyebrow">${brand} · ${ROLE_NAMES[ME.role]}</p><h1 style="margin-top:.5rem">${title}</h1>${sub ? `<p class="note" style="font-size:.95rem;margin-top:.4rem;max-width:62ch">${sub}</p>` : ""}</div></div>
     <section class="wrap pagebody">${body}</section></main></div>`;
+  paintBadges();
 }
 
 async function pagePortal(tab) {
@@ -551,9 +586,11 @@ async function pagePortal(tab) {
   }
   const items = staffNav(ME.role).filter((x) => x.k);
   if (!items.some((x) => x.k === tab)) tab = items[0].k;
-  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, intern: tabIntern, dc2: tabDc2, jobs: tabJobs, outcomes: tabOutcomes, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
+  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, intern: tabIntern, dc2: tabDc2, jobs: tabJobs, pods: tabPods, outcomes: tabOutcomes, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
+  const counts = rpc("staff_counts").catch(() => ({}));
   try { await pages[tab](); }
   catch (e) { shell(tab, "Something went wrong", "", `<div class="notice">${esc(e.message)}</div>`); }
+  ui.counts = await counts; paintBadges();
 }
 
 function tabSoon() {
@@ -584,7 +621,7 @@ const decideButtons = (a) => `<div class="actions">${a.rec && a.status === "Unde
 
 function callForm(a, tracks) {
   const id = a.id;
-  return `<form class="form call-form" data-k="${id}" novalidate><div class="field"><label for="dn-${id}">Call notes</label><textarea id="dn-${id}" rows="2"></textarea></div>
+  return `<form class="form call-form" data-k="${id}" novalidate><div class="field"><label for="dn-${id}">Call notes</label><textarea id="dn-${id}" placeholder="What you discussed and agreed" rows="2"></textarea></div>
     <div class="field"><label for="dt-${id}">Agreed track (required)</label><select id="dt-${id}" data-act-change="track" data-k="${id}"><option value="">Choose the track you agreed</option>${tracks.filter((t) => !t.paused).map((t) => `<option value="${t.code}">${esc(t.name)}</option>`).join("")}<option value="NONE">No available track for this person</option></select></div>
     <div class="field" id="wi-${id}" hidden><label for="wt-${id}">What are they interested in?</label><select id="wt-${id}" data-act-change="interest" data-k="${id}"><option value="">Choose one</option>${INTERESTS.map((o) => `<option>${o}</option>`).join("")}<option value="Other">Other (type it)</option></select><input id="wo-${id}" placeholder="e.g. Nursing" hidden style="margin-top:.4rem"><span class="note">This closes the application and tells them kindly why.</span></div>
     <div class="field" id="ri-${id}"><span class="lbl">Your recommendation to the Admissions Admin</span><div class="rate">${Object.entries(REC_L).map(([v, l]) => `<label><input type="radio" name="rec-${id}" value="${v}"><span>${l}</span></label>`).join("")}</div><input class="rw" id="rw-${id}" placeholder="One line on why, e.g. Clear goal, strong assessment" style="margin-top:.4rem"></div>
@@ -750,8 +787,8 @@ async function tabStaff() {
   const opts = Object.entries(ROLE_NAMES).map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
   shell("staff", "Staff accounts", "Add someone here, then they create their password from “First time? Set up your account” on the staff sign-in page.",
     `<div class="grid2"><form class="card form" id="staff-form" novalidate><h3>Add or change a staff member</h3>
-      <div class="field"><label for="sf-email">Work email</label><input id="sf-email" type="email"></div>
-      <div class="field"><label for="sf-name">Full name</label><input id="sf-name"></div>
+      <div class="field"><label for="sf-email">Work email</label><input id="sf-email" placeholder="e.g. kemi@jobnestcareers.com" type="email"></div>
+      <div class="field"><label for="sf-name">Full name</label><input id="sf-name" placeholder="e.g. Kemi Adeyemi"></div>
       <div class="field"><label for="sf-role">Role</label><select id="sf-role">${opts}</select></div>
       <div class="field"><label for="sf-track">Track (facilitators)</label><select id="sf-track"><option value="">All tracks</option>${(INFO?.tracks || []).map((t) => `<option value="${t.code}">${esc(t.name)}</option>`).join("")}</select><span class="note">A facilitator with a track only sees and marks that track.</span></div>
       <label class="consent"><input type="checkbox" id="sf-active" checked> Active (can sign in)</label>
@@ -785,8 +822,8 @@ function pageAccount(a, base) {
     <p>Hi ${esc(a.first_name)}. You'll sign in with your matric number and the password you choose here.</p>
     <form id="account-form" class="form" data-ref="${esc(a.ref)}" data-token="${esc(tok)}" data-matric="${esc(a.matric)}" novalidate>
       <div class="field"><label for="ac-m">Matric number</label><input id="ac-m" value="${esc(a.matric)}" readonly autocomplete="username"></div>
-      <div class="field"><label for="ac-p">Password</label><input id="ac-p" type="password" autocomplete="new-password"><span class="note">At least 8 characters, including a number.</span></div>
-      <div class="field"><label for="ac-p2">Confirm password</label><input id="ac-p2" type="password" autocomplete="new-password"></div>
+      <div class="field"><label for="ac-p">Password</label><input id="ac-p" placeholder="At least 8 characters" type="password" autocomplete="new-password"><span class="note">At least 8 characters, including a number.</span></div>
+      <div class="field"><label for="ac-p2">Confirm password</label><input id="ac-p2" placeholder="Type it again" type="password" autocomplete="new-password"></div>
       <p class="err" id="ac-err" role="alert"></p><div><button class="btn gold" type="submit">Save and open the portal</button></div></form>
     <p class="note"><a class="link" href="${base}">← Back to your application</a></p></div></section>`;
 }
@@ -795,7 +832,7 @@ const learnCard = (h) => pubHeader("admissions").replace("Jobnest Admissions", "
 function pageLearnSignIn(msg = "") {
   app.innerHTML = learnCard(`<span class="eyebrow">Student portal</span><h1>Sign in</h1>${msg ? `<div class="notice">${msg}</div>` : ""}
     <form id="lsignin-form" class="form" novalidate><div class="field"><label for="ls-m">Matric number</label><input id="ls-m" placeholder="GEP/27A/001" autocomplete="username" autocapitalize="characters"></div>
-    <div class="field"><label for="ls-p">Password</label><input id="ls-p" type="password" autocomplete="current-password"></div>
+    <div class="field"><label for="ls-p">Password</label><input id="ls-p" placeholder="Your password" type="password" autocomplete="current-password"></div>
     <p class="err" id="ls-err" role="alert"></p><div><button class="btn" type="submit">Sign in</button></div></form>
     <div class="notice"><span><b>First time here, or forgot your password?</b> We'll email you a link to set it.</span><a class="btn sm ghost" href="#/learn/forgot">Get a link</a></div>
     <p class="note">Your matric number is in your admission email, and looks like GEP/27A/001.</p>`);
@@ -933,7 +970,7 @@ function dueLabel(d) { const days = Math.ceil((d - Date.now()) / DAY); return da
 const greeting = () => { const h = Number(fmt(new Date(), { hour: "numeric", hour12: false })); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
 function itemSub(it) {
   const r = row(it);
-  return it.type === "lesson" ? `${LKIND.lesson}${it.mins ? ` · ${it.mins} min` : ""}` : it.type === "quiz" ? `${LKIND.quiz} · ${(it.qs || []).length} questions · counts toward your week result`
+  return it.type === "lesson" ? `${LKIND.lesson}${it.mins ? ` · ${it.mins} min` : ""}` : it.type === "quiz" ? `${LKIND.quiz} · ${QUIZ_N} questions · ${QUIZ_MIN} min`
     : it.type === "logweek" ? `${LKIND.logweek} · ${r ? "submitted" : "fill at the end of the week"}` : it.type === "oath" ? (r ? "Signed" : "Required to unlock Week 2 · about 3 min")
     : it.type === "guide" ? "Platform guide · about 4 min" : STAFF_STEPS.includes(it.title) ? "Completed by staff" : LKIND.task + (it.link ? " · submit a link" : "");
 }
@@ -1040,10 +1077,10 @@ function gateCard(wi) {
   const msg = { open: `Complete ${g.hasQuiz && g.pi >= 0 ? "the assessment and the week project" : g.pi >= 0 ? "the week project" : "the assessment"}. You need ${g.hasQuiz && g.pi >= 0 ? "an average of " : ""}<b>${PASS()}% or more</b> to move on. Below ${PASS()}%, you repeat this week.`,
     grading: `Your week project is with your facilitator. The next week unlocks once it's graded and your ${g.hasQuiz ? "average" : "grade"} is ${PASS()}% or more.`,
     revise: "Your facilitator asked for changes to your week project. Make them and resubmit.", pass: "Passed. Well done!",
-    fail: `You need ${PASS()}% to move on. Repeat this week to try again: the lessons, assessment and project reset.` }[g.state];
+    fail: g.qi >= 0 && g.q < PASS() && (row(LS.W[wi].items[g.qi])?.data?.attempt || 1) < 2 ? `Your assessment is below ${PASS()}%. Redo this week's lessons, then retake the assessment once: open the assessment to start.` : `You need ${PASS()}% to move on. Repeat this week to try again: the lessons, assessment and project reset.` }[g.state];
   return `<div class="gate-card ${g.state}"><div class="gc-h"><div><span class="eyebrow">Week result${g.attempt > 1 ? ` · attempt ${g.attempt}` : ""}</span><b>${g.state === "pass" ? "Week passed" : g.state === "fail" ? "Week not passed" : g.state === "grading" ? "Waiting for your grade" : g.state === "revise" ? "Revision requested" : "Pass mark: " + PASS() + "%"}</b></div>
     <div class="gc-tiles">${g.hasQuiz ? tile("Assessment", g.q != null ? g.q + "%" : "—", "quiz") : ""}${g.pi >= 0 ? tile("Week project", pLabel, "graded by facilitator") : ""}${tile(g.hasQuiz && g.pi >= 0 ? "Average" : "Result", g.avg != null ? g.avg + "%" : "—", "need " + PASS() + "%")}</div></div>
-    <p>${msg}</p>${g.state === "fail" ? `<div><button class="btn" data-act="ls-repeat" data-k="${wi + 1}">Repeat Week ${wi + 1}</button></div>` : ""}</div>`;
+    <p>${msg}</p>${g.state === "fail" ? (g.qi >= 0 && g.q < PASS() && (row(LS.W[wi].items[g.qi])?.data?.attempt || 1) < 2 ? `<div><a class="btn" href="#/learn/learning/${wi + 1}/${LS.W[wi].items[g.qi].key}">Go to the assessment</a></div>` : `<div><button class="btn" data-act="ls-repeat" data-k="${wi + 1}">Repeat Week ${wi + 1}</button></div>`) : ""}</div>`;
 }
 function weekPill(wi, un) {
   if (!un) return `<span class="pill">Locked</span>`; const g = weekGate(wi), p = weekProgress(wi);
@@ -1053,6 +1090,8 @@ function weekPill(wi, un) {
 function itemRow(wi, it, un) {
   const dn = isDoneIt(it), sc = itemScoreIt(it), r = row(it);
   if (!un) return `<div class="item locked"><span class="ic">${LICON.lock}</span><div><b>${esc(it.title)}</b><small>${itemSub(it)}</small></div>${it.opt ? `<span class="req opt">Optional</span>` : ""}</div>`;
+  const blk = !dn && !r ? seqBlock(wi, it) : null;
+  if (blk) return `<a class="item seq-locked" href="#/learn/learning/${wi + 1}/${it.key}"><span class="ic">${LICON.lock}</span><div><b>${esc(it.title)}</b><small>Opens after “${esc(blk.title)}”</small></div>${it.opt ? `<span class="req opt">Optional</span>` : ""}</a>`;
   const pill = r?.status === "revise" ? `<span class="pill bad">Revise</span>` : r?.status === "submitted" ? `<span class="pill info">Grading</span>` : it.type === "logweek" && r ? (r.data?.signed ? `<span class="pill ok">Signed</span>` : `<span class="pill info">To sign</span>`) : dn ? `<span class="pill ok">${sc != null ? sc + "%" : "Done"}</span>` : `<span class="pill">Start</span>`;
   return `<a class="item ${dn ? "done" : ""}" href="#/learn/learning/${wi + 1}/${it.key}"><span class="ic">${dn ? LICON.done : LICON[it.type] || LICON.task}</span><div><b>${esc(it.title)}</b><small>${itemSub(it)}</small></div><span class="item-r">${it.opt ? `<span class="req opt">Optional</span>` : ""}${pill}</span></a>`;
 }
@@ -1114,12 +1153,61 @@ function lessonBody(it) {
     <div class="try-box"><span class="eyebrow">Try it now · 10 minutes</span><p>Pick one point above and apply it to something you're working on today. Write two or three sentences in your notes about what you did and what changed.</p></div>
     <h3>Key takeaways</h3><ul>${pts.map((p) => `<li>${esc(p)}</li>`).join("")}</ul></div>`;
 }
+function seqBlock(wi, it) {
+  const L = LS.W[wi].items, i = L.indexOf(it);
+  const b = L.slice(0, i).find((x) => !x.opt && !isDoneIt(x));
+  return b || null;
+}
+const QUIZ_MIN = 10, QUIZ_N = 5;
+function quizReview(d) {
+  return (d.review || []).map((q, qi) => `<fieldset class="q"><legend>${qi + 1}. ${esc(q.q)}</legend>${q.o.map((o, oi) => `<label class="opt ${oi === q.a ? "right" : oi === q.ans ? "wrong" : ""}"><input type="radio" disabled ${oi === q.ans ? "checked" : ""}> ${esc(o)}</label>`).join("")}${q.ans == null ? `<p class="note">Not answered</p>` : ""}</fieldset>`).join("");
+}
+function quizBody(wi, it, r) {
+  const d = r?.data || {}, retake = !!d.retake, att = d.attempt || 1, gate = LS.W[wi].stage >= 1;
+  const Q = ui.quiz && ui.quiz.key === it.key ? ui.quiz : null;
+  if (Q) return `<div class="qtimer" id="qtimer" aria-live="off"><span>⏱ <b class="mono" id="qt-left">--:--</b> left</span><span class="note">Question <b id="qt-done">0</b> of ${Q.d.qs.length} answered</span></div>
+    <form id="ls-quiz" data-k="${it.key}" novalidate>${Q.d.qs.map((q, qi) => `<fieldset class="q"><legend>${qi + 1}. ${esc(q.q)}</legend>${q.o.map((o, oi) => `<label class="opt"><input type="radio" name="q${qi}" value="${oi}" ${Q.ans[qi] === oi ? "checked" : ""}> ${esc(o)}</label>`).join("")}</fieldset>`).join("")}
+      <p class="err" id="quiz-err" role="alert"></p><div style="margin-top:1rem"><button class="btn" type="submit">Submit answers</button></div></form>`;
+  if (r && !retake) {
+    const pass = r.score >= PASS();
+    return `<div class="result ${pass ? "pass" : "fail"}">${att > 1 ? `Retake score: ${d.last}%. Your best score, <b>${r.score}%</b>, counts.` : `You scored <b>${r.score}%</b>.`} ${pass ? "Well done!" : ""}${d.late ? " Time ran out, so unanswered questions were marked wrong." : ""}</div>
+      ${!pass && att < 2 ? `<div class="card retake"><h3>Below ${PASS()}%: redo the lessons, then retake</h3><p class="note">Go back through this week's lessons. When you've marked them complete again, you get <b>one retake</b> with new questions. Your best score counts.</p><div><button class="btn" data-act="ls-retry" data-k="${it.key}">Redo this week's lessons</button></div></div>` : ""}
+      ${!pass && att >= 2 ? `<div class="card retake"><h3>You've used your retake</h3><p class="note">Your week result uses your best score. If the week isn't passed, you can repeat the week from the week page.</p></div>` : ""}
+      <h3 style="margin-top:1.2rem">Your answers</h3>${quizReview(d)}`;
+  }
+  return `<div class="card qstart"><h3>${retake ? "Your retake" : "Before you start"}</h3><ul class="reqs"><li><b>${QUIZ_N} questions</b>, picked at random for you from a larger question bank.</li><li>You have <b>${QUIZ_MIN} minutes</b> once you press Start. Answers are sent automatically when time runs out.</li>
+    <li>${retake ? "This is your only retake. Your best score counts." : `One attempt. If you score below ${PASS()}%, you redo this week's lessons and get one retake.`}</li>${gate ? `<li>Your score counts toward your week result.</li>` : ""}</ul>
+    <div><button class="btn gold" data-act="ls-qstart" data-k="${it.key}">${retake ? "Start retake" : "Start assessment"}</button></div></div>`;
+}
+let QTIMER = null;
+function quizTick() {
+  const Q = ui.quiz, el = $("#qt-left"); if (!Q || !el) { clearInterval(QTIMER); QTIMER = null; return; }
+  const left = Math.max(0, Math.round((Q.deadline - (Date.now() + Q.skew)) / 1000));
+  el.textContent = `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
+  $("#qtimer").classList.toggle("warn", left <= 60);
+  $("#qt-done").textContent = Q.ans.filter((x) => x != null).length;
+  if (left <= 0 && !Q.sent) { Q.sent = true; toast("Time's up. Sending your answers."); quizSubmit(true); }
+}
+async function quizSubmit(auto) {
+  const Q = ui.quiz; if (!Q) return;
+  const btn = $("#ls-quiz button[type=submit]");
+  if (!auto && Q.ans.some((x) => x == null)) { const n = Q.ans.filter((x) => x == null).length; if (!confirm(`${n} question${n === 1 ? " is" : "s are"} unanswered. Submit anyway?`)) return; }
+  clearInterval(QTIMER); QTIMER = null;
+  const key = Q.key, ans = Q.ans.slice();
+  let r; try { r = await busy(btn, () => rpc("learn_quiz", { p_key: key, p_answers: ans })); } catch { Q.sent = false; QTIMER = setInterval(quizTick, 1000); return; }
+  if (!r) return;
+  ui.quiz = null; LS.L = r; toast("Answers submitted"); await lsRender(); window.scrollTo({ top: 0, behavior: "smooth" });
+}
 function lsItemView(wi, ii) {
   const it = LS.W[wi].items[ii], r = row(it), dn = isDoneIt(it), un = unlockedW(wi), me = LS.C.me;
   const head = `<a class="back" href="#/learn/learning/${wi + 1}">← Week ${wi + 1}: ${esc(LS.W[wi].title)}</a><div><p class="eyebrow">${LKIND[it.type] || "Activity"}${it.mins ? " · " + it.mins + " min" : ""}${it.opt ? " · Optional" : ""}</p><h2 style="margin-top:.4rem">${esc(it.title)}</h2></div>`;
   const nav = seqNav(wi, ii), btn = (lbl, undo) => `<div><button class="btn ${dn ? "ghost" : ""}" data-act="ls-done" data-k="${it.key}" data-v="${dn ? 0 : 1}">${dn ? undo : lbl}</button></div>`;
   if (!un) return `<div class="view">${head}<div class="gate">${LICON.lock}<span><b>Locked.</b> This opens when Week ${wi + 1} unlocks.</span></div></div>`;
+  const blk = !dn && !r ? seqBlock(wi, it) : null;
+  if (blk) return `<div class="view">${head}<div class="gate">${LICON.lock}<span><b>Do the steps in order.</b> Finish “${esc(blk.title)}” first, then this opens.</span></div><div><a class="btn" href="#/learn/learning/${wi + 1}/${blk.key}">Go to “${esc(blk.title)}”</a></div>${nav}</div>`;
   if (ON_WEEK_PAGE.includes(it.title)) return `<div class="view">${head}<p style="max-width:62ch">${esc(it.detail || "")}</p><div class="signoff ${dn ? "signed" : ""}"><b>${dn ? "Done ✓" : "Do this on the Week " + (wi + 1) + " page"}</b><p class="note">${it.title === "Mock interview simulation" ? "Your coach marks this after your call." : it.title === "Book your 1-on-1 session" ? "Pick a time on the Week 15 page. This ticks itself when you book." : "The tools for this step are on the week page."}</p></div><div><a class="btn" href="#/learn/learning/${wi + 1}">Open Week ${wi + 1}</a></div>${nav}</div>`;
+  if (it.title === "Collect your internship certificate") return `<div class="view">${head}${LS.X.eval ? `<div class="signoff signed"><b>Your internship is complete 🎉</b><p class="note">${LS.X.placement ? `${esc(LS.X.placement.sup_name)} at ${esc(LS.X.placement.org)} submitted your final evaluation.` : "Your supervisor submitted your final evaluation."} Ask your host company for their internship letter, and add the internship to your CV in Week 14.</p></div>${btn("Mark as collected", "Collected ✓ · Undo")}`
+    : `<div class="gate">${LICON.lock}<span><b>Not yet.</b> This opens after your supervisor signs all four logbook weeks and submits your final evaluation.</span></div>`}${nav}</div>`;
   if (it.title === "Confirm your placement") return `<div class="view">${head}${placementCard()}${LS.X.placement ? btn("I confirm my placement", "Confirmed ✓ · Undo") : ""}${nav}</div>`;
   if (it.type === "oath") return `<div class="view">${head}${oathView(dn, r)}${nav}</div>`;
   if (it.type === "guide") return `<div class="view">${head}${guideView()}<div class="actions"><button class="btn ghost" data-act="tour">Take the guided tour again</button><button class="btn ${dn ? "ghost" : ""}" data-act="ls-done" data-k="${it.key}" data-v="${dn ? 0 : 1}">${dn ? "Done ✓ · Mark as not done" : "I know my way around"}</button></div>${nav}</div>`;
@@ -1130,13 +1218,7 @@ function lsItemView(wi, ii) {
   if (it.type === "logweek") return `<div class="view">${head}${logWeek(wi, it, r)}${nav}</div>`;
   if (it.type === "lesson") return `<div class="view">${head}<div class="video"><span class="play" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg></span><span class="cap">${esc(it.title)} · video coming soon</span></div>
     <p class="note">Your facilitator adds the video here. Until then, the text version below covers the lesson.</p>${lessonBody(it)}${btn("Mark lesson complete", "Completed ✓ · Mark as not done")}${nav}</div>`;
-  if (it.type === "quiz") { const qs = it.qs || [], d = r?.data || {}, ans = d.answers || [], cor = d.correct || [];
-    return `<div class="view">${head}<p class="note">Answer all ${qs.length} questions. You have <b>one attempt</b>. ${it.title.includes("Readiness") || LS.W[wi].stage >= 1 ? `Your score counts toward your week result, and you need ${PASS()}% or more to move on.` : ""}</p>
-      <form id="ls-quiz" data-k="${it.key}" novalidate>${qs.map((q, qi) => `<fieldset class="q"><legend>${qi + 1}. ${esc(q.q)}</legend>${q.o.map((o, oi) => {
-        const cls = r ? (oi === cor[qi] ? "right" : oi === Number(ans[qi]) ? "wrong" : "") : "";
-        return `<label class="opt ${cls}"><input type="radio" name="q${qi}" value="${oi}" ${r ? "disabled" : ""} ${r && Number(ans[qi]) === oi ? "checked" : ""}> ${esc(o)}</label>`; }).join("")}</fieldset>`).join("")}
-      <div id="qres" style="margin-top:1rem">${r ? `<div class="result ${r.score >= PASS() ? "pass" : "fail"}">You scored ${r.score}%. ${r.score >= PASS() ? "Well done!" : "Review the lessons before your week result."}</div>` : ""}</div>
-      <p class="err" id="quiz-err" role="alert"></p>${r ? "" : `<div style="margin-top:1rem"><button class="btn" type="submit">Submit answers</button></div>`}</form>${nav}</div>`; }
+  if (it.type === "quiz") return `<div class="view">${head}${quizBody(wi, it, r)}${nav}</div>`;
   if (it.link) {
     const st = aStatus(it), canEdit = !r || r.status === "revise" || (r.status !== "graded" && !it.proj) || r.status === "submitted";
     return `<div class="view">${head}<p style="max-width:64ch">${esc(it.detail || "")}</p>${deadlineLine(wi)}
@@ -1359,14 +1441,14 @@ function jobView(wi) {
       <p class="note" id="pitch-count">${words} words · about ${Math.round(words / 2.3)} seconds spoken (aim for 120–150 words)</p>
       ${pI ? linkBox(pI, "pt-link", "Link to your recorded pitch (Loom, YouTube unlisted, Google Drive)", "https://", "Submit pitch recording") : ""}</div>
     <div class="card"><div class="ch"><h3>Outreach log</h3><span class="pill ${outs.length >= 10 ? "ok" : "now"}">${outs.length} of 10</span></div><div class="bar"><i style="width:${Math.min(100, outs.length * 10)}%"></i></div>
-      <form id="out-form" class="form" style="margin-top:.8rem" novalidate><div class="grid2"><div class="field"><label for="o-name">Person</label><input id="o-name" placeholder="e.g. Head of Data"></div><div class="field"><label for="o-co">Company</label><input id="o-co"></div></div>
+      <form id="out-form" class="form" style="margin-top:.8rem" novalidate><div class="grid2"><div class="field"><label for="o-name">Person</label><input id="o-name" placeholder="e.g. Head of Data"></div><div class="field"><label for="o-co">Company</label><input id="o-co" placeholder="e.g. Paystack"></div></div>
         <div class="grid2"><div class="field"><label for="o-ch">Channel</label><select id="o-ch"><option>LinkedIn</option><option>Email</option><option>WhatsApp</option><option>In person</option></select></div><div class="field"><label for="o-st">Status</label><select id="o-st"><option>Sent</option><option>Replied</option><option>Meeting booked</option></select></div></div>
         <div><button class="btn sm" type="submit">Log message</button></div></form>
       ${outs.length ? `<ul class="roles">${outs.slice().reverse().map((o) => `<li><b>${esc(o.name)} · ${esc(o.co)}</b><span class="note">${esc(o.ch)} · ${esc(o.on)}</span><span class="pill ${o.st === "Sent" ? "" : "ok"}">${esc(o.st)}</span></li>`).join("")}</ul>` : `<p class="empty">No messages logged yet. Aim for 2 a day.</p>`}
       ${oI ? `<div class="actions" style="margin-top:.8rem"><button class="btn sm ${isDoneIt(oI) ? "ghost" : ""}" data-act="ls-done" data-k="${oI.key}" data-v="${isDoneIt(oI) ? 0 : 1}" ${outs.length < 10 && !isDoneIt(oI) ? "disabled" : ""}>${isDoneIt(oI) ? "Done ✓ · Undo" : `Mark outreach done (${outs.length}/10)`}</button></div>` : ""}</div></div>`; }
   const tI = byTitle(wi, "Weekly job application tracker"), rI = byTitle(wi, "Report your first interview invite"), hasInt = apps.some((a) => a.st === "Interviewing" || a.st === "Offer");
   return stats + `<div class="card"><div class="ch"><h3>Add an application</h3></div>
-    <form id="app-form" class="form" novalidate><div class="app-row"><div class="field"><label for="a-role">Role</label><input id="a-role" placeholder="e.g. Junior Data Analyst"></div><div class="field"><label for="a-co">Company</label><input id="a-co"></div><div class="field"><label for="a-st">Status</label><select id="a-st">${APP_ST.map((x) => `<option>${x}</option>`).join("")}</select></div><div class="field"><span class="lbl">&nbsp;</span><button class="btn sm" type="submit">Add</button></div></div></form></div>
+    <form id="app-form" class="form" novalidate><div class="app-row"><div class="field"><label for="a-role">Role</label><input id="a-role" placeholder="e.g. Junior Data Analyst"></div><div class="field"><label for="a-co">Company</label><input id="a-co" placeholder="e.g. Flutterwave"></div><div class="field"><label for="a-st">Status</label><select id="a-st">${APP_ST.map((x) => `<option>${x}</option>`).join("")}</select></div><div class="field"><span class="lbl">&nbsp;</span><button class="btn sm" type="submit">Add</button></div></div></form></div>
   <div class="board">${APP_ST.map((st) => `<div class="col"><div class="col-h"><b>${st}</b><span class="mono">${apps.filter((a) => a.st === st).length}</span></div>${apps.map((a, i) => a.st !== st ? "" : `<div class="app-card"><b>${esc(a.role)}</b><span class="note">${esc(a.co)} · ${esc(a.on)}</span><label class="sr-only" for="as-${i}">Status</label><select id="as-${i}" data-app="${i}">${APP_ST.map((x) => `<option ${x === a.st ? "selected" : ""}>${x}</option>`).join("")}</select></div>`).join("") || `<p class="note">None yet</p>`}</div>`).join("")}</div>
   <div class="cols"><div class="card"><div class="ch"><h3>This week's tracker</h3>${tI && isDoneIt(tI) ? `<span class="pill ok">Submitted</span>` : ""}</div><p class="note">Submit your tracker every Friday. Aim for at least 5 targeted applications a week (minimum 3 to submit).</p>
       ${tI ? `<div><button class="btn sm" data-act="ls-done" data-k="${tI.key}" data-v="${isDoneIt(tI) ? 0 : 1}" ${apps.length < 3 && !isDoneIt(tI) ? "disabled" : ""}>${isDoneIt(tI) ? "Submitted ✓ · Undo" : `Submit tracker (${apps.length} applications)`}</button></div>` : ""}</div>
@@ -1411,15 +1493,15 @@ function lsGraduatePage() {
       <form class="card form" id="grad-out" novalidate><div class="ch"><h3>Where are you now?</h3>${o ? `<span class="pill ok">Updated ${fmtDay(o.at)}</span>` : ""}</div>
         <p class="note">Got a job, an internship or freelance work? Tell us, so we can celebrate you and track how Jobnest graduates do. Update it any time.</p>
         <div class="field"><label for="go-st">What are you doing now?</label>${optSel(OUT_ST, o?.status, "go-st", "Choose one")}</div>
-        <div class="grid2"><div class="field"><label for="go-co">Company</label><input id="go-co" value="${esc(o?.company || "")}"></div><div class="field"><label for="go-role">Your role</label><input id="go-role" value="${esc(o?.role || "")}"></div></div>
+        <div class="grid2"><div class="field"><label for="go-co">Company</label><input id="go-co" placeholder="e.g. Kuda" value="${esc(o?.company || "")}"></div><div class="field"><label for="go-role">Your role</label><input id="go-role" placeholder="e.g. Data Analyst" value="${esc(o?.role || "")}"></div></div>
         <div class="grid2"><div class="field"><label for="go-start">Start date</label><input id="go-start" type="date" value="${esc(o?.start_date || "")}"></div><div class="field"><label for="go-via">How did you get it?</label>${optSel(VIA, o?.via, "go-via", "Choose one")}</div></div>
         <p class="err" id="go-err" role="alert"></p><div><button class="btn" type="submit">${o ? "Update" : "Save"}</button></div></form>
     </div><div class="stack">
       ${sv ? `<div class="card"><div class="ch"><h3>Exit survey</h3><span class="pill ok">Sent</span></div><p class="note">Thank you for your feedback. It helps us make the next cohort better.</p></div>`
         : `<form class="card form" id="grad-survey" novalidate><div class="ch"><h3>Exit survey</h3><span class="note">3 minutes</span></div>
         <div class="field"><span class="lbl">How likely are you to recommend Jobnest Academy to a friend? (0 = not at all, 10 = definitely)</span><div class="rate nps">${[...Array(11)].map((_, n) => `<label><input type="radio" name="gs-rec" value="${n}"><span>${n}</span></label>`).join("")}</div></div>
-        <div class="field"><label for="gs-best">What helped you most?</label><textarea id="gs-best" rows="2"></textarea></div>
-        <div class="field"><label for="gs-imp">What should we improve?</label><textarea id="gs-imp" rows="2"></textarea></div>
+        <div class="field"><label for="gs-best">What helped you most?</label><textarea id="gs-best" placeholder="e.g. The internship and the weekly feedback" rows="2"></textarea></div>
+        <div class="field"><label for="gs-imp">What should we improve?</label><textarea id="gs-imp" placeholder="e.g. More practice exercises before the project" rows="2"></textarea></div>
         <div class="field"><label for="gs-quote">A sentence about your experience (optional)</label><textarea id="gs-quote" rows="2" placeholder="e.g. Jobnest gave me real work experience and the confidence to apply."></textarea></div>
         <label class="check"><input type="checkbox" id="gs-ok"> Jobnest may share this sentence with my first name and track on its website and social media.</label>
         <p class="err" id="gs-err" role="alert"></p><div><button class="btn" type="submit">Send survey</button></div></form>`}
@@ -1482,8 +1564,8 @@ function lsAssignmentDetail(key) {
 }
 function lsCohortPage() {
   const C = LS.C, up = lsSessions().filter((x) => x.at.getTime() + x.minutes * 6e4 > Date.now()), past = lsSessions().filter((x) => x.at.getTime() + x.minutes * 6e4 <= Date.now()).reverse();
-  lsShell("cohort", pageHead("My Cohort", esc(C.cohort.name), "Your live sessions and announcements.") + `<section class="wrap pagebody"><div class="cols">
-    <div class="stack"><div class="card"><h3>Coming up</h3>${up.length ? `<ul class="sess-list">${up.slice(0, 8).map(sessionRow).join("")}</ul>` : `<p class="empty">No sessions scheduled yet.</p>`}</div>
+  lsShell("cohort", pageHead("My Cohort", esc(C.cohort.name), "Your pod, live sessions and announcements.") + `<section class="wrap pagebody"><div class="cols">
+    <div class="stack">${podCard(LS.pod)}<div class="card"><h3>Coming up</h3>${up.length ? `<ul class="sess-list">${up.slice(0, 8).map(sessionRow).join("")}</ul>` : `<p class="empty">No sessions scheduled yet.</p>`}</div>
       ${past.length ? `<div class="card"><h3>Earlier sessions</h3><ul class="sess-list">${past.slice(0, 10).map(sessionRow).join("")}</ul></div>` : ""}</div>
     <div class="stack"><div class="card"><h3>Announcements</h3>${(C.news || []).length ? C.news.map((n) => `<div class="ann"><span class="eyebrow">${fmtAt(n.at)} · ${esc(n.by || "")}</span><b>${esc(n.title)}</b><p class="note">${lines(n.body)}</p></div>`).join("") : `<p class="empty">No announcements yet.</p>`}</div></div></div></section>`);
 }
@@ -1544,13 +1626,14 @@ function gradCelebrate() {
 }
 async function lsRender(p1, p2, p3) {
   setTimeout(gradCelebrate, 300);
+  setTimeout(() => { if (ui.quiz && $("#qt-left") && !QTIMER) { QTIMER = setInterval(quizTick, 1000); quizTick(); } }, 0);
   if (p1 === undefined) [p1, p2, p3] = lsParts();
   const page = p1 || "home", cert = LS.cert;
   if (page === "learning") { const wi = Math.min(Math.max((parseInt(p2, 10) || curWeek() + 1) - 1, 0), LS.W.length - 1);
     if (LS.W[wi].stage === 6 && !LS.X.booking && !p3 && unlockedW(wi) && !LS.slots) { try { LS.slots = await rpc("dc2_slots"); } catch { LS.slots = []; } }
     lsLearning(wi, p3 || null); }
   else if (page === "assignments") lsAssignmentsPage(p2 || null);
-  else if (["cohort", "sessions", "news"].includes(page)) lsCohortPage();
+  else if (["cohort", "sessions", "news"].includes(page)) { if (LS.pod === undefined) LS.pod = await rpc("student_pod").catch(() => null); lsCohortPage(); }
   else if (page === "profile") lsProfilePage(cert);
   else if (page === "help") lsHelpPage();
   else if (page === "graduate") lsGraduatePage();
@@ -1578,7 +1661,7 @@ const TOUR = [
   { t: "You're all set", b: "Start with Week 1: Orientation and sign your Student Oath. You can take this tour again from the More menu." },
 ];
 let TOUR_I = null;
-function clearSpot() { $$(".spot").forEach((x) => x.classList.remove("spot")); }
+function clearSpot() { $$(".spot").forEach((x) => x.classList.remove("spot")); $$(".spot-host").forEach((x) => x.classList.remove("spot-host")); }
 function startTour() { ui.lsMore = false; if (!$("#t-today")) { ui.wantTour = true; return go("#/learn"); } TOUR_I = 0; $("#toast").hidden = true; clearTimeout(toast.t); renderTour(); }
 function renderTour() {
   clearSpot();
@@ -1586,19 +1669,30 @@ function renderTour() {
   if (!root) { root = document.createElement("div"); root.id = "tour-root"; document.body.appendChild(root); }
   if (TOUR_I == null) { root.innerHTML = ""; return; }
   const i = TOUR_I, st = TOUR[i], last = i === TOUR.length - 1;
-  let low = false;
-  if (st.sel) {
-    const el = [].concat(st.sel).map((x) => $(x)).find((x) => x && x.offsetParent !== null);
-    if (el) { el.classList.add("spot"); el.scrollIntoView({ block: "center", behavior: "smooth" }); low = true; }
-  }
-  root.innerHTML = `<div class="scrim"></div><div class="tour ${low ? "low" : ""}" role="dialog" aria-modal="true" aria-labelledby="tour-t">
+  const el = st.sel ? [].concat(st.sel).map((x) => $(x)).find((x) => x && x.offsetParent !== null) : null;
+  if (el) { el.classList.add("spot"); el.closest(".appnav, header, .top")?.classList.add("spot-host"); el.scrollIntoView({ block: "center", behavior: "auto" }); }
+  root.innerHTML = `<div class="scrim"></div><div class="tour ${el ? "placed" : ""}" role="dialog" aria-modal="true" aria-labelledby="tour-t">
     <div class="hd"><span class="badge">${i + 1} of ${TOUR.length}</span><button class="x" data-act="tour-end" aria-label="Close tour">✕</button></div>
     <h2 id="tour-t">${st.t}</h2><p>${st.b}</p>
     <div class="dots" aria-hidden="true">${TOUR.map((_, k) => `<i class="${k === i ? "on" : ""}"></i>`).join("")}</div>
     <div class="ft">${i > 0 ? `<button class="skip" data-act="tour-back">Back</button>` : `<button class="skip" data-act="tour-end">Skip tour</button>`}
     <button class="btn" data-act="${last ? "tour-end" : "tour-next"}" id="tour-next">${last ? "Get started" : "Next →"}</button></div></div>`;
+  if (el) placeTour(el);
   $("#tour-next").focus({ preventScroll: true });
 }
+// Put the tour box above or below the highlighted part so it never covers it.
+function placeTour(el) {
+  const box = $(".tour.placed"); if (!box || !el) return;
+  const H = window.innerHeight, gap = 12, h = box.offsetHeight;
+  let r = el.getBoundingClientRect();
+  if (r.height + h + gap * 3 > H) { window.scrollBy(0, r.top - gap - (el.closest(".appnav") ? 0 : 60)); r = el.getBoundingClientRect(); }
+  let top;
+  if (H - r.bottom >= h + gap * 2) top = r.bottom + gap;
+  else if (r.top >= h + gap * 2) top = r.top - h - gap;
+  else { window.scrollBy(0, r.top - gap - 60); r = el.getBoundingClientRect(); top = Math.max(r.bottom + gap, H - h - gap); }
+  box.style.top = Math.max(gap, Math.min(top, H - h - gap)) + "px";
+}
+window.addEventListener("resize", () => { const el = $(".spot"); if (el && TOUR_I != null) placeTour(el); });
 function endTour() {
   TOUR_I = null; renderTour(); window.scrollTo({ top: 0, behavior: "smooth" });
   try { localStorage.setItem("jn.tour." + (CAMPUS?.me?.matric || ""), "1"); } catch { /* ignore */ }
@@ -1645,9 +1739,9 @@ async function tabIntern() {
       <span class="anext">${p ? `${x.signed}/4 signed${x.to_sign ? ` · ${x.to_sign} waiting` : ""}${x.eval ? " · evaluated" : ""}` : "No placement yet"}</span>${p ? (x.eval ? `<span class="pill ok">Done</span>` : `<span class="pill now">Placed</span>`) : `<span class="pill">To place</span>`}</summary>
       <div class="abody">${link ? `<div class="notice"><span><b>Supervisor's link</b> · share it with ${esc(p.sup_name)} by WhatsApp or email. Anyone with it can sign this logbook.</span>
           <span class="actions"><button class="btn sm" data-act="copy-host" data-k="${esc(link)}">Copy link</button>${p.sup_phone ? `<a class="btn sm ghost" target="_blank" rel="noopener" href="https://wa.me/${esc(p.sup_phone.replace(/\D/g, "").replace(/^0/, "234"))}?text=${encodeURIComponent(`Hello ${p.sup_name}, this is Jobnest Academy. Please use this link each Friday to sign ${x.name}'s internship logbook: ${link}`)}">WhatsApp</a>` : ""}</span></div>` : ""}
-        ${can ? `<form class="form place-form" data-i="${i}" novalidate><div class="grid2"><div class="field"><label for="po-${i}">Company</label><input id="po-${i}" value="${esc(p?.org || "")}"></div><div class="field"><label for="pr-${i}">Role</label><input id="pr-${i}" value="${esc(p?.role || "")}" placeholder="e.g. Data Analyst Intern"></div></div>
-          <div class="grid2"><div class="field"><label for="ps-${i}">Supervisor's name</label><input id="ps-${i}" value="${esc(p?.sup_name || "")}"></div><div class="field"><label for="pp-${i}">Supervisor's WhatsApp</label><input id="pp-${i}" value="${esc(p?.sup_phone || "")}" inputmode="tel"></div></div>
-          <div class="field"><label for="pe-${i}">Supervisor's email (optional)</label><input id="pe-${i}" type="email" value="${esc(p?.sup_email || "")}"></div>
+        ${can ? `<form class="form place-form" data-i="${i}" novalidate><div class="grid2"><div class="field"><label for="po-${i}">Company</label><input id="po-${i}" placeholder="e.g. Brightpath Logistics Ltd" value="${esc(p?.org || "")}"></div><div class="field"><label for="pr-${i}">Role</label><input id="pr-${i}" value="${esc(p?.role || "")}" placeholder="e.g. Data Analyst Intern"></div></div>
+          <div class="grid2"><div class="field"><label for="ps-${i}">Supervisor's name</label><input id="ps-${i}" placeholder="e.g. Funmi Bello" value="${esc(p?.sup_name || "")}"></div><div class="field"><label for="pp-${i}">Supervisor's WhatsApp</label><input id="pp-${i}" placeholder="e.g. 0803 000 0000" value="${esc(p?.sup_phone || "")}" inputmode="tel"></div></div>
+          <div class="field"><label for="pe-${i}">Supervisor's email (optional)</label><input id="pe-${i}" placeholder="e.g. funmi@company.com" type="email" value="${esc(p?.sup_email || "")}"></div>
           <div class="actions"><button class="btn sm" type="submit">${p ? "Save changes" : "Save placement"}</button></div></form>` : ""}</div></details>`; };
   shell("intern", "Internships", "Weeks 10–13. Add each student's placement, then share the supervisor's link so they can sign the weekly logbook and give the final evaluation.",
     `<div class="card">${L.length ? `<div class="arows">${L.map(row3).join("")}</div>` : empty("No admitted students yet.")}</div>`);
@@ -1663,9 +1757,9 @@ async function tabDc2() {
   const call = (x, i) => `<details class="arow noav" data-id="dc${x.id}" ${ui.open === "dc" + x.id ? "open" : ""}><summary><span class="an"><b>${esc(x.name)}</b><span class="note">${fmtAt(x.at)} WAT · ${esc(x.track || "")}${isCoach ? "" : ` · ${esc(x.coach)}`}</span></span>
       <span class="anext">${x.result ? `Score ${x.result.score}/10` : new Date(x.at) < new Date() ? "Add the result" : "Booked"}</span>${x.result ? `<span class="pill ok">Done</span>` : `<span class="pill now">${new Date(x.at) < new Date() ? "To complete" : "Upcoming"}</span>`}</summary>
     <div class="abody">${x.note ? `<p class="note">Their note: “${esc(x.note)}”</p>` : ""}${x.cv ? `<details><summary class="link sm">See their CV</summary><div style="margin-top:.6rem">${cvPreview(x.cv)}</div></details>` : `<p class="note">No CV saved yet.</p>`}
-      <form class="form dc2-form" data-i="${i}" novalidate><div class="grid2"><div class="field"><label for="dsc-${i}">Interview Confidence Score (1–10)</label><input id="dsc-${i}" type="number" min="1" max="10" value="${x.result?.score ?? ""}"></div></div>
-        <div class="field"><label for="dno-${i}">Summary for the student</label><textarea id="dno-${i}" rows="2">${esc(x.result?.note || "")}</textarea></div>
-        <div class="field"><label for="dnx-${i}">Next steps (one per line)</label><textarea id="dnx-${i}" rows="3">${esc((x.result?.next || []).join("\n"))}</textarea></div>
+      <form class="form dc2-form" data-i="${i}" novalidate><div class="grid2"><div class="field"><label for="dsc-${i}">Interview Confidence Score (1–10)</label><input id="dsc-${i}" placeholder="1 to 10" type="number" min="1" max="10" value="${x.result?.score ?? ""}"></div></div>
+        <div class="field"><label for="dno-${i}">Summary for the student</label><textarea id="dno-${i}" placeholder="e.g. Strong pitch. Slow down and use numbers." rows="2">${esc(x.result?.note || "")}</textarea></div>
+        <div class="field"><label for="dnx-${i}">Next steps (one per line)</label><textarea id="dnx-${i}" placeholder="One step per line" rows="3">${esc((x.result?.next || []).join("\n"))}</textarea></div>
         <div class="actions"><button class="btn sm" type="submit">${x.result ? "Update result" : "Save result"}</button></div></form></div></details>`;
   shell("dc2", "Discovery Call 2", "Week 15. Students book a 40-minute call with a career coach, then you record their Interview Confidence Score and next steps.",
     `<div class="grid2">${isCoach ? `<form class="card form" id="dc2-times" novalidate><h3>Add times</h3><p class="note">Each call is 40 minutes. Times are in WAT.</p>
@@ -1696,6 +1790,36 @@ async function tabJobs() {
   shell("jobs", "Job search", "Weeks 14–17. Each student's CV, LinkedIn, portfolio, pitch, outreach and job applications. It updates as students work.",
     `<div class="kpis">${[["Outreach sent", tot.out], ["Applications", tot.apps], ["Interviews", tot.ints], ["Offers", tot.offers]].map(([l, v]) => `<div class="kpi card"><span class="eyebrow">${l}</span><b class="mono">${v}</b></div>`).join("")}</div>
     <div class="card" style="margin-top:1rem">${L.length ? `<div class="arows">${L.map(row4).join("")}</div>` : empty("No admitted students yet.")}</div>`);
+}
+
+/* ---------- staff: accountability pods ---------- */
+async function tabPods() {
+  const d = await rpc("acad_pods"); ui.pods = d;
+  const can = ["director", "cohort_manager", "academy_admin", "super"].includes(ME.role);
+  const tn = (c) => (d.tracks.find((t) => t.code === c) || {}).name || "All tracks";
+  const podSel = (app, cur) => `<select data-change="pod-move" data-app="${app}" aria-label="Move to pod">${cur ? "" : `<option value="">Add to a pod…</option>`}${d.pods.map((p) => `<option value="${p.id}" ${p.id === cur ? "selected" : ""}>${esc(p.name)}</option>`).join("")}${cur ? `<option value="0">Remove from pod</option>` : ""}</select>`;
+  const pod = (p) => `<div class="card"><div class="ch"><h3>${esc(p.name)}</h3><span class="pill">${p.members.length}</span></div>
+    <p class="note">${esc(tn(p.track))}${p.meet ? ` · ${esc(p.meet)}` : ""}${p.link ? ` · <a class="link" href="${esc(p.link)}" target="_blank" rel="noopener">Meeting link ↗</a>` : ""}</p>
+    <ul class="pod-m">${p.members.map((m) => `<li><span><b>${esc(m.name)}</b> <span class="note mono">${esc(m.matric)}</span></span>${can ? podSel(m.app, p.id) : ""}</li>`).join("") || `<li class="note">No one yet.</li>`}</ul>
+    ${can ? `<details style="margin-top:.8rem"><summary class="link sm">Edit pod</summary><form class="form pod-form" data-id="${p.id}" novalidate style="margin-top:.6rem">${podFields(p, d.tracks)}<div class="actions"><button class="btn sm" type="submit">Save</button><button class="link sm danger" type="button" data-act="pod-del" data-k="${p.id}">Delete pod</button></div></form></details>` : ""}</div>`;
+  shell("pods", "Accountability pods", "Small groups of students who check in with each other every week to keep each other on pace. Students see their pod in My Cohort.",
+    `${can ? `<div class="grid2"><form class="card form" id="pods-auto" novalidate><h3>Create pods automatically</h3><p class="note">Puts everyone not yet in a pod into new pods, grouped by track.</p>
+        <div class="grid2"><div class="field"><label for="pa-size">People per pod</label><input id="pa-size" type="number" min="3" max="10" value="5"></div><div class="field"><label for="pa-meet">Weekly check-in</label><input id="pa-meet" placeholder="e.g. Thursdays, 19:00 WAT" value="Thursdays, 19:00 WAT"></div></div>
+        <div><button class="btn" type="submit">Create pods</button></div></form>
+      <form class="card form pod-form" data-id="" novalidate><h3>New pod</h3>${podFields(null, d.tracks)}<div><button class="btn sm" type="submit">Add pod</button></div></form></div>` : ""}
+    ${d.unassigned.length ? `<div class="card" style="margin-top:1rem"><div class="ch"><h3>Not in a pod yet</h3><span class="pill now">${d.unassigned.length}</span></div><ul class="pod-m">${d.unassigned.map((m) => `<li><span><b>${esc(m.name)}</b> <span class="note">${esc(tn(m.track))}</span></span>${can && d.pods.length ? podSel(m.app, null) : ""}</li>`).join("")}</ul></div>` : ""}
+    <div class="pod-grid">${d.pods.map(pod).join("") || `<div class="card">${empty("No pods yet.")}</div>`}</div>`);
+}
+const podFields = (p, tracks) => `<div class="field"><label>Pod name</label><input name="name" value="${esc(p?.name || "")}" placeholder="e.g. Data Analysis pod 1"></div>
+  <div class="field"><label>Track</label><select name="track"><option value="">All tracks</option>${tracks.map((t) => `<option value="${t.code}" ${p?.track === t.code ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></div>
+  <div class="field"><label>Weekly check-in</label><input name="meet" value="${esc(p?.meet || "")}" placeholder="e.g. Thursdays, 19:00 WAT"></div>
+  <div class="field"><label>Meeting link (optional)</label><input name="link" value="${esc(p?.link || "")}" placeholder="https://"></div>`;
+function podCard(P) {
+  if (!P || !P.name) return `<div class="card"><h3>Your accountability pod</h3><p class="note">You'll be put in a small pod of classmates who check in with each other every week. It appears here once it's set up.</p></div>`;
+  return `<div class="card"><div class="ch"><h3>Your accountability pod</h3><span class="note">${esc(P.name)}</span></div>
+    <div class="pod">${P.members.map((m) => `<span class="pm ${m.me ? "me" : ""}"><span class="pa">${esc(m.initials)}</span><span class="note">${esc(m.name)}${m.me ? " (you)" : ""}</span></span>`).join("")}</div>
+    <p class="note">${P.meet ? `Pod check-in every <b>${esc(P.meet)}</b> (30 minutes). ` : ""}Share your progress, help each other through blockers, and keep each other on pace.</p>
+    ${P.link ? `<div><a class="btn sm" href="${esc(P.link)}" target="_blank" rel="noopener">Join pod check-in</a></div>` : ""}</div>`;
 }
 
 /* ---------- staff: academy ---------- */
@@ -1735,14 +1859,14 @@ async function tabContent() {
     ${canEdit ? `<div class="stack"><form class="card form" id="lesson-form" data-id="${e.type === "lesson" ? e.id : ""}" novalidate><h3>${e.type === "lesson" ? "Edit item" : "Add a lesson or link"}</h3>
         <div class="grid2"><div class="field"><label for="le-kind">Type</label><select id="le-kind">${Object.entries(KIND_L).map(([k, l]) => `<option value="${k}" ${e.type === "lesson" && e.kind === k ? "selected" : ""}>${KIND_I[k]} ${l}</option>`).join("")}</select></div>
         <div class="field"><label for="le-track">For</label><select id="le-track">${trackOpts(d.tracks, d.my_track, e.type === "lesson" ? e.track_code : null)}</select></div></div>
-        <div class="field"><label for="le-title">Title</label><input id="le-title" value="${e.type === "lesson" ? esc(e.title) : ""}"></div>
+        <div class="field"><label for="le-title">Title</label><input id="le-title" placeholder="e.g. Welcome video" value="${e.type === "lesson" ? esc(e.title) : ""}"></div>
         <div class="field"><label for="le-url">Link (YouTube, Google Drive, …)</label><input id="le-url" type="url" placeholder="https://" value="${e.type === "lesson" ? esc(e.url || "") : ""}"></div>
-        <div class="field"><label for="le-body">Notes for students (optional)</label><textarea id="le-body" rows="3">${e.type === "lesson" ? esc(e.body || "") : ""}</textarea></div>
+        <div class="field"><label for="le-body">Notes for students (optional)</label><textarea id="le-body" placeholder="e.g. Watch this before the live class" rows="3">${e.type === "lesson" ? esc(e.body || "") : ""}</textarea></div>
         <label class="consent"><input type="checkbox" id="le-pub" ${e.type === "lesson" && !e.published ? "" : "checked"}> Visible to students</label>
         <div class="actions"><button class="btn sm" type="submit">${e.type === "lesson" ? "Save changes" : `Add to week ${wk}`}</button>${e.type === "lesson" ? `<button class="btn sm ghost" type="button" data-act="cancel-edit">Cancel</button>` : ""}</div></form>
       <form class="card form" id="task-form" data-id="${e.type === "task" ? e.id : ""}" novalidate><h3>${e.type === "task" ? "Edit task" : "Add a task"}</h3>
-        <div class="field"><label for="tk-title">Title</label><input id="tk-title" value="${e.type === "task" ? esc(e.title) : ""}"></div>
-        <div class="field"><label for="tk-brief">What should they do and hand in?</label><textarea id="tk-brief" rows="3">${e.type === "task" ? esc(e.brief || "") : ""}</textarea></div>
+        <div class="field"><label for="tk-title">Title</label><input id="tk-title" placeholder="e.g. Introduce yourself" value="${e.type === "task" ? esc(e.title) : ""}"></div>
+        <div class="field"><label for="tk-brief">What should they do and hand in?</label><textarea id="tk-brief" placeholder="What they should do and hand in" rows="3">${e.type === "task" ? esc(e.brief || "") : ""}</textarea></div>
         <div class="field"><label for="tk-url">Materials link (optional)</label><input id="tk-url" type="url" placeholder="https://" value="${e.type === "task" ? esc(e.url || "") : ""}"></div>
         <div class="grid2"><div class="field"><label for="tk-date">Due date</label><input id="tk-date" type="date" value="${e.type === "task" ? watParts(e.due_at).date : defDue.date}"></div><div class="field"><label for="tk-time">Time (WAT)</label><input id="tk-time" type="time" value="${e.type === "task" ? watParts(e.due_at).time : "23:59"}"></div></div>
         <div class="field"><label for="tk-track">For</label><select id="tk-track">${trackOpts(d.tracks, d.my_track, e.type === "task" ? e.track_code : null)}</select></div>
@@ -1761,8 +1885,8 @@ async function tabGrading() {
       ${x.status === "submitted" ? `<span class="pill now">To grade</span>` : x.status === "graded" ? `<span class="pill ok">Graded</span>` : `<span class="pill bad">Revise</span>`}</summary>
     <div class="abody"><p><a class="btn sm ghost" href="${esc(x.link)}" target="_blank" rel="noopener">Open their work ↗</a></p>${x.feedback && x.status !== "submitted" ? `<p class="note"><b>Feedback:</b> ${lines(x.feedback)}</p>` : ""}
       ${canGrade && x.status === "submitted" ? `<form class="form lgrade-form" data-i="${i}" novalidate><div class="rate"><label><input type="radio" name="lg-${i}" value="graded" checked><span>Grade it</span></label><label><input type="radio" name="lg-${i}" value="revise"><span>Ask for changes</span></label></div>
-        <div class="grid2"><div class="field"><label for="lgg-${i}">Grade out of 100</label><input id="lgg-${i}" type="number" min="0" max="100" inputmode="numeric">${late ? `<span class="note">Late: their score is capped at ${x.cap * 100}% of this.</span>` : ""}</div></div>
-        <div class="field"><label for="lgf-${i}">Feedback (required when asking for changes)</label><textarea id="lgf-${i}" rows="2"></textarea></div>
+        <div class="grid2"><div class="field"><label for="lgg-${i}">Grade out of 100</label><input id="lgg-${i}" placeholder="0 to 100" type="number" min="0" max="100" inputmode="numeric">${late ? `<span class="note">Late: their score is capped at ${x.cap * 100}% of this.</span>` : ""}</div></div>
+        <div class="field"><label for="lgf-${i}">Feedback (required when asking for changes)</label><textarea id="lgf-${i}" placeholder="What was good, and what to improve" rows="2"></textarea></div>
         <p class="note">Rubric: meets the brief 30 · quality & accuracy 30 · clarity & presentation 20 · timeliness 20. Students need ${70}% averaged with the week's quiz to move on.</p>
         <div class="actions"><button class="btn sm" type="submit">Send result</button></div></form>` : ""}</div></details>`; };
   const steps = d.staff_steps, open = steps.filter((x) => !x.done);
@@ -1771,7 +1895,7 @@ async function tabGrading() {
     <div class="card" style="margin-top:1rem"><div class="ch"><h3>Project messages</h3><span class="note">${M.filter((m) => m.waiting).length} waiting for a reply</span></div>
       ${M.length ? `<div class="arows">${M.map((m, i) => `<details class="arow noav" data-id="mg${i}" ${ui.open === "mg" + i ? "open" : ""}><summary><span class="an"><b>${esc(m.name)}</b><span class="note">${esc(m.matric)} · ${esc(m.track)} · ${ago(m.last_at)}</span></span>${m.waiting ? `<span class="pill now">Reply</span>` : `<span class="pill ok">Answered</span>`}</summary>
         <div class="abody"><ul class="thread">${m.messages.map((x) => `<li class="${x.staff ? "me" : ""}"><span>${esc(x.body)}</span><small>${x.staff ? esc(x.by || "Staff") : esc(m.name)} · ${fmtAt(x.at)}</small></li>`).join("")}</ul>
-        <div class="field"><label for="mr-${i}">Your reply</label><textarea id="mr-${i}" rows="2"></textarea></div><div><button class="btn sm" data-act="msg-reply" data-k="${i}">Send reply</button></div></div></details>`).join("")}</div>` : empty("No messages yet.")}</div>
+        <div class="field"><label for="mr-${i}">Your reply</label><textarea id="mr-${i}" placeholder="Write your reply" rows="2"></textarea></div><div><button class="btn sm" data-act="msg-reply" data-k="${i}">Send reply</button></div></div></details>`).join("")}</div>` : empty("No messages yet.")}</div>
     <div class="card" style="margin-top:1rem"><div class="ch"><h3>Supervisor steps</h3><span class="note">${open.length} open</span></div><p class="note">Internship steps staff complete for each student. Tick them when done.</p>
       ${steps.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Student</th><th>Week</th><th>Step</th><th></th></tr></thead><tbody>${steps.map((x) => `<tr><td data-label="Student"><b>${esc(x.name)}</b><span class="note" style="display:block">${esc(x.matric)}</span></td><td data-label="Week" class="mono">W${x.week}</td><td data-label="Step">${esc(x.title)}</td>
         <td>${canGrade ? `<label class="consent" style="margin:0"><input type="checkbox" data-change="lmark" data-app="${x.app}" data-key="${esc(x.key)}" ${x.done ? "checked" : ""}> Done</label>` : x.done ? `<span class="pill ok">Done</span>` : ""}</td></tr>`).join("")}</tbody></table></div>` : empty("No admitted students yet.")}</div>
@@ -1796,7 +1920,7 @@ async function tabSessions() {
       <div class="grid2"><div class="field"><label for="se-kind">Type</label><select id="se-kind">${[["class", "Class"], ["clinic", "Clinic / office hours"], ["orientation", "Orientation"], ["other", "Other"]].map(([k, l]) => `<option value="${k}" ${e?.kind === k ? "selected" : ""}>${l}</option>`).join("")}</select></div>
       <div class="field"><label for="se-track">For</label><select id="se-track">${trackOpts(d.tracks, d.my_track, e?.track_code)}</select></div></div>
       <div class="grid2"><div class="field"><label for="se-date">Date</label><input id="se-date" type="date" value="${dv.date}"></div><div class="field"><label for="se-time">Start (WAT)</label><input id="se-time" type="time" value="${dv.time}"></div></div>
-      <div class="grid2"><div class="field"><label for="se-min">Minutes</label><input id="se-min" type="number" min="10" max="480" value="${e ? e.minutes : 60}"></div><div class="field"><label for="se-host">Host</label><input id="se-host" value="${e ? esc(e.host || "") : esc(ME.name)}"></div></div>
+      <div class="grid2"><div class="field"><label for="se-min">Minutes</label><input id="se-min" type="number" min="10" max="480" value="${e ? e.minutes : 60}"></div><div class="field"><label for="se-host">Host</label><input id="se-host" placeholder="e.g. Tolu Bello" value="${e ? esc(e.host || "") : esc(ME.name)}"></div></div>
       <div class="field"><label for="se-link">Meeting link (Google Meet, Zoom…)</label><input id="se-link" type="url" placeholder="https://" value="${e ? esc(e.link || "") : ""}"></div>
       <div class="actions"><button class="btn sm" type="submit">${e ? "Save changes" : "Add session"}</button>${e ? `<button class="btn sm ghost" type="button" data-act="cancel-edit">Cancel</button>` : ""}</div></form>` : ""}</div>`);
   ui.sessions = d;
@@ -1817,8 +1941,8 @@ async function tabNews() {
   const canPost = ["director", "cohort_manager", "facilitator", "academy_admin", "super"].includes(ME.role);
   shell("news", "Announcements", "Shown on every student's portal, and emailed if you choose.",
     `<div class="grid2">${canPost ? `<form class="card form" id="news-form" novalidate><h3>New announcement</h3>
-      <div class="field"><label for="nw-title">Title</label><input id="nw-title"></div>
-      <div class="field"><label for="nw-body">Message</label><textarea id="nw-body" rows="5"></textarea></div>
+      <div class="field"><label for="nw-title">Title</label><input id="nw-title" placeholder="e.g. Live class moved to Thursday"></div>
+      <div class="field"><label for="nw-body">Message</label><textarea id="nw-body" placeholder="Your message to students" rows="5"></textarea></div>
       <div class="field"><label for="nw-track">Send to</label><select id="nw-track">${trackOpts(d.tracks, d.my_track, null)}</select></div>
       <label class="consent"><input type="checkbox" id="nw-email" checked> Also email it to them</label>
       <p class="err" id="nw-err" role="alert"></p><div><button class="btn" type="submit">Post</button></div></form>` : ""}
@@ -1885,9 +2009,17 @@ document.addEventListener("click", async (e) => {
     return;
   }
   if (a === "copy-host") { try { await navigator.clipboard.writeText(k); } catch { const ta = document.createElement("textarea"); ta.value = k; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); } return toast("Link copied"); }
+  if (a === "pod-del") { if (!confirm("Delete this pod? Its members go back to 'Not in a pod yet'.")) return; try { await busy(t, () => rpc("acad_pod_delete", { p_id: +k })); toast("Pod deleted"); route(); } catch { /* shown */ } return; }
   if (a === "dc2-rm") { try { await busy(t, () => rpc("coach_remove_slot", { p_id: +k })); toast("Time removed"); route(); } catch { /* shown */ } return; }
   if (a === "msg-reply") { const tx = $("#mr-" + k).value.trim(); if (!tx) return toast("Write a reply first"); try { await busy(t, () => rpc("acad_message_reply", { p_app: ui.msgs[+k].app, p_body: tx })); toast("Reply sent"); route(); } catch { /* shown */ } return; }
   if (a === "grad-close" || a === "grad-go") { $("#grad-modal")?.remove(); if (a === "grad-go") go("#/learn/graduate"); return; }
+  if (a === "ls-qstart") {
+    let d; try { d = await busy(t, () => rpc("learn_quiz_start", { p_key: k })); } catch { return; }
+    if (!d) return;
+    ui.quiz = { key: k, d, ans: d.qs.map(() => null), deadline: Date.parse(d.deadline), skew: Date.parse(d.now) - Date.now() };
+    await lsRender(); clearInterval(QTIMER); QTIMER = setInterval(quizTick, 1000); quizTick(); return;
+  }
+  if (a === "ls-retry") { if (!confirm("Redo this week's lessons? They'll be marked not done until you complete them again. Then your retake opens.")) return; const wk = findItem(k)?.wi; if (await lsCall("learn_quiz_retry", { p_key: k }, t, "Lessons reopened. Go through them, then retake.")) go(`#/learn/learning/${(wk ?? 0) + 1}`); return; }
   if (a === "dc-day") { ui.dcDay = k; ui.dcSlot = null; return lsRender(); }
   if (a === "dc-slot") { ui.dcSlot = +k; return lsRender(); }
   if (a === "dc-book") { try { const X = await busy(t, () => rpc("dc2_book", { p_slot: +k, p_note: $("#bk-note")?.value || "" })); if (X) { LS.X = X; LS.L = await rpc("learn_state"); toast("Booked. Check your email for the link."); lsRender(); } } catch { LS.slots = await rpc("dc2_slots").catch(() => []); ui.dcSlot = null; lsRender(); } return; }
@@ -1972,17 +2104,26 @@ document.addEventListener("change", (e) => {
   const el = e.target, k = el.dataset.k;
   if (el.dataset.actChange === "track") { const none = el.value === "NONE"; $("#wi-" + k).hidden = !none; $("#ri-" + k).hidden = none; }
   if (el.dataset.actChange === "interest") { $("#wo-" + k).hidden = el.value !== "Other"; }
+  if (el.dataset.change === "pod-move") {
+    const v = el.value; if (v === "") return; el.disabled = true;
+    rpc("acad_pod_assign", { p_app: el.dataset.app, p_pod: v === "0" ? null : +v }).then(() => { toast(v === "0" ? "Removed from pod" : "Moved"); route(); }).catch((x) => { toast(x.message); el.disabled = false; });
+    return;
+  }
   if (el.dataset.change === "lmark") {
     el.disabled = true;
     rpc("acad_learn_mark", { p_app: el.dataset.app, p_key: el.dataset.key, p_done: el.checked }).then(() => toast(el.checked ? "Marked done" : "Marked not done"))
       .catch((x) => { el.checked = !el.checked; toast(x.message); }).finally(() => { el.disabled = false; });
     return;
   }
+  if (ui.quiz && el.closest?.("#ls-quiz") && el.name?.startsWith("q")) { ui.quiz.ans[+el.name.slice(1)] = +el.value; quizTick(); return; }
   if (el.dataset.li && LS) { const d = { ...draft("li", {}), [el.dataset.li]: el.checked }; saveDraft("li", d); return; }
   if (el.dataset.prep && LS) { const d = { ...draft("prep", {}), [el.dataset.prep]: el.checked }; saveDraft("prep", d); return; }
   if (el.dataset.app != null && el.tagName === "SELECT" && LS) { const apps = draft("apps", []).map((a, i) => (i === +el.dataset.app ? { ...a, st: el.value } : a)); saveDraft("apps", apps, true); lsRender(); return; }
   if (el.id === "week-select") { ui.wtab = "tasks"; return go(el.value === "grad" ? "#/learn/graduate" : "#/learn/learning/" + el.value); }
   if (el.id === "g-state") fillTowns();
+  if (el.id === "g-country") setCountry();
+  if (el.id === "g-cc") el.dataset.touched = "1";
+  if ((el.id === "g-first" || el.id === "g-sur") && el.value.trim()) el.value = nameCase(el.value);
   if (el.id === "g-town") { const o = $("#g-town-o"); o.hidden = el.value !== "Other"; if (!o.hidden) o.focus(); }
   if (el.id === "st-unlock") {
     const on = el.checked; el.disabled = true;
@@ -2116,6 +2257,7 @@ document.addEventListener("submit", async (e) => {
     try { const G = await busy(f.querySelector("button"), () => rpc("grad_checkin", { p_day: d, p_status: st, p_note: $(`#ck${d}-note`).value })); if (G) { LS.G = G; toast("Check-in sent. Thank you!"); lsRender(); } } catch { /* shown */ }
     return;
   }
+  if (f.id === "verify-form") { const q = $("#vq").value.trim(); if (!q) { const e2 = $("#vq-err"); if (e2) e2.textContent = "Enter a certificate number."; return; } go("#/verify/" + encodeURIComponent(q.toUpperCase())); return; }
   if (f.id === "sup-msg-form") {
     const v = $("#sup-msg-txt").value.trim(); if (!v) return toast("Write a message first");
     try { const X = await busy(f.querySelector("button"), () => rpc("learn_message", { p_body: v })); if (X) { LS.X = X; toast("Message sent"); lsRender(); } } catch { /* shown */ }
@@ -2135,6 +2277,7 @@ document.addEventListener("submit", async (e) => {
     const r0 = $("#a-role").value.trim(), co = $("#a-co").value.trim(); if (!r0 || !co) return toast("Add the role and the company");
     saveDraft("apps", [...draft("apps", []), { role: r0, co, st: $("#a-st").value, on: fmtDay(new Date()) }], true); toast("Application added"); lsRender(); return;
   }
+  if (f.id === "ls-quiz" && ui.quiz) { await quizSubmit(false); return; }
   if (f.id === "ls-quiz") {
     const it = findItem(f.dataset.k)?.it, n = (it?.qs || []).length, ans = [];
     for (let i = 0; i < n; i++) { const c = f.querySelector(`input[name="q${i}"]:checked`); if (!c) { $("#quiz-err").textContent = `Answer question ${i + 1} first.`; return; } ans.push(+c.value); }
@@ -2197,6 +2340,15 @@ document.addEventListener("submit", async (e) => {
     try { await busy(f.querySelector("button"), () => rpc("coach_result", { p_app: x.app, p_score: +$("#dsc-" + i).value || null, p_note: $("#dno-" + i).value, p_next: $("#dnx-" + i).value })); toast("Result sent to the student"); route(); } catch { /* shown */ }
     return;
   }
+  if (f.id === "pods-auto") {
+    try { const n = await busy(f.querySelector("button"), () => rpc("acad_pods_auto", { p_size: +$("#pa-size").value || 5, p_meet: $("#pa-meet").value })); toast(n ? `${n} pod${n === 1 ? "" : "s"} created` : "Everyone is already in a pod"); route(); } catch { /* shown */ }
+    return;
+  }
+  if (f.classList.contains("pod-form")) {
+    const g = (n) => f.querySelector(`[name="${n}"]`).value;
+    try { await busy(f.querySelector("button[type=submit]"), () => rpc("acad_pod_save", { p_id: f.dataset.id ? +f.dataset.id : null, p_name: g("name"), p_track: g("track"), p_meet: g("meet"), p_link: g("link") })); toast(f.dataset.id ? "Pod saved" : "Pod added"); route(); } catch { /* shown */ }
+    return;
+  }
   if (f.id === "session-form") {
     const v = (id) => $("#" + id).value;
     if (!v("se-date") || !v("se-time")) return toast("Add a date and start time");
@@ -2253,16 +2405,22 @@ function fitCert() {
 }
 window.addEventListener("resize", fitCert);
 const certUrl = (c) => `${location.origin}/verify/${c.cert_id}`;
-function certBlock(c) {
+function certBlock(c, pub) {
   const d = c.completed_on ? new Date(c.completed_on + "T12:00:00Z") : new Date();
   const li = "https://www.linkedin.com/profile/add?startTask=CERTIFICATION_NAME&name=" + encodeURIComponent(c.programme) + "&organizationName=" + encodeURIComponent("Jobnest Academy") +
     "&issueYear=" + d.getUTCFullYear() + "&issueMonth=" + (d.getUTCMonth() + 1) + "&certUrl=" + encodeURIComponent(certUrl(c)) + "&certId=" + encodeURIComponent(c.cert_id);
   CERT_NOW = c;
-  return `<div class="cert-actions"><button class="btn gold" data-act="cert-pdf">Download PDF</button><a class="btn li-btn" href="${esc(li)}" target="_blank" rel="noopener">Add to LinkedIn ↗</a><button class="btn ghost" data-act="cert-copy">Copy verification link</button></div>
+  return `<div class="cert-actions"><button class="btn gold" data-act="cert-pdf">Download PDF</button>${pub ? "" : `<a class="btn li-btn" href="${esc(li)}" target="_blank" rel="noopener">Add to LinkedIn ↗</a>`}<button class="btn ghost" data-act="cert-copy">Copy verification link</button></div>
     <div id="cert-box" class="cert-box">${certHTML(c)}</div>
     <p class="note" style="margin-top:.8rem">Employers can check it's real at <span class="mono" style="overflow-wrap:anywhere">${esc(certUrl(c).replace(/^https?:\/\//, ""))}</span></p>`;
 }
 let CERT_NOW = null;
+function pageVerify() {
+  app.innerHTML = pubHeader() + `<section class="wrap pub-wrap"><form class="card verify form" id="verify-form" novalidate><span class="eyebrow">For employers and recruiters</span><h1>Verify a certificate</h1>
+    <p>Enter the certificate number printed on a Jobnest Academy certificate (for example JNA-GEP27A-001), or the graduate's matric number.</p>
+    <div class="verify-row"><label class="sr-only" for="vq">Certificate number</label><input id="vq" class="mono" placeholder="e.g. JNA-GEP27A-001" autocapitalize="characters"><button class="btn" type="submit">Verify</button></div>
+    <p class="err" id="vq-err" role="alert"></p></form></section>` + pubFoot();
+}
 async function pageCertificate(code) {
   loading();
   let c = null;
@@ -2274,7 +2432,8 @@ async function pageCertificate(code) {
   app.innerHTML = pubHeader() + `<section class="wrap pub-wrap cert-page">
     <div class="verified"><span class="v-tick" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M5 12l5 5 9-9"/></svg></span><div><b>Verified certificate</b><span>Jobnest Academy issued this certificate. It is genuine.</span></div></div>
     <dl class="v-facts"><div><dt>Name</dt><dd>${esc(c.name)}</dd></div><div><dt>Programme</dt><dd>${esc(c.programme)}</dd></div>${c.track ? `<div><dt>Track</dt><dd>${esc(c.track)}</dd></div>` : ""}<div><dt>Completed</dt><dd>${esc(fmtDateD(c.completed_on))}</dd></div><div><dt>Certificate</dt><dd class="mono">${esc(c.cert_id)}</dd></div></dl>
-    ${certBlock(c)}</section>`;
+    ${certBlock(c, true)}
+    <form class="card form verify-again" id="verify-form" novalidate><h3>Check another certificate</h3><div class="verify-row"><label class="sr-only" for="vq">Certificate number</label><input id="vq" class="mono" placeholder="e.g. JNA-GEP27A-001" autocapitalize="characters"><button class="btn" type="submit">Verify</button></div></form></section>`;
   document.title = `Certificate · ${c.name} · Jobnest Academy`;
   fitCert();
 }
@@ -2397,6 +2556,7 @@ async function route() {
     if (p0 === "tracks") return pageTracks();
     if (p0 === "programmes") return pagePrograms();
     if ((p0 === "verify" || p0 === "certificate") && p1) return pageCertificate(p1);
+    if (p0 === "verify") return pageVerify();
     if (p0 === "start") return go("#/apply");
     if (p0 === "apply") {
       if (p1 === "zuri" && p2) { try { sessionStorage.setItem("jn_zuri", p2.slice(0, 4000)); } catch (e) {} history.replaceState(null, "", "/apply"); }

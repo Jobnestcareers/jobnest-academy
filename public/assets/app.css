@@ -321,3 +321,33 @@ a.fab{color:var(--brand-ink)}
 
 /* Light look on every device, even when the phone is in dark mode. */
 :root{color-scheme:light only}
+.qtimer{position:sticky;top:calc(52px + env(safe-area-inset-top,0px));z-index:12;display:flex;justify-content:space-between;align-items:center;gap:.6rem;flex-wrap:wrap;background:var(--navy,#10263D);color:#fff;border-radius:12px;padding:.6rem .9rem;margin:.4rem 0 1rem}
+.qtimer .note{color:#C9D6E2}.qtimer b{font-size:1.1rem}.qtimer.warn{background:#B3402F}
+.qstart .reqs{margin:.5rem 0 1rem}.retake{margin-top:1rem;border-color:var(--accent,#F4B740)}
+.item.seq-locked{opacity:.7;border-style:dashed}.item.seq-locked .ic{color:var(--lock)}
+.verify-row{display:flex;gap:.6rem;flex-wrap:wrap}.verify-row input{flex:1 1 220px;text-transform:uppercase}.verify-again{margin-top:1.2rem}
+.phone-in{display:flex;gap:.5rem}.phone-in select{flex:0 0 6.7rem;min-width:0;padding-right:1.4rem}.phone-in input{flex:1;min-width:0}
+.tour.placed{top:0;transform:translateX(-50%)}
+@media(max-width:520px){.tour{padding:1rem 1.1rem;gap:.55rem;border-radius:16px}.tour h2{font-size:1.08rem}.tour p{font-size:.9rem;line-height:1.45}.tour .ft .btn{padding:.6rem 1rem}}
+.spot-host{z-index:31!important}
+.snav-m summary .cnt-b{margin-left:.5rem;font-size:.72rem;background:var(--accent);color:#1b2430;border-radius:99px;padding:0 .45rem}
+.pod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem;margin-top:1rem}
+.pod-m{list-style:none;margin:.6rem 0 0;padding:0;display:grid;gap:.4rem}.pod-m li{display:flex;justify-content:space-between;align-items:center;gap:.5rem;flex-wrap:wrap}.pod-m select{max-width:11rem;padding:.3rem .5rem;font-size:.85rem}
+.pm{display:inline-flex;align-items:center;gap:.4rem;background:var(--surface-2);border-radius:99px;padding:.25rem .7rem .25rem .25rem}.pm .pa{width:28px;height:28px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font:700 .72rem var(--f-display)}.pm.me .pa{background:var(--accent);color:var(--ink)}
+/* Admission letter: always one A4 page */
+@media print{
+  @page{size:A4;margin:12mm 14mm}
+  html,body,#app{height:auto!important;min-height:0!important}
+  .letter{font-size:10pt!important;line-height:1.42}
+  .letter p,.letter li{margin:.35em 0!important}
+  .letter h1{margin:.5em 0 .35em!important;font-size:17pt}
+  .letter h2{margin:.6em 0 .2em!important;font-size:11.5pt!important}
+  .letter h3{margin:.6em 0 .2em!important;font-size:11pt}
+  .letter ul{margin:.2em 0!important}
+  .letter-kv{padding:.55rem .75rem!important;gap:.35rem .8rem!important;margin:.5em 0!important}
+  .sign{margin-top:.5rem!important}
+  .sig-wrap{height:54px!important}
+  .lf{margin-top:.4rem!important;padding-top:.5rem!important}
+  .letter{break-inside:avoid;page-break-inside:avoid}
+}
+@media print{.letter{gap:.4rem!important;padding:0!important}.lh{padding-bottom:.6rem!important}.letter-wrap{min-height:0!important}}
