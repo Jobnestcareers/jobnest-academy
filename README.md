@@ -92,6 +92,9 @@ bash dev/test_portal.sh         # student portal, grading, attendance and track 
 bash dev/test_timer.sh          # timed assessment: saving, time-outs and auto-submit
 python3 dev/e2e.py 1280         # full journey in a browser, including paying (use 390 for phone)
 ```
+The four `dev/test_*.sh` scripts print `ok` or `FAIL` for each check and exit non-zero if any check fails.
+GitHub Actions runs them against Postgres 16 on every push (`.github/workflows/db-tests.yml`).
+To use another server, set `PGHOST`, `PGPORT` and `PGUSER`.
 
 ## Build phases
 1. Foundations and admissions ✅ (this version)
