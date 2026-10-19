@@ -760,8 +760,12 @@ async function tabEmails() {
       <div class="actions"><button class="btn sm ghost" data-act="copy-mail" data-k="${m.id}">Copy email</button>${m.sent_at ? "" : `${m.error ? `<button class="btn sm" data-act="retry-mail" data-k="${m.id}">Try sending again</button>` : ""}<button class="btn sm ghost" data-act="mark-sent" data-k="${m.id}">I sent it by hand</button>`}</div></div></details>`).join("")}</div>` : `<div class="card" style="margin-top:1rem">${empty("No emails yet.")}</div>`}`);
 }
 
+const TEST_MODES = [["normal", "Normal (live)", "A week opens when the week before it is passed and its start date has come."],
+  ["progress", "Progress only (testing)", "Dates are ignored. A week opens as soon as all lessons and tasks in the week before are done and graded. Use this to test the locks."],
+  ["open", "All weeks open (content check)", "Every week is open, with no locks. Use this only to read through lessons and tasks."]];
+const TEST_MSG = { progress: "Testing: dates are ignored. Weeks open by progress only.", open: "Testing: students can see every week right now." };
 async function tabSettings() {
-  const [s, unlocked] = await Promise.all([rpc("admin_settings"), rpc("admin_test_unlock", {}).catch(() => false)]);
+  const [s, mode] = await Promise.all([rpc("admin_settings"), rpc("admin_test_mode", {}).catch(() => rpc("admin_test_unlock", {}).then((on) => (on ? "open" : "normal")).catch(() => "normal"))]);
   const c = s.cohort, p = s.programme;
   const f = (id, label, val, attrs = "") => `<div class="field"><label for="${id}">${label}</label><input id="${id}" value="${esc(val ?? "")}" ${attrs}></div>`;
   shell("settings", "Settings", "Changes apply straight away to the Academy site and admissions.",
@@ -782,9 +786,9 @@ async function tabSettings() {
         <p class="lbl" style="margin-top:.6rem">Who supports you: names and photo links</p>
         ${TEAM.map(([r], i) => { let tm = {}; try { tm = JSON.parse(s.site.team || "{}") || {}; } catch { /* empty */ } const m = tm[r] || {};
           return `<div class="grid2">${f(`st-tn${i}`, `${r}: name`, m.name || "")}${f(`st-tp${i}`, `${r}: photo link`, m.photo || "", 'type="url"')}</div>`; }).join("")}</div>
-      <div class="card"><h3>Testing</h3><p class="note">Opens every week of the student portal now, so the team can test lessons and tasks before the start date. Turn it off before launch.</p>
-        <label class="consent"><input type="checkbox" id="st-unlock" ${unlocked ? "checked" : ""}> <span>Open all portal weeks for testing</span></label>
-        <p class="note" id="st-unlock-msg" style="color:var(--danger,#B42318);font-weight:600">${unlocked ? "On: students can see every week right now." : ""}</p></div>
+      <div class="card"><h3>Testing</h3><p class="note">How weeks open in the student portal. Use a testing mode so the team can try the portal before the start date. Set it back to Normal before launch.</p>
+        <div class="modes" role="radiogroup" aria-label="How weeks open">${TEST_MODES.map(([k, l, d]) => `<label class="consent mode-opt"><input type="radio" name="st-mode" value="${k}" ${mode === k ? "checked" : ""}> <span><b>${l}</b><br><span class="note">${d}</span></span></label>`).join("")}</div>
+        <p class="note" id="st-unlock-msg" style="color:var(--danger,#B42318);font-weight:600">${TEST_MSG[mode] || ""}</p></div>
       <div class="card"><h3>Admission letter</h3><p class="note">Printed at the bottom of every admission letter.</p>${f("st-sname", "Signed by (full name)", s.site.signer_name)}${f("st-stitle", "Their title", s.site.signer_title)}</div>
     </div><p class="err" id="st-err" role="alert"></p><div class="actions" style="margin-top:1rem"><button class="btn" type="submit">Save settings</button></div></form>`);
 }
@@ -967,7 +971,7 @@ function weekGate(wi) {
   g.state = g.avg >= PASS() ? "pass" : "fail"; return g;
 }
 const weekDone = (wi) => { if (!weekItemsDone(wi)) return false; const g = weekGate(wi); return !g || g.state === "pass"; };
-const dateOpen = (wi) => wi === 0 || Date.now() >= weekStartAt(wi).getTime() - 2 * DAY;
+const dateOpen = (wi) => wi === 0 || LS.L.ignore_dates || Date.now() >= weekStartAt(wi).getTime() - 2 * DAY;
 function unlockedW(wi) { if (LS.L.unlock_all || wi === 0) return true; return weekDone(wi - 1) && dateOpen(wi); }
 const curWeek = () => { const i = LS.W.findIndex((_, wi) => !weekDone(wi)); return i < 0 ? LS.W.length - 1 : i; };
 const oathSigned = () => { const it = LS.W[0].items.find((x) => x.type === "oath"); return it ? isDoneIt(it) : true; };
@@ -1496,7 +1500,7 @@ function lsGraduatePage() {
   const ends = G.end_date ? new Date(G.end_date + "T12:00:00+01:00") : weekDue(LS.W.length - 1);
   const chk = [[`All ${LS.W.length} weeks complete`, all, `${done} of ${LS.W.length} done`], ["Internship evaluation from your supervisor", !!G.eval, G.eval ? "Received" : "Your host supervisor completes this in Week 13"],
     ["Exit survey", !!sv, sv ? "Thank you!" : "Below, 3 minutes"], ["Certificate issued", !!cert, cert ? "Ready to download" : "Jobnest issues it once the steps above are done"]];
-  const ck = (d) => { const c = (G.checkins || {})[d], opens = new Date(ends.getTime() + (d - 7) * DAY), open = LS.L.unlock_all || Date.now() >= opens.getTime();
+  const ck = (d) => { const c = (G.checkins || {})[d], opens = new Date(ends.getTime() + (d - 7) * DAY), open = LS.L.unlock_all || LS.L.ignore_dates || Date.now() >= opens.getTime();
     return `<form class="card form grad-ck" data-day="${d}" novalidate><div class="ch"><h3>${d}-day check-in</h3>${c ? `<span class="pill ok">Sent ${fmtDay(c.at)}</span>` : open ? `<span class="pill now">Open</span>` : `<span class="pill">Opens ${fmtD(opens)}</span>`}</div>
       ${open ? `<div class="field"><label for="ck${d}-st">What are you doing now?</label>${optSel(OUT_ST, c?.status || o?.status, `ck${d}-st`, "Choose one")}</div>
         <div class="field"><label for="ck${d}-note">Anything we can help with? (optional)</label><input id="ck${d}-note" value="${esc(c?.note || "")}" placeholder="e.g. I have an interview next week and want to practise"></div>
@@ -2363,10 +2367,11 @@ document.addEventListener("change", (e) => {
   if (el.id === "g-cc") { el.dataset.touched = "1"; ccShow(); }
   if ((el.id === "g-first" || el.id === "g-sur") && el.value.trim()) el.value = nameCase(el.value);
   if (el.id === "g-town") { const o = $("#g-town-o"); o.hidden = el.value !== "Other"; if (!o.hidden) o.focus(); }
-  if (el.id === "st-unlock") {
-    const on = el.checked; el.disabled = true;
-    rpc("admin_test_unlock", { p_on: on }).then((r) => { el.checked = r; $("#st-unlock-msg").textContent = r ? "On: students can see every week right now." : ""; toast(r ? "All portal weeks are open for testing" : "Portal weeks are back to their dates"); })
-      .catch((x) => { el.checked = !on; toast(x.message); }).finally(() => { el.disabled = false; });
+  if (el.name === "st-mode") {
+    const m = el.value; $$("input[name=st-mode]").forEach((x) => (x.disabled = true));
+    rpc("admin_test_mode", { p_mode: m }).then((r) => { $("#st-unlock-msg").textContent = TEST_MSG[r] || ""; toast(r === "open" ? "All portal weeks are open for testing" : r === "progress" ? "Weeks now open by progress only. Dates are ignored." : "Portal weeks are back to normal"); })
+      .catch((x) => toast(x.message)).finally(() => $$("input[name=st-mode]").forEach((x) => (x.disabled = false)));
+    return;
   }
   if (el.name === "plan" && $("#pay-btn")) $("#pay-btn").textContent = `Accept and pay ${naira(+el.dataset.amount)}`;
 });

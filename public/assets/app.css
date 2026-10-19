@@ -402,3 +402,4 @@ img.av{object-fit:cover}
 .fee-amt{font-family:var(--f-display);font-weight:800}
 .idcard dt{color:rgba(255,255,255,.75)}
 .notice.careers-n{margin-bottom:1rem;border-color:var(--accent)}
+.modes{display:grid;gap:.5rem;margin:.6rem 0}.mode-opt{align-items:flex-start}
