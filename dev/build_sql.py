@@ -46,6 +46,6 @@ for k, t in tpl.items():
 out.append(",\n".join(trows))
 out.append("on conflict (key) do nothing;")
 (root / 'supabase/03_seed.sql').write_text("\n".join(out) + "\n")
-parts = [(root / f'supabase/{n}').read_text() for n in ['01_schema.sql', '02_functions.sql', '03_seed.sql', '04_email_sending.sql', '05_payments.sql', '06_portal.sql', '07_timer_tour.sql', '08_five_minutes.sql', '09_test_unlock.sql', '10_continue.sql', '11_calls.sql', '12_certificates.sql', '13_landing.sql', '14_learning.sql', '15_phase2.sql', '16_jobsearch.sql', '17_graduation.sql', '18_cert_matric.sql', '19_feedback.sql', '19b_quiz_bank.sql', '20_community.sql', '21_updates.sql']]
+parts = [(root / f'supabase/{n}').read_text() for n in ['01_schema.sql', '02_functions.sql', '03_seed.sql', '04_email_sending.sql', '05_payments.sql', '06_portal.sql', '07_timer_tour.sql', '08_five_minutes.sql', '09_test_unlock.sql', '10_continue.sql', '11_calls.sql', '12_certificates.sql', '13_landing.sql', '14_learning.sql', '15_phase2.sql', '16_jobsearch.sql', '17_graduation.sql', '18_cert_matric.sql', '19_feedback.sql', '19b_quiz_bank.sql', '20_community.sql', '21_updates.sql', '22_platform_links.sql']]
 (root / 'supabase/setup.sql').write_text("-- Jobnest Academy: full database setup. Paste into Supabase → SQL Editor → Run.\n\n" + "\n\n".join(parts))
 print('rows', len(rows), 'templates', len(trows))

@@ -401,3 +401,4 @@ img.av{object-fit:cover}
 .dp-form textarea{font:inherit;font-size:.95rem;width:100%;border:1.5px solid var(--line);border-radius:10px;padding:.6rem .7rem;background:var(--surface);color:var(--ink)}
 .fee-amt{font-family:var(--f-display);font-weight:800}
 .idcard dt{color:rgba(255,255,255,.75)}
+.notice.careers-n{margin-bottom:1rem;border-color:var(--accent)}

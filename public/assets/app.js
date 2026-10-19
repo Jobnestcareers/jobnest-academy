@@ -775,6 +775,8 @@ async function tabSettings() {
       <div class="card"><h3>Fee</h3><div class="grid2">${f("st-fee", "Full fee (₦)", p.fee, 'type="number" min="0" step="1000"')}${f("st-pct", "Extra for 2 instalments (%)", p.inst_pct, 'type="number" min="0" max="50"')}</div><p class="note">2 instalments total: ${naira(p.inst_total)}</p></div>
       <div class="card"><h3>Seats by track</h3>${s.tracks.map((t) => `<div class="grid2" style="align-items:end"><div class="field"><label for="seat-${t.code}">${esc(t.name)}</label><input id="seat-${t.code}" type="number" min="0" value="${t.seats}" data-track="${t.code}"></div><label class="consent"><input type="checkbox" id="pause-${t.code}" ${t.paused ? "checked" : ""}> Paused</label></div>`).join("")}</div>
       <div class="card"><h3>Links</h3>${f("st-site", "Academy address", s.site.site_url, 'type="url"')}${f("st-web", "Jobnest website", s.site.website_url, 'type="url"')}${f("st-call", "Discovery Call meeting link (Teams)", s.site.call_link, 'type="url"')}${f("st-zuri", "Zuri chat link", s.site.zuri_url, 'type="url"')}</div>
+      <div class="card"><h3>Jobnest platforms</h3><p class="note">Leave each one empty until it launches. Once filled in, students see the link on their Opportunities, Graduation and My Career pages.</p>
+        ${f("st-careers", "Jobnest Careers (jobs and opportunities) link", s.site.careers_url, 'type="url" placeholder="https://careers.jobnestcareers.com"')}${f("st-recruit", "Jobnest Recruit (employers) link", s.site.recruit_url, 'type="url" placeholder="https://recruit.jobnestcareers.com"')}</div>
       <div class="card"><h3>Landing page</h3><p class="note">Optional. Each part shows on the Academy landing page only once it's filled in.</p>
         ${f("st-info", "Free info session link (e.g. a booking form)", s.site.info_session_url, 'type="url"')}${f("st-sample", "Sample lesson link", s.site.sample_lesson_url, 'type="url"')}
         <p class="lbl" style="margin-top:.6rem">Who supports you: names and photo links</p>
@@ -1035,7 +1037,7 @@ function lsHome(cert) {
   const bal = LS.fee ? `<div class="notice bal bad"><span><b>Your learning is paused.</b> Your second instalment of <b>${naira(LS.fee.balance)}</b> was due on ${fmtDateD(LS.fee.due_date)}. Pay the balance to open your lessons again.</span><a class="btn sm gold" href="#/a/${esc(LS.fee.ref)}/${esc(LS.fee.token)}/pay">Pay now</a></div>`
     : C.me.balance > 0 ? `<div class="notice bal"><span>Your second instalment of <b>${naira(C.me.balance)}</b> is due by ${fmtDateD(C.me.due_date)}.</span><a class="btn sm gold" href="#/a/${esc(C.me.ref)}/${esc(C.me.token)}/pay">Pay now</a></div>` : "";
   const certCard = cert ? `<div class="card cert-card"><span class="eyebrow">Certificate of completion</span><h2>Your certificate is ready 🎓</h2><div class="actions"><a class="btn gold" href="#/learn/certificate">View and download</a></div></div>` : "";
-  lsShell("home", pageHead(`Week ${cur + 1} of ${LS.W.length} · ${esc(C.me.track || "")}`, `${greeting()}, ${esc(C.me.first_name)}`, esc(before ? `The programme starts on ${fmtDateD(LS.L.start_date)}. You can start Week 1 now.` : encouragement(cur))) +
+  lsShell("home", pageHead(`Week ${cur + 1} of ${LS.W.length} · ${esc(C.me.track || "")}`, `${greeting()}, ${esc(C.me.first_name)}`, esc(before && !weekDone(0) ? `The programme starts on ${fmtDateD(LS.L.start_date)}. You can start Week 1 now.` : encouragement(cur))) +
   `<section class="wrap home">${installCard()}${bal}${certCard}
     ${allWeeksDone() ? gradHero() : `<div class="card today" id="t-today"><div class="today-l">
         ${cur === 0 ? "" : `<p class="cd-inline ${dl.c}">⏳ <b>${daysLeft} day${daysLeft === 1 ? "" : "s"} left</b> · due ${fmtD(weekDue(cur))}, 17:00</p>`}
@@ -1487,6 +1489,7 @@ function gradHero() {
     <div class="actions"><a class="btn gold" href="#/learn/graduate">See your next steps →</a></div></div></div>`;
 }
 const optSel = (L, v, id, ph) => `<select id="${id}">${ph ? `<option value="">${ph}</option>` : ""}${L.map(([k, l]) => `<option value="${k}" ${k === v ? "selected" : ""}>${l}</option>`).join("")}</select>`;
+const webUrl = (u) => (/^https?:\/\/\S+$/i.test(u || "") ? u : ""), careersUrl = () => webUrl(INFO && INFO.careers_url), recruitUrl = () => webUrl(INFO && INFO.recruit_url);
 function lsGraduatePage() {
   const G = LS.G || {}, me = LS.C.me, done = LS.W.filter((_, i) => weekDone(i)).length, all = done === LS.W.length, cert = LS.cert, o = G.outcome, sv = G.survey;
   const apps = draft("apps", []), ints = apps.filter((a) => a.st === "Interviewing" || a.st === "Offer").length, avg = avgScore();
@@ -1520,9 +1523,10 @@ function lsGraduatePage() {
         <div class="field"><label for="gs-quote">A sentence about your experience (optional)</label><textarea id="gs-quote" rows="2" placeholder="e.g. Jobnest gave me real work experience and the confidence to apply."></textarea></div>
         <label class="check"><input type="checkbox" id="gs-ok"> Jobnest may share this sentence with my first name and track on its website and social media.</label>
         <p class="err" id="gs-err" role="alert"></p><div><button class="btn" type="submit">Send survey</button></div></form>`}
-      <div class="card next-opp ${cert ? "" : "lk"}"><div class="ch"><h3>Find your next opportunity</h3>${cert ? `<span class="pill ok">Open</span>` : `<span class="pill">🔒 Locked</span>`}</div>
-        ${cert ? `<p class="note">You're a Jobnest graduate. Browse jobs, internships and graduate programmes on Jobnest Careers, and apply with your verified certificate.</p><div class="actions"><a class="btn gold" href="https://jobnestcareers.com/#opportunities" target="_blank" rel="noopener">Go to Jobnest Opportunities ↗</a></div>`
-          : `<p class="note">Jobnest Career Opportunities opens here once your certificate is issued. Finish the steps on the left first.</p>`}</div>
+      <div class="card next-opp ${cert && careersUrl() ? "" : "lk"}"><div class="ch"><h3>Find your next opportunity</h3>${!cert ? `<span class="pill">🔒 Locked</span>` : careersUrl() ? `<span class="pill ok">Open</span>` : `<span class="pill">Coming soon</span>`}</div>
+        ${!cert ? `<p class="note">Jobnest Careers opens here once your certificate is issued. Finish the steps on the left first.</p>`
+          : careersUrl() ? `<p class="note">You're a Jobnest graduate. Browse jobs, internships and graduate programmes on Jobnest Careers, and apply with your verified certificate.</p><div class="actions"><a class="btn gold" href="${esc(careersUrl())}" target="_blank" rel="noopener">Go to Jobnest Careers ↗</a></div>`
+          : `<p class="note">Jobnest Careers, our jobs and opportunities platform, is launching soon. Your link will appear here, and we'll send you an alert when it opens. Until then, use the Opportunities page.</p><div class="actions"><a class="btn sm ghost" href="#/learn/opps">Opportunities</a></div>`}</div>
       <div class="card"><h3>Keep your job search going</h3><p class="note">Your portal stays open after the programme. Keep using your tools:</p>
         <div class="actions"><a class="btn sm ghost" href="#/learn/learning/${LS.W.length}">Applications board</a><a class="btn sm ghost" href="#/learn/learning/${LS.W.findIndex((w) => w.stage === 5) + 1}">CV builder</a><a class="btn sm ghost" href="#/learn/help">Help & Support</a></div></div>
     </div></div>
@@ -1716,7 +1720,9 @@ function lsCareerPage() {
         <div class="field"><label for="cg-plan">Your 90-day action plan</label><textarea id="cg-plan" data-cr="plan" rows="3" placeholder="Three concrete things you'll do in the next 90 days">${esc(c.plan || "")}</textarea></div>
         <p class="note">Saved automatically as you type.</p></div>
       ${discussionCard(LS.discCareer || [], false, "career")}
-      <div class="card"><h3>Talent matching</h3><p class="note">When Jobnest Recruit is connected, you can choose to share your verified skills and portfolio with employers. Nothing is shared without your consent.</p>
+      <div class="card"><div class="ch"><h3>Talent matching</h3>${recruitUrl() ? `<span class="pill ok">Live</span>` : `<span class="pill">Coming soon</span>`}</div>
+        <p class="note">${recruitUrl() ? "Employers hire through Jobnest Recruit. If you agree, they can see your assessed skills and the portfolio items you've made visible. Nothing is shared without your consent." : "When Jobnest Recruit launches, you can choose to share your assessed skills and portfolio with employers hiring through it. Nothing is shared without your consent."}</p>
+        ${recruitUrl() ? `<div class="actions" style="margin-bottom:.4rem"><a class="btn sm ghost" href="${esc(recruitUrl())}" target="_blank" rel="noopener">Visit Jobnest Recruit ↗</a></div>` : ""}
         <label class="check"><input type="checkbox" data-cr="consent" ${c.consent ? "checked" : ""}> I'd like to be considered for talent matching</label></div>
     </div></div></section>`);
 }
@@ -1728,6 +1734,7 @@ function lsOppsPage() {
   const shown = O.filter((o) => f === "All" || (f === "Saved" ? saved[o.id] : o.kind === f)), tracked = O.filter((o) => st[o.id]);
   const days = (dl) => dl ? Math.ceil((new Date(dl + "T23:59:00+01:00") - Date.now()) / DAY) : null;
   lsShell("opps", pageHead("Opportunities", "Find your next step", "Jobs, internships, graduate programmes, freelance work and career events, shared by the Jobnest team. Listings for your track come first.") + `<section class="wrap pagebody">
+    ${careersUrl() ? `<div class="notice careers-n"><span><b>More opportunities on Jobnest Careers.</b> Browse every live job, internship and graduate programme on our careers platform.</span><a class="btn sm gold" href="${esc(careersUrl())}" target="_blank" rel="noopener">Open Jobnest Careers ↗</a></div>` : ""}
     ${O.length ? `<div class="chips" role="group" aria-label="Filter opportunities">${kinds.map((t) => `<button class="chipf" data-act="opp-f" data-k="${esc(t)}" aria-pressed="${f === t}">${esc(t)}${t === "Saved" && Object.keys(saved).length ? ` (${Object.keys(saved).length})` : ""}</button>`).join("")}</div>` : ""}
     <div class="cols wide"><div class="opps">${shown.length ? shown.map((o) => { const dd = days(o.deadline); return `<article class="card opp"><div class="ch"><div><span class="tag">${esc(o.kind)}</span>${o.match ? ` <span class="pill ok">Matches your track</span>` : ""}<h3 style="margin-top:.5rem">${esc(o.title)}</h3><p class="note">${esc(o.org)}${o.location ? " · " + esc(o.location) : ""}</p></div>
       <button class="save" data-act="opp-save" data-k="${o.id}" aria-pressed="${!!saved[o.id]}" aria-label="${saved[o.id] ? "Remove from saved" : "Save opportunity"}"><svg width="20" height="20" viewBox="0 0 24 24" fill="${saved[o.id] ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2"><path d="M6 3h12v18l-6-4-6 4z"/></svg></button></div>
@@ -1783,7 +1790,7 @@ async function pageLearn(p1, p2, p3) {
   if (!isStudent()) { app.innerHTML = learnCard(`<h1>You're signed in as staff</h1><p>Sign out first to use the student portal.</p><div class="actions"><a class="btn" href="#/portal">Go to the staff portal</a><button class="btn ghost" data-act="signout-learn">Sign out</button></div>`); return; }
   if (!LS) loading();
   try {
-    const [C, L, ex, ct, mod, X, G, POD, N, FEE, PF] = await Promise.all([rpc("student_campus"), rpc("learn_state"), rpc("student_campus_extra").catch(() => ({})), rpc("student_certificate").catch(() => null), COURSE_DATA ? null : import("./course.js"), rpc("learn_extra").catch(() => ({})), rpc("grad_state").catch(() => ({})), rpc("student_pod").catch(() => null), rpc("notices_list").catch(() => null), rpc("learn_fee_lock").catch(() => null), LS && LS.photo !== undefined ? null : rpc("profile_get").catch(() => ({}))]);
+    const [C, L, ex, ct, mod, X, G, POD, N, FEE, PF] = await Promise.all([rpc("student_campus"), rpc("learn_state"), rpc("student_campus_extra").catch(() => ({})), rpc("student_certificate").catch(() => null), COURSE_DATA ? null : import("./course.js"), rpc("learn_extra").catch(() => ({})), rpc("grad_state").catch(() => ({})), rpc("student_pod").catch(() => null), rpc("notices_list").catch(() => null), rpc("learn_fee_lock").catch(() => null), LS && LS.photo !== undefined ? null : rpc("profile_get").catch(() => ({})), info().catch(() => null)]);
     if (mod) { COURSE_DATA = mod.COURSE; COURSE_STAGES = mod.COURSE.stages; }
     CAMPUS = C; CAMPUS.cert = ct;
     const cert = ct && ct.cert_id ? ct : null; CAMPUS.cert = cert;
@@ -2434,7 +2441,7 @@ document.addEventListener("submit", async (e) => {
     const v = (id) => $("#" + id).value;
     const p = { cohort: { name: v("st-name"), start_date: v("st-start"), year2: v("st-year"), batch: v("st-batch"), applications_open: $("#st-open").checked, pass_mark: +v("st-pass"), ready_n: +v("st-n"), assess_minutes: +v("st-mins"), offer_days: +v("st-days"), inst_due_week: +v("st-due") },
       programme: { fee: +v("st-fee"), inst_pct: +v("st-pct") }, tracks: $$("[data-track]").map((i) => ({ code: i.dataset.track, seats: +i.value, paused: $("#pause-" + i.dataset.track).checked })),
-      site: { site_url: v("st-site"), website_url: v("st-web"), zuri_url: v("st-zuri"), call_link: v("st-call"), info_session_url: v("st-info"), sample_lesson_url: v("st-sample"), team: JSON.stringify(Object.fromEntries(TEAM.map(([r], i) => [r, { name: v(`st-tn${i}`), photo: v(`st-tp${i}`) }]).filter(([, m]) => m.name || m.photo))), signer_name: v("st-sname"), signer_title: v("st-stitle") } };
+      site: { site_url: v("st-site"), website_url: v("st-web"), zuri_url: v("st-zuri"), call_link: v("st-call"), info_session_url: v("st-info"), sample_lesson_url: v("st-sample"), team: JSON.stringify(Object.fromEntries(TEAM.map(([r], i) => [r, { name: v(`st-tn${i}`), photo: v(`st-tp${i}`) }]).filter(([, m]) => m.name || m.photo))), signer_name: v("st-sname"), signer_title: v("st-stitle"), careers_url: v("st-careers"), recruit_url: v("st-recruit") } };
     try { await busy(f.querySelector("button[type=submit]"), () => rpc("admin_save_settings", { p })); INFO = null; toast("Settings saved"); route(); } catch (x) { $("#st-err").textContent = x.message; }
     return;
   }
