@@ -194,12 +194,13 @@ const select = (id, opts) => `<select id="${id}">${["", ...opts].map((o) => `<op
 const STEPS = ["Apply", "Readiness check", "Call", "Offer", "Pay", "Admitted"];
 const stepBar = (n) => `<ol class="stepbar" aria-label="Your progress: step ${n + 1} of ${STEPS.length}">${STEPS.map((t, i) => `<li class="${i < n ? "done" : i === n ? "now" : ""}"${i === n ? ' aria-current="step"' : ""}><span></span><em>${t}</em></li>`).join("")}</ol><p class="stepbar-m" aria-hidden="true">Step ${n + 1} of ${STEPS.length} · ${STEPS[n]}</p>`;
 
+const pilotCode = () => { try { return sessionStorage.getItem("jn_pilot") || ""; } catch (e) { return ""; } };
 function pageApply() {
-  if (!appsOpen()) return go("#/gep");
+  if (!appsOpen() && !pilotCode()) return go("#/gep");
   let zuri = ""; try { zuri = sessionStorage.getItem("jn_zuri") || ""; } catch (e) {}
   const zGoal = (zuri.match(/^Goal[^:]*:\s*(.+)$/m) || [])[1] || "";
   app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><form class="card form app-form" id="apply-form" novalidate>
-    ${stepBar(0)}<h1>Apply to the ${esc(prog().name)}</h1>
+    ${stepBar(0)}${pilotCode() ? `<div class="notice pilot-n"><span><b>Pilot test.</b> You're helping us test Jobnest Academy before launch. Everything works like the real programme, but you won't be asked to pay, and your test account is deleted when testing ends.</span></div>` : ""}<h1>Apply to the ${esc(prog().name)}</h1>
     <p class="note">You don't pick a track here. You'll agree it together on your Discovery Call.</p>
     ${!zuri && INFO.zuri_url ? `<p class="zuri-hint">Not sure what you want to do yet? <a href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Chat with Zuri first ↗</a> She'll fill this form in for you at the end.</p>` : ""}
     <h3>About you</h3>
@@ -269,7 +270,7 @@ const nameCase = (v) => { v = v.trim().replace(/\s+/g, " "); return v === v.toLo
 async function submitApply(form) {
   const v = (id) => ($("#" + id)?.value || "").trim();
   const r = (n) => $(`input[name="${n}"]:checked`)?.value || "";
-  const d = { first_name: nameCase(v("g-first")), surname: nameCase(v("g-sur")), email: v("g-email"), phone: phoneValue(), city: cityValue(), edu: v("g-edu"), nysc: v("g-nysc"),
+  const d = { pilot: pilotCode() || undefined, first_name: nameCase(v("g-first")), surname: nameCase(v("g-sur")), email: v("g-email"), phone: phoneValue(), city: cityValue(), edu: v("g-edu"), nysc: v("g-nysc"),
     situation: v("g-sit"), hours: r("g-hours"), laptop: r("g-laptop"), internet: r("g-net"), motivation: v("g-mot"), zuri_summary: v("g-zuri") };
   const miss = [["first_name", "first name"], ["surname", "surname"], ["email", "email"], ["phone", "WhatsApp number"], ["city", "where you live"], ["edu", "education"], ["nysc", "NYSC status"],
     ["situation", "current situation"], ["hours", "weekly hours"], ["laptop", "laptop"], ["internet", "internet"], ["motivation", "6-month answer"]].filter(([k]) => !d[k]).map(([, l]) => l);
@@ -337,6 +338,8 @@ function statusCard(a, base) {
 
 function offerCard(a, base) {
   const f = a.fees, tok = base.split("/").pop();
+  if (a.pilot) return `<div class="offer"><span class="eyebrow">Pilot · offer of admission</span><h2>You've been offered a place in the pilot, ${esc(a.first_name)}!</h2><p>${esc(a.track || "")} track · ${esc(a.cohort)}</p>
+    <p>You don't need to pay. The Jobnest team will admit you shortly, and you'll get your matric number and student portal link by email.</p></div>`;
   return `<div class="offer"><span class="eyebrow">Offer of admission</span><h2>Congratulations, ${esc(a.first_name)}! You've been offered a place.</h2><p>${esc(a.track || "")} track · ${esc(a.cohort)}</p>
     <p class="deadline">⏳ Accept and pay by <b>${fmtLong(a.offer_deadline)}, ${fmtTime(a.offer_deadline)} WAT</b>, or your seat goes to the waitlist.</p></div>
     <fieldset class="pay-choose"><legend class="lbl">How would you like to pay?</legend><div class="plans">
@@ -1006,7 +1009,7 @@ async function tabPipeline() {
   const review = apps.filter((a) => a.status === "Under review"), soon = apps.filter((a) => a.status === "Offer sent" && a.offer_deadline && new Date(a.offer_deadline) - Date.now() < 2 * 864e5).sort((a, b) => new Date(a.offer_deadline) - new Date(b.offer_deadline));
   const seats = ov.tracks.reduce((t, x) => t + x.seats, 0), used = ov.tracks.reduce((t, x) => t + x.used, 0);
   const offers = (code) => apps.filter((a) => a.status === "Offer sent" && a.track_code === code).length, waitl = (code) => apps.filter((a) => a.status === "Waitlisted" && a.track_code === code).length;
-  const row = (a) => `<li class="sc-q"><span class="st-av">${ini(a.first_name + " " + a.surname)}</span><div class="sc-q-t"><div class="sc-q-h"><b>${esc(a.first_name)} ${esc(a.surname)}</b><span class="mono note">${esc(a.ref)}</span></div>
+  const row = (a) => `<li class="sc-q"><span class="st-av">${ini(a.first_name + " " + a.surname)}</span><div class="sc-q-t"><div class="sc-q-h"><b>${esc(a.first_name)} ${esc(a.surname)}</b>${a.pilot ? `<span class="pill gold">Pilot</span>` : ""}<span class="mono note">${esc(a.ref)}</span></div>
       <span class="note">${esc(a.track_name || a.wanted || "")} · ${esc(a.city || "")} · ${esc(a.situation || "")}</span>
       <span class="sc-tags">${a.score != null ? `<span class="pill info">Readiness ${a.score}%</span>` : ""}${a.dc1_score ? `<span class="pill info">Call ${a.dc1_score}/10</span>` : ""}${a.rec ? `<span class="pill ${a.rec.d === "offer" ? "ok" : a.rec.d === "waitlist" ? "now" : "bad"}">Officer: ${REC_L[a.rec.d]}</span>` : ""}${a.offer_deadline && a.status === "Offer sent" ? `<span class="pill now">Pay by ${fmtDay(a.offer_deadline)}</span>` : ""}</span>
       ${a.rec?.why || a.dc1_note ? `<span class="note"><i>“${esc(a.rec?.why || a.dc1_note)}”</i>${a.officer_name ? ` · ${esc(a.officer_name)}` : ""}</span>` : ""}</div>
@@ -1113,7 +1116,7 @@ function appRow(a, mode, tracks) {
   else if (dec && ["adm_admin", "super"].includes(ME.role)) acts = decideButtons(a);
   else if (dec) acts = `<p class="note">${a.status === "Under review" ? "Waiting for the Admissions Admin to decide." : "The Admissions Admin can send an offer when a seat frees up."}</p>`;
   const hidden = mode === "list" && (ui.q ? !(`${a.first_name} ${a.surname} ${a.email} ${a.ref}`.toLowerCase().includes(ui.q)) : g !== ui.admG);
-  return `<details class="arow" data-id="${a.id}" data-g="${g}" ${ui.open === a.id ? "open" : ""} ${hidden ? "hidden" : ""}><summary><span class="aav">${esc(ini)}</span><span class="an"><b>${esc(a.first_name)} ${esc(a.surname)}</b><span class="note">${esc(a.ref)} · ${esc(a.track_name || "Track not agreed yet")}</span></span><span class="anext">${esc(nextStep(a))}</span>${pill(a.status)}</summary>
+  return `<details class="arow" data-id="${a.id}" data-g="${g}" ${ui.open === a.id ? "open" : ""} ${hidden ? "hidden" : ""}><summary><span class="aav">${esc(ini)}</span><span class="an"><b>${esc(a.first_name)} ${esc(a.surname)}${a.pilot ? ` <span class="pill gold">Pilot</span>` : ""}</b><span class="note">${esc(a.ref)} · ${esc(a.track_name || "Track not agreed yet")}</span></span><span class="anext">${esc(nextStep(a))}</span>${pill(a.status)}</summary>
     <div class="abody">${details(a)}${recCard(a)}${decCard(a)}${acts ? `<div class="staff-act">${acts}</div>` : ""}
       <details class="atl" data-act-toggle="timeline" data-k="${a.id}"><summary class="link sm">Timeline & emails</summary><div class="tl-body"><p class="note">Loading…</p></div></details></div></details>`;
 }
@@ -1192,7 +1195,7 @@ async function tabPay() {
   const row = (a) => {
     const mine = d.payments.filter((y) => y.app_ref === a.ref && y.status === "success");
     const canRec = ["Offer sent", "Offer expired"].includes(a.status) || balanceOf(a) > 0;
-    return `<details class="arow" data-id="${a.id}" ${ui.open === a.id ? "open" : ""}><summary><span class="aav">${esc(((a.first_name[0] || "") + (a.surname[0] || "")).toUpperCase())}</span><span class="an"><b>${esc(a.first_name)} ${esc(a.surname)}</b><span class="note">${esc(a.matric || a.ref)} · ${esc(a.track_name || "")}</span></span><span class="anext">${esc(line(a))}</span>${pill(a.status)}</summary>
+    return `<details class="arow" data-id="${a.id}" ${ui.open === a.id ? "open" : ""}><summary><span class="aav">${esc(((a.first_name[0] || "") + (a.surname[0] || "")).toUpperCase())}</span><span class="an"><b>${esc(a.first_name)} ${esc(a.surname)}${a.pilot ? ` <span class="pill gold">Pilot</span>` : ""}</b><span class="note">${esc(a.matric || a.ref)} · ${esc(a.track_name || "")}</span></span><span class="anext">${esc(line(a))}</span>${pill(a.status)}</summary>
       <div class="abody"><dl class="kv app-kv"><div><dt>Contact</dt><dd>${esc(a.email)} · ${esc(a.phone)}</dd></div>
         <div><dt>Payments</dt><dd>${mine.length ? mine.map((y) => `${naira(y.amount_paid ?? y.amount)} · ${PART[y.part]} · ${fmtAt(y.paid_at)} · ${y.channel === "manual" ? `recorded by staff (${esc(y.note || "")})` : esc(y.channel || "")}`).join("<br>") : "None yet"}</dd></div></dl>
         <div class="staff-act">${canRec ? `<form class="form recpay-form" data-k="${a.id}" novalidate><p class="eyebrow">Record a payment made outside Paystack</p><div class="grid2"><div class="field"><label for="ra-${a.id}">Amount received (₦)</label><input id="ra-${a.id}" type="number" min="1" step="500" inputmode="numeric" value="${a.status === "Admitted" ? balanceOf(a) : a.fees.fee}"></div><div class="field"><label for="rn-${a.id}">Note</label><input id="rn-${a.id}" placeholder="e.g. GTBank transfer, ref 0091"></div></div><div class="actions"><button class="btn sm" type="submit">Record payment</button></div></form>` : ""}
@@ -1221,7 +1224,8 @@ const TEST_MODES = [["normal", "Normal (live)", "A week opens when the week befo
   ["open", "All weeks open (content check)", "Every week is open, with no locks. Use this only to read through lessons and tasks."]];
 const TEST_MSG = { progress: "Testing: dates are ignored. Weeks open by progress only.", open: "Testing: students can see every week right now." };
 async function tabSettings() {
-  const [s, mode] = await Promise.all([rpc("admin_settings"), rpc("admin_test_mode", {}).catch(() => rpc("admin_test_unlock", {}).then((on) => (on ? "open" : "normal")).catch(() => "normal"))]);
+  const [s, mode, pilot] = await Promise.all([rpc("admin_settings"), rpc("admin_test_mode", {}).catch(() => rpc("admin_test_unlock", {}).then((on) => (on ? "open" : "normal")).catch(() => "normal")), ME.role === "super" ? rpc("admin_pilot", { p_action: "status" }).catch(() => null) : null]);
+  const P = pilot && pilot.pilot, plink = P ? `${location.origin}/apply/pilot/${pilot.code}` : "";
   const c = s.cohort, p = s.programme;
   const f = (id, label, val, attrs = "") => `<div class="field"><label for="${id}">${label}</label><input id="${id}" value="${esc(val ?? "")}" ${attrs}></div>`;
   shell("settings", "Settings", "Changes apply straight away to the Academy site and admissions.",
@@ -1242,6 +1246,13 @@ async function tabSettings() {
         <p class="lbl" style="margin-top:.6rem">Who supports you: names and photo links</p>
         ${TEAM.map(([r], i) => { let tm = {}; try { tm = JSON.parse(s.site.team || "{}") || {}; } catch { /* empty */ } const m = tm[r] || {};
           return `<div class="grid2">${f(`st-tn${i}`, `${r}: name`, m.name || "")}${f(`st-tp${i}`, `${r}: photo link`, m.photo || "", 'type="url"')}</div>`; }).join("")}</div>
+      ${pilot ? `<div class="card pilot-card"><h3>Pilot cohort</h3>${P ? `<p class="note">Outside testers apply through this private link into their own cohort, so real applicants stay in ${esc(s.cohort.name)}. They never pay: admit them with <b>Record a bank transfer</b> on Payments.</p>
+        <dl class="kv"><div><dt>Cohort</dt><dd>${esc(P.name)} · matric numbers like <span class="mono">${esc(P.matric)}</span></dd></div><div><dt>Testers</dt><dd>${pilot.applied} applied · ${pilot.admitted} admitted</dd></div><div><dt>Sign-ups</dt><dd>${P.open ? `<span class="pill ok">Open</span>` : `<span class="pill">Closed</span>`}</dd></div></dl>
+        <div class="field"><label for="pl-link">Pilot application link</label><input id="pl-link" readonly value="${esc(plink)}"></div>
+        <div class="actions"><button type="button" class="btn sm" data-act="copy-host" data-k="${esc(plink)}">Copy link</button><button type="button" class="btn sm ghost" data-act="pilot-${P.open ? "close" : "open"}">${P.open ? "Close sign-ups" : "Reopen sign-ups"}</button></div>
+        <p class="note">When testing is over, run <b>cleanup_pilot.sql</b> in Supabase. It deletes the pilot cohort and every tester, and keeps everything else.</p>`
+        : `<p class="note">Let outside testers try the whole student journey before launch, in their own cohort, without touching ${esc(s.cohort.name)}. You'll get a private application link to send them.</p>
+        <div class="actions"><button type="button" class="btn sm" data-act="pilot-create">Start a pilot cohort</button></div>`}</div>` : ""}
       <div class="card"><h3>Testing</h3><p class="note">How weeks open in the student portal. Use a testing mode so the team can try the portal before the start date. Set it back to Normal before launch.</p>
         <div class="modes" role="radiogroup" aria-label="How weeks open">${TEST_MODES.map(([k, l, d]) => `<label class="consent mode-opt"><input type="radio" name="st-mode" value="${k}" ${mode === k ? "checked" : ""}> <span><b>${l}</b><br><span class="note">${d}</span></span></label>`).join("")}</div>
         <p class="note" id="st-unlock-msg" style="color:var(--danger,#B42318);font-weight:600">${TEST_MSG[mode] || ""}</p></div>
@@ -2750,6 +2761,9 @@ document.addEventListener("click", async (e) => {
   if (a === "dp-del") { if (!confirm("Delete your post?")) return; try { await busy(t, () => rpc("disc_delete_mine", { p_id: +k })); lsRender(); } catch { /* shown */ } return; }
   if (a === "dp-hide" || a === "dp-pin") { try { await busy(t, () => rpc("acad_disc_moderate", { p_id: +k, p_hidden: a === "dp-hide" ? t.dataset.v === "1" : null, p_pinned: a === "dp-pin" ? t.dataset.v === "1" : null })); route(); } catch { /* shown */ } return; }
   if (a === "dm") { ui.dm = k; return route(); }
+  if (a === "pilot-create" || a === "pilot-open" || a === "pilot-close") {
+    if (a === "pilot-create" && !confirm("Start a pilot cohort? You'll get a private link for outside testers.")) return;
+    try { await busy(t, () => rpc("admin_pilot", { p_action: a.slice(6) })); toast(a === "pilot-create" ? "Pilot started. Copy the link and send it to your testers." : a === "pilot-close" ? "Pilot sign-ups closed" : "Pilot sign-ups reopened"); route(); } catch { /* shown */ } return; }
   if (a === "cm-all") { ui.cmAll = !ui.cmAll; return route(); }
   if (a === "esc-yes" || a === "esc-no") { const note = a === "esc-no" ? prompt("Why? (optional, the person who raised it sees this)") : null;
     try { await busy(t, () => rpc("escalation_decide", { p_id: +k, p_decision: a === "esc-yes" ? "approved" : "declined", p_note: note })); toast(a === "esc-yes" ? "Approved" : "Declined"); route(); } catch { /* shown */ } return; }
@@ -3404,6 +3418,7 @@ async function route() {
     if (p0 === "verify") return pageVerify();
     if (p0 === "start") return go("#/apply");
     if (p0 === "apply") {
+      if (p1 === "pilot" && p2) { try { sessionStorage.setItem("jn_pilot", p2.slice(0, 40)); } catch (e) {} history.replaceState(null, "", "/apply"); }
       if (p1 === "zuri" && p2) { try { sessionStorage.setItem("jn_zuri", p2.slice(0, 4000)); } catch (e) {} history.replaceState(null, "", "/apply"); }
       return pageApply();
     }
