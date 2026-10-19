@@ -105,9 +105,9 @@ begin
   mode := case when private.setting('unlock_weeks', 'off') = 'on' then 'open' when private.setting('week_dates', 'on') = 'off' then 'progress' else 'normal' end;
 
   create temp table if not exists _st on commit drop as select * from private.student_status(c.id) limit 0;
-  delete from _st; insert into _st select * from private.student_status(c.id);
+  delete from _st where true; insert into _st select * from private.student_status(c.id);
   create temp table if not exists _wt on commit drop as select * from private.week_table(c.id) limit 0;
-  delete from _wt; insert into _wt select * from private.week_table(c.id);
+  delete from _wt where true; insert into _wt select * from private.week_table(c.id);
 
   r := jsonb_build_object(
     'me', s.full_name, 'mode', mode, 'today', private.today(),
