@@ -1,19 +1,68 @@
 # Jobnest Academy
 
-The live Jobnest Academy platform: the public Academy site, the applicant journey
-(apply → readiness check → Discovery Call booking → status), and the staff portals
-(Admissions Officer, Admissions Admin, Super Admin). Built from the approved prototype.
+The live Jobnest Academy platform for the 17-week Graduate Employability Programme: the public
+Academy site, the applicant journey from application to paid admission, the student portal that
+carries a student from Week 1 to graduation, and the staff portals that run it. Built from the
+approved prototype.
+
+## What's built
+
+**Public site and admissions**
+- Academy landing page with fees (full or 2 parts), tracks and programme pages, team from Settings,
+  and a sample certificate.
+- Application form with State and City/town dropdowns, a Zuri summary pre-fill link
+  (`/apply/zuri/...`), and a random application number. Applicants continue later with that
+  number and their surname.
+- Timed readiness assessment drawn from a question bank (5 minutes by default, changeable in Settings).
+- Discovery Call booking with the Teams link and Add to Google Calendar.
+- Offers, Paystack payment (full or 2 parts), matric numbers, the one-page admission letter,
+  reminders and expiry of unpaid offers.
+- Automatic emails for every step through Resend.
+
+**Student portal** (`/learn`, installable as a home-screen app)
+- Home, My Learning with stages and weeks that open by progress and date, lessons,
+  server-marked quizzes with timer and retake, tasks and assignments, Student Oath and check-ins.
+- Client project with brief, rubric and supervisor messages.
+- Internship placement and a weekly logbook that the host supervisor signs from a secure
+  no-login link.
+- Coaching: Discovery Call 2 booking with coach times and results, CV builder.
+- My Career (from Week 14): readiness checklist, skills profile, portfolio, interview practice,
+  career goals and talent-matching consent. Job search tools and Opportunities (from Week 16).
+- Graduation step and page, certificate tab with PDF download, Add to LinkedIn and a public
+  verify page (`/verify`, accepts the certificate code or the matric number).
+- Job outcomes, 30/60/90-day alumni check-ins and an exit survey.
+- Cohort and pod pages, cohort discussion and career chat, alerts, profile photo and ID card.
+- An overdue second instalment pauses learning until it is paid.
+
+**Staff portal** (`/portal`)
+- A home page for every role: Super Admin command centre, Programme Director, Cohort Manager,
+  Facilitator, Career Coach, Academy Admin, Admissions Admin and Admissions Officer.
+- Needs attention queue, Student 360 record with notes, documents and check-ins, and global search.
+- Applications, call times, payments (including recording a bank transfer), students and
+  certificates, content, grading, live sessions and attendance, announcements, pods, discussion,
+  internships and host organisations, job search, opportunities, outcomes and support.
+- Staff & access with roles, permissions and invites; facilitators see only their track.
+- Settings for links, fees, the team, testing modes and the pilot cohort.
+
+**Pilot cohort for outside testers**
+- The Super Admin starts a pilot under **Settings** and gets a private link (`/apply/pilot/CODE`).
+- Testers apply into their own cohort (matric `GEP/26P/...`), so real applicants stay in Cohort 1.
+- Testers can't pay through Paystack; admissions admits them with **Record a bank transfer**.
+- Staff lists show a Pilot badge, and staff pages, live sessions and announcements follow the
+  pilot while it runs.
+- `supabase/cleanup_pilot.sql` deletes the pilot cohort and every tester and keeps everything else.
 
 ## How it fits together
 
 | Part | Where | What it does |
 | --- | --- | --- |
 | `public/` | Netlify | The website people use. Plain HTML, CSS and JavaScript, no build step. |
-| `supabase/setup.sql` | Supabase | The database: tables, the functions the website calls, and starting data. |
+| `supabase/setup.sql` | Supabase | The database: tables, the functions the website calls, and starting data. Built from the numbered files by `dev/build_sql.py`. |
+| `website/` | Netlify (separate site) | The main Jobnest website for jobnestcareers.com. Set the Netlify base directory to `website`. |
 | `dev/` | Your computer only | Tests and a local stand-in for Supabase. Not published. |
 
 Every table is locked. The website can only call the database functions in
-`supabase/02_functions.sql`, and each function checks who is asking (applicant link,
+`supabase/`, and each function checks who is asking (applicant link,
 staff role) before it reads or changes anything.
 
 ## First-time setup
@@ -76,9 +125,23 @@ created by `netlify/functions/student-account.mjs` with the Supabase secret key,
 send them email. Staff add lessons, links and tasks under **Content**, mark work under **Grading**,
 schedule classes and take attendance under **Live sessions**, and post **Announcements**. A facilitator
 given a track under **Staff accounts** only sees and marks that track.
-Existing databases need `supabase/06_portal.sql` and then `supabase/07_timer_tour.sql` run once.
-The readiness assessment is timed (10 minutes by default, changeable in Settings): answers save as the
+The readiness assessment is timed (5 minutes by default, changeable in Settings): answers save as the
 applicant goes, and the every-minute job submits any assessment left open after time runs out.
+
+## Updating an existing database
+A new database only needs `supabase/setup.sql`. An existing one needs each numbered file in
+`supabase/` it hasn't had yet, run once in order (`04_email_sending.sql` up to `26_pilot.sql`).
+Each file is safe to run again.
+
+## Testing and launch tools
+- **Settings → Testing** has three modes: Normal (progress and dates), Progress only (dates ignored)
+  and All weeks open.
+- `supabase/sample_course_content.sql` adds sample lessons, tasks and live classes for all 17 weeks.
+- `supabase/cleanup_pilot.sql` removes the pilot cohort and its testers when pilot testing ends.
+- `supabase/cleanup_test_data.sql` clears every application and the sample content before launch, so
+  the first real student gets `GEP/27A/001`.
+
+Both clean-up scripts start with a SELECT that shows what would be deleted. Run that first.
 
 ## Testing locally
 Needs Postgres 16 and Python 3 with Playwright.
@@ -94,8 +157,11 @@ python3 dev/e2e.py 1280         # full journey in a browser, including paying (u
 ```
 
 ## Build phases
-1. Foundations and admissions ✅ (this version)
+1. Foundations and admissions ✅
 2. Automatic emails ✅ (Resend, sent every minute by `netlify/functions/send-emails.mjs`)
 3. Paystack payment, admission letter and matric numbers ✅
 4. Student portal and learning ✅
-5. Projects, internships, coaching and certificates
+5. Projects, internships, coaching and certificates ✅ (plus job search, graduation and alumni outcomes)
+6. Staff role portals and the Super Admin command centre ✅
+7. Pilot cohort with outside testers ✅ (now)
+8. Launch: clear test data and open Cohort 1 (Jan 2027)
