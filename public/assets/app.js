@@ -1714,7 +1714,7 @@ function lsCareerPage() {
         <div class="field"><label for="cg-int">Industries that interest you</label><input id="cg-int" data-cr="interests" placeholder="e.g. Fintech, logistics, e-commerce" value="${esc(c.interests || "")}"></div>
         <div class="field"><label for="cg-grow">Skills you want to develop</label><textarea id="cg-grow" data-cr="grow" rows="2" placeholder="e.g. SQL, presenting to managers">${esc(c.grow || "")}</textarea></div>
         <div class="field"><label for="cg-plan">Your 90-day action plan</label><textarea id="cg-plan" data-cr="plan" rows="3" placeholder="Three concrete things you'll do in the next 90 days">${esc(c.plan || "")}</textarea></div>
-        <p class="note">Saved automatically. Your career coach can see your goals.</p></div>
+        <p class="note">Saved automatically as you type.</p></div>
       ${discussionCard(LS.discCareer || [], false, "career")}
       <div class="card"><h3>Talent matching</h3><p class="note">When Jobnest Recruit is connected, you can choose to share your verified skills and portfolio with employers. Nothing is shared without your consent.</p>
         <label class="check"><input type="checkbox" data-cr="consent" ${c.consent ? "checked" : ""}> I'd like to be considered for talent matching</label></div>
