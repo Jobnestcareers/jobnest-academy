@@ -121,6 +121,8 @@ const TRACK_INFO = {
   ADM: ["Keep a team organised and running.", ["Calendars, email and documents", "Google Workspace and Microsoft 365", "Meeting notes and follow-ups", "Basic records and reporting"], ["Administrative Assistant", "Operations Assistant"]],
 };
 const part1Of = (p) => Math.ceil((p.inst_total || 0) / 2 / 500) * 500;
+const feeBox = (p, c) => { const t = p.inst_total || 0, a = part1Of(p), b = t - a, extra = t - p.fee, wk = c.inst_due_week || 6;
+  return `<span class="nl-fees"><span class="nl-fee"><span>Pay in full</span><b>${naira(p.fee)}</b></span>${t > 0 ? `<span class="nl-fee two"><span class="nl-fee-r"><span>Or two parts</span><b>${naira(t)}</b></span><small>${naira(a)} to accept your place, then ${naira(b)} before Week ${wk}.${extra > 0 ? ` That's ${naira(extra)} more than paying in full.` : ""}</small></span>` : ""}<a class="nl-help" href="#/" data-act="jump" data-k="faq-cost">Need help with fees?</a></span>`; };
 const teamOf = () => { try { return JSON.parse(INFO.team || "{}") || {}; } catch { return {}; } };
 const FAQ = [["Can I join during NYSC?", "Yes."], ["Do I need experience?", "No. Just basic digital skills and clear communication."],
   ["Will I get a job at the end?", "We can't promise one, but you'll finish with experience, a portfolio and coaching."]];
@@ -155,7 +157,7 @@ function pageHome() {
         <p class="nl-status ${open ? "on" : ""}"><span class="nl-dot"></span>${open ? `Applications open${start ? ` · ${esc(c.name || "Next cohort")} starts ${start}` : ""}` : "Applications are closed for now"}</p>
         <h1 class="nl-h1">From graduate to work-ready.</h1>
         <p class="nl-lead">In ${weeks} weeks, learn a skill employers pay for, deliver a real client project, intern with a company, and get coached through your job search. All online.</p>
-        ${open ? `<div class="actions"><a class="btn gold lg" href="#/apply">Apply now →</a>${INFO.zuri_url ? `<a class="btn ghost lg nl-ghost" href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Not sure yet? Talk to Zuri</a>` : ""}</div>`
+        ${open ? `<div class="actions"><a class="btn gold lg" href="#/apply">Apply now →</a>${INFO.zuri_url ? `<a class="btn ghost lg nl-ghost" href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Not sure which path fits? Ask Zuri</a>` : ""}</div>${INFO.zuri_url ? `<p class="nl-zsub">Zuri is our career assistant. Chat now, no booking needed.</p>` : ""}`
           : `<p class="note">Applications for the next cohort will open soon. Check back here.</p>`}
       </div>
       <div class="nl-art" aria-hidden="true">
@@ -174,14 +176,14 @@ function pageHome() {
     <section class="nl-route"><div class="wrap"><div class="nl-route-h"><h2 class="nl-h2">The ${weeks} weeks.</h2><a class="nl-more" href="#/tracks">See what you can learn →</a></div>
       <ol class="nl-weeks">${ROUTE_STOPS.map(([w, t], i) => `<li class="${i === ROUTE_STOPS.length - 1 ? "end" : ""}"><span>${w}</span><b>${t}</b></li>`).join("")}</ol></div></section>
     <section class="wrap nl-sec" id="how"><h2 class="nl-h2">How to get in.</h2>
-      <ol class="nl-steps">${[["Apply", "5 minutes"], ["Readiness check", `${mins} minutes`], ["Call with us", "15 minutes"], ["Accept and pay", p.fee ? `${naira(p.fee)}, or 2 × ${naira(part1Of(p))}` : "You're in"]].map(([a, b], i) => `<li><span class="nl-n ${i === 3 ? "last" : ""}">${i + 1}</span><span><b>${a}</b><small>${b}</small>${i === 3 && p.fee ? `<a class="nl-help" href="#/" data-act="jump" data-k="faq-cost">Need help with fees?</a>` : ""}</span></li>`).join("")}</ol>
-      <div class="nl-need"><b>You'll need:</b><span>${TICK}A laptop</span><span>${TICK}Reliable internet</span><span>${TICK}About 15 hours a week</span></div>
+      <ol class="nl-steps">${[["Apply", "5 minutes"], ["Readiness check", `${mins} minutes`], ["Call with us", "15 minutes"], ["Accept and pay", p.fee ? "Only after you get an offer" : "You're in"]].map(([a, b], i) => `<li><span class="nl-n">${i + 1}</span><span><b>${a}</b><small>${b}</small>${i === 3 && p.fee ? feeBox(p, c) : ""}</span></li>`).join("")}</ol>
+      <div class="nl-need"><b class="nl-need-h">You'll need</b><ul>${["A laptop", "Reliable internet", "About 15 hours a week"].map((x) => `<li>${TICK}${x}</li>`).join("")}</ul></div>
       ${INFO.info_session_url || INFO.sample_lesson_url ? `<div class="nl-taste"><div><b>Not ready to apply yet?</b><span>${INFO.info_session_url ? "Join a free info session" : ""}${INFO.info_session_url && INFO.sample_lesson_url ? ", or " : ""}${INFO.sample_lesson_url ? (INFO.info_session_url ? "try a sample lesson" : "Try a sample lesson") : ""}.</span></div><div class="actions">${INFO.info_session_url ? `<a class="btn" href="${esc(INFO.info_session_url)}" target="_blank" rel="noopener">Book an info session</a>` : ""}${INFO.sample_lesson_url ? `<a class="btn ghost" href="${esc(INFO.sample_lesson_url)}" target="_blank" rel="noopener">Try a sample lesson</a>` : ""}</div></div>` : ""}</section>
     <section class="wrap nl-sec"><h2 class="nl-h2">Who supports you.</h2>
       <ul class="nl-team">${TEAM.map(([r, d]) => { const m = teamOf()[r] || {}; const ini = (m.name || r).split(/\s+/).map((w) => w[0]).slice(0, 2).join("").toUpperCase();
         return `<li>${m.name || m.photo ? `<span class="nl-face">${m.photo ? `<img src="${esc(m.photo)}" alt="" loading="lazy">` : esc(ini)}</span>` : ""}${m.name ? `<b>${esc(m.name)}</b><span class="nl-role">${r}</span>` : `<b>${r}</b>`}<span>${d}</span></li>`; }).join("")}</ul></section>
     <section class="wrap nl-sec nl-faq" id="faq"><h2 class="nl-h2">FAQ.</h2>
-      <div>${p.fee ? `<details id="faq-cost" open><summary>How much does it cost?</summary><p>${naira(p.fee)} in full, or 2 payments of ${naira(part1Of(p))}. You only pay after you're offered a place. Need help with fees? Email <a href="mailto:info@jobnestcareers.com">info@jobnestcareers.com</a> and tell us your situation.</p></details>` : ""}${FAQ.map(([q, a], i) => `<details ${i || p.fee ? "" : "open"}><summary>${q}</summary><p>${a}</p></details>`).join("")}</div></section>
+      <div>${p.fee ? `<details id="faq-cost" open><summary>How much does it cost?</summary><p>${naira(p.fee)} in full, or ${naira(p.inst_total)} in two parts: ${naira(part1Of(p))} to accept your place, then ${naira(p.inst_total - part1Of(p))} before Week ${c.inst_due_week || 6}. You only pay after you're offered a place. Need help with fees? Email <a href="mailto:info@jobnestcareers.com">info@jobnestcareers.com</a> and tell us your situation.</p></details>` : ""}${FAQ.map(([q, a], i) => `<details ${i || p.fee ? "" : "open"}><summary>${q}</summary><p>${a}</p></details>`).join("")}</div></section>
     ${open ? `<section class="nl-band"><div class="wrap"><div><h2 class="nl-h2">Ready to become work-ready?</h2><p>Applying takes 5 minutes.</p></div><a class="btn gold lg" href="#/apply">Apply now →</a></div></section>` : ""}
     <footer class="nl-foot"><div class="wrap"><span>© ${new Date().getFullYear()} Jobnest Services</span>
       <nav aria-label="Footer"><a href="#/check">Continue an application</a><a href="#/learn/signin">Student sign-in</a><a href="#/verify">Verify a certificate</a><a href="#/staff">Staff sign-in</a><a href="${esc(INFO.website_url || "https://jobnestcareers.com")}">Jobnest.com ↗</a></nav></div></footer>`;
@@ -200,8 +202,9 @@ function pageApply() {
   let zuri = ""; try { zuri = sessionStorage.getItem("jn_zuri") || ""; } catch (e) {}
   const zGoal = (zuri.match(/^Goal[^:]*:\s*(.+)$/m) || [])[1] || "";
   app.innerHTML = pubHeader("admissions") + `<section class="wrap pub-wrap"><form class="card form app-form" id="apply-form" novalidate>
-    ${stepBar(0)}${pilotCode() ? `<div class="notice pilot-n"><span><b>Pilot test.</b> You're helping us test Jobnest Academy before launch. Everything works like the real programme, but you won't be asked to pay, and your test account is deleted when testing ends.</span></div>` : ""}<h1>Apply to the ${esc(prog().name)}</h1>
-    <p class="note">You don't pick a track here. You'll agree it together on your Discovery Call.</p>
+    ${stepBar(0)}<p class="ap-saved" id="ap-saved" aria-live="polite"></p><div id="ap-back"></div>${pilotCode() ? `<div class="notice pilot-n"><span><b>Pilot test.</b> You're helping us test Jobnest Academy before launch. Everything works like the real programme, but you won't be asked to pay, and your test account is deleted when testing ends.</span></div>` : ""}<h1>Apply to the ${esc(prog().name)}</h1>
+    <div class="ap-track"><span class="ap-i" aria-hidden="true">i</span><span><b>You don't choose a track on this form.</b><span>On your Discovery Call, we'll look at your goals and agree the right track with you. Want to look at the options first?</span>
+      <button type="button" class="ap-link" data-act="ap-tracks">See what you'll learn →</button><small>Opens on this page. Your answers stay here.</small></span></div>
     ${!zuri && INFO.zuri_url ? `<p class="zuri-hint">Not sure what you want to do yet? <a href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Chat with Zuri first ↗</a> She'll fill this form in for you at the end.</p>` : ""}
     <h3>About you</h3>
     <div class="grid2"><div class="field"><label for="g-first">First name</label><input id="g-first" autocomplete="given-name" maxlength="80" placeholder="e.g. Ada" autocapitalize="words"></div><div class="field"><label for="g-sur">Surname</label><input id="g-sur" autocomplete="family-name" maxlength="80" placeholder="e.g. Obi" autocapitalize="words"></div></div>
@@ -225,8 +228,48 @@ function pageApply() {
     <label class="consent"><input type="checkbox" id="g-consent"> <span>I agree that Jobnest Academy may use these details to process my application, as set out in the <a href="${esc(INFO.website_url || "https://jobnestcareers.com")}/#privacy" target="_blank" rel="noopener">Privacy Policy</a>.</span></label>
     <p class="err" id="g-err" role="alert"></p>
     <div class="actions"><button class="btn gold" type="submit">Submit application</button><span class="note">Next: a ${INFO.cohort?.assess_minutes || 5}-minute readiness assessment.</span></div>
+    <p class="note">Your answers are saved on this device as you type, and cleared once you submit.</p>
   </form></section>`;
+  apRestore();
 }
+
+// Application form autosave: answers live in this browser until the form is submitted.
+const AP_KEY = "jn_apply_draft";
+const apFields = () => $$("#apply-form input, #apply-form select, #apply-form textarea").filter((x) => (x.id || x.name) && x.type !== "submit");
+function apSave() {
+  const v = {};
+  apFields().forEach((x) => { if (x.type === "radio") { if (x.checked) v[x.name] = x.value; } else if (x.type === "checkbox") v[x.id] = x.checked; else v[x.id] = x.value; });
+  try { localStorage.setItem(AP_KEY, JSON.stringify({ v, at: Date.now() })); } catch (e) { return; }
+  const s = $("#ap-saved"); if (s) s.textContent = "Saved on this device · just now";
+}
+function apRestore() {
+  let d = null; try { d = JSON.parse(localStorage.getItem(AP_KEY) || "null"); } catch (e) {}
+  if (!d?.v || Date.now() - (d.at || 0) > 30 * 864e5) return;
+  const v = d.v, set = (id) => { const x = $("#" + id); if (x && v[id] != null && x.type !== "checkbox") x.value = v[id]; };
+  if (v["g-country"]) { set("g-country"); setCountry(); }
+  if (v["g-cc"]) { set("g-cc"); $("#g-cc").dataset.touched = "1"; ccShow(); }
+  if (v["g-state"]) { set("g-state"); fillTowns(); }
+  apFields().forEach((x) => {
+    if (["g-country", "g-cc", "g-state"].includes(x.id)) return;
+    if (x.type === "radio") x.checked = v[x.name] === x.value;
+    else if (x.type === "checkbox") x.checked = !!v[x.id];
+    else if (v[x.id] != null && (x.id !== "g-zuri" || !x.value) && (x.id !== "g-mot" || !x.value)) x.value = v[x.id];
+  });
+  const town = $("#g-town"), o = $("#g-town-o"); if (town && o) o.hidden = town.value !== "Other";
+  const filled = Object.entries(v).some(([k, x]) => x && !["g-country", "g-cc"].includes(k));
+  if (filled) $("#ap-back").innerHTML = `<div class="notice ap-back"><span><b>Welcome back.</b> We kept your answers from earlier, so you can carry on where you stopped.</span><button type="button" class="ap-link" data-act="ap-clear">Start again</button></div>`;
+  $("#ap-saved").textContent = filled ? "All answers saved" : "";
+}
+function apTracks() {
+  const T = (INFO.tracks || []).filter((t) => t.open !== false);
+  const d = document.createElement("div"); d.className = "ap-drawer"; d.id = "ap-drawer";
+  d.innerHTML = `<div class="ap-dr-bg" data-act="ap-tracks-close"></div><aside class="ap-dr" role="dialog" aria-modal="true" aria-labelledby="ap-dr-h"><div class="ap-dr-top"><h2 id="ap-dr-h">What you'll learn</h2><button type="button" class="btn ghost" data-act="ap-tracks-close">Close</button></div>
+    <p class="note">Everyone does the same first weeks, then one track. You'll pick your track with us on the call.</p>
+    ${T.map((t) => { const [desc, learn] = TRACK_INFO[t.code] || ["", []]; return `<div class="ap-tk"><b>${esc(t.name)}</b>${desc ? `<span>${desc}</span>` : ""}${learn.length ? `<small>${learn.join(" · ")}</small>` : ""}</div>`; }).join("") || `<p class="note">Tracks will be listed here soon.</p>`}
+    <button type="button" class="btn gold" data-act="ap-tracks-close">Back to my application</button><small class="note" style="text-align:center">Your answers are still on the form.</small></aside>`;
+  document.body.appendChild(d); document.body.style.overflow = "hidden"; d.querySelector(".ap-dr-top .btn").focus();
+}
+function apTracksClose() { $("#ap-drawer")?.remove(); document.body.style.overflow = ""; $("[data-act=ap-tracks]")?.focus(); }
 
 const TOP_C = ["NG", "GH", "GB", "US", "CA", "KE", "ZA"];
 function countryOptions(sel) {
@@ -283,7 +326,7 @@ async function submitApply(form) {
   err.textContent = "";
   try {
     const res = await busy(form.querySelector("button[type=submit]"), () => rpc("submit_application", { p: d }));
-    try { sessionStorage.removeItem("jn_zuri"); } catch (e) {}
+    try { sessionStorage.removeItem("jn_zuri"); localStorage.removeItem(AP_KEY); } catch (e) {}
     saveMyApp(res.ref, res.token);
     toast(`Application received · ${res.ref}`);
     go(`#/a/${res.ref}/${res.token}/assess`);
@@ -2697,6 +2740,9 @@ document.addEventListener("click", async (e) => {
     try { await busy(t, () => rpc(issue ? "acad_issue_certificate" : "acad_revoke_certificate", { p_app: k })); toast(issue ? "Certificate issued" : "Certificate withdrawn"); route(); } catch (x) { toast(x.message); }
     return;
   }
+  if (a === "ap-tracks") { e.preventDefault(); return apTracks(); }
+  if (a === "ap-tracks-close") { e.preventDefault(); return apTracksClose(); }
+  if (a === "ap-clear") { e.preventDefault(); try { localStorage.removeItem(AP_KEY); } catch (x) {} $("#apply-form").reset(); return pageApply(); }
   if (a === "jump") { e.preventDefault(); const el = document.getElementById(k); if (el?.tagName === "DETAILS") el.open = true; el?.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
   if (a === "signout") { await auth.signOut(); ME = null; return go("#/staff"); }
   if (a === "copy-link") { const v = $("#my-ref")?.textContent || ""; try { await navigator.clipboard.writeText(v); } catch { const t = document.createElement("textarea"); t.value = v; document.body.append(t); t.select(); document.execCommand("copy"); t.remove(); } return toast("Application number copied"); }
@@ -2882,6 +2928,7 @@ function applyFilter() {
   filterRows();
 }
 document.addEventListener("input", (e) => {
+  if (e.target.closest?.("#apply-form")) { clearTimeout(ui.apT); ui.apT = setTimeout(apSave, 400); }
   if (e.target.dataset?.cv && LS) { const c = { ...cvData() }; $$("[data-cv]").forEach((x) => (c[x.dataset.cv] = x.value)); saveDraft("cv", c); const s0 = $("#cv-saved"); if (s0) s0.textContent = "Saving…";
     $("#cv-preview").innerHTML = cvPreview(c); const ch = atsChecks(c), sc = ch.filter((x) => x[1]).length; $("#ats-list").innerHTML = atsList(ch); const pl = $("#ats-pill"); pl.textContent = `ATS check ${sc}/5`; pl.className = `pill ${sc >= 4 ? "ok" : "now"}`; return; }
   if (e.target.dataset?.pitch && LS) { const pt = { ...draft("pitch", {}) }; $$("[data-pitch]").forEach((x) => (pt[x.dataset.pitch] = x.value)); saveDraft("pitch", pt);
@@ -2926,6 +2973,7 @@ document.addEventListener("change", (e) => {
   if (el.id === "g-cc") { el.dataset.touched = "1"; ccShow(); }
   if ((el.id === "g-first" || el.id === "g-sur") && el.value.trim()) el.value = nameCase(el.value);
   if (el.id === "g-town") { const o = $("#g-town-o"); o.hidden = el.value !== "Other"; if (!o.hidden) o.focus(); }
+  if (el.closest?.("#apply-form")) apSave();
   if (el.name === "st-mode") {
     const m = el.value; $$("input[name=st-mode]").forEach((x) => (x.disabled = true));
     rpc("admin_test_mode", { p_mode: m }).then((r) => { $("#st-unlock-msg").textContent = TEST_MSG[r] || ""; toast(r === "open" ? "All portal weeks are open for testing" : r === "progress" ? "Weeks now open by progress only. Dates are ignored." : "Portal weeks are back to normal"); })
@@ -3438,3 +3486,4 @@ document.addEventListener("click", (e) => {
   e.preventDefault(); go(a.getAttribute("href"));
 }, true);
 route();
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && $("#ap-drawer")) apTracksClose(); });

@@ -586,3 +586,44 @@ tr.off td{opacity:.55}
 .sc-act li>.pill,.sc-act li>.btn{flex:none;align-self:center}
 @media (max-width:420px){.campus .rail .sg summary{grid-template-columns:26px 1fr;gap:.45rem;padding:.5rem}.campus .rail .sg-s{grid-column:2}.campus .rail .sg-n{width:26px;height:26px}.campus .rail .sg[open] .sg-w{grid-template-columns:1fr}}
 .notice.pilot-n{background:#FDF0D2;border-color:#F4B740;margin-bottom:1rem}
+/* Hero cards: stacked with one even gap on every screen (no more fixed positions), staggered left/right */
+.nl-art{display:flex;flex-direction:column;justify-content:center;gap:20px;height:auto;min-height:440px;padding:40px 24px;box-sizing:border-box}
+.nl-art .nl-card{position:relative;left:auto;right:auto;top:auto;bottom:auto;hyphens:manual}
+.nl-art .nl-c1{align-self:flex-start}
+.nl-art .nl-c2{align-self:flex-end}
+.nl-art .nl-c3{align-self:flex-start;margin-left:26px}
+@media(max-width:600px){.nl-art{min-height:0;padding:28px 16px;gap:16px}.nl-art .nl-c3{margin-left:10px}}
+/* "You'll finish with": more room between the cards and the certificate */
+.nl-finrow{gap:56px}
+.nl-cert{transform:none}
+@media(max-width:860px){.nl-finrow{gap:32px}}
+/* Tester fixes: landing */
+.nl-zsub{margin:-.35rem 0 0;font-size:.92rem;color:var(--muted)}
+.nl-fees{display:flex;flex-direction:column;gap:8px;margin-top:6px;font-size:.92rem}
+.nl-fee{display:flex;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--surface)}
+.nl-fee.two{flex-direction:column;gap:4px}
+.nl-fee-r{display:flex;justify-content:space-between;gap:10px}
+.nl-fee b{font-family:'JetBrains Mono',monospace;font-size:.88rem}
+.nl-fee small{font-size:.85rem;line-height:1.45}
+.nl-need{display:flex;flex-direction:column;align-items:stretch;gap:14px}
+.nl-need-h{font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.2rem}
+.nl-need ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.nl-need li{display:flex;gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:.95rem}
+.nl-need li svg{color:var(--brand);flex:none}
+@media(max-width:700px){.nl-need ul{grid-template-columns:1fr}}
+/* Tester fixes: application form */
+.ap-saved{margin:0;min-height:1.1em;font-size:.85rem;font-weight:600;color:var(--brand);text-align:right}
+.notice.ap-back{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#E6F1EF;border:1px solid #BFDCD6}
+.ap-track{display:flex;gap:14px;background:#FFF8E6;border:1px solid #F4D58A;border-radius:14px;padding:16px 18px}
+.ap-track>span:last-child{display:flex;flex-direction:column;gap:6px;line-height:1.5;align-items:flex-start}
+.ap-track small{color:var(--muted)}
+.ap-i{flex:none;width:32px;height:32px;border-radius:50%;background:#F4B740;color:#10263D;display:grid;place-items:center;font-weight:800}
+.ap-link{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--brand);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.ap-drawer{position:fixed;inset:0;z-index:60;display:flex;justify-content:flex-end}
+.ap-dr-bg{position:absolute;inset:0;background:rgba(16,38,61,.45)}
+.ap-dr{position:relative;width:min(480px,100%);height:100%;overflow:auto;background:var(--surface);padding:28px;box-sizing:border-box;display:flex;flex-direction:column;gap:14px}
+.ap-dr-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.ap-dr-top h2{margin:0;font-family:'Bricolage Grotesque',sans-serif;font-weight:800;font-size:1.6rem}
+.ap-tk{border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.ap-tk span{font-size:.95rem}.ap-tk small{color:var(--muted);font-size:.85rem}
+@media(max-width:600px){.ap-dr{padding:20px 16px}.ap-track{padding:14px}}
