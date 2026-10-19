@@ -542,27 +542,26 @@ const SUPER_NAV = [{ g: "Overview" }, { k: "command", l: "Command centre" }, { k
   { g: "Academy" }, { k: "students", l: "Students" }, { k: "grading", l: "Grading" }, { k: "intern", l: "Internships" }, { k: "dc2", l: "Discovery Call 2" }, { k: "pods", l: "Pods" },
   { k: "sessions", l: "Live sessions" }, { k: "news", l: "Announcements" }, { k: "support", l: "Help requests" }, { k: "discussion", l: "Discussion" }, { k: "content", l: "Content" },
   { g: "Careers" }, { k: "jobs", l: "Job search" }, { k: "opps", l: "Opportunities" }, { k: "outcomes", l: "Outcomes & alumni" },
+  { g: "Role pages" }, { k: "health", l: "Programme Director" }, { k: "today", l: "Cohort Manager" }, { k: "desk", l: "Facilitator" }, { k: "career", l: "Career Coach" }, { k: "ops", l: "Academy Admin" }, { k: "pipeline", l: "Admissions Admin" }, { k: "home", l: "Admissions Officer" },
   { g: "Organisation" }, { k: "staff", l: "Staff & access" }, { k: "emails", l: "Emails" }, { k: "settings", l: "Settings" }, { k: "audit", l: "Activity log" }];
+const N = (k, l) => ({ k, l }), G = (g) => ({ g });
+const ROLE_NAV = {
+  director: [G("Overview"), N("health", "Programme health"), G("Learning"), N("students", "Students"), N("grading", "Grading"), N("sessions", "Live sessions"), N("news", "Announcements"), N("pods", "Pods"), N("content", "Content"),
+    G("Work experience"), N("intern", "Internships"), N("dc2", "Discovery Call 2"), N("jobs", "Job search"), N("opps", "Opportunities"), N("outcomes", "Outcomes & alumni"), G("Support"), N("support", "Help requests"), N("discussion", "Discussion")],
+  cohort_manager: [G("Today"), N("today", "Today"), G("Cohort"), N("students", "Students"), N("grading", "Grading"), N("sessions", "Live sessions"), N("news", "Announcements"), N("pods", "Pods"), N("content", "Content"),
+    G("Support"), N("support", "Help requests"), N("discussion", "Discussion"), G("Work experience"), N("intern", "Internships"), N("dc2", "Discovery Call 2"), N("jobs", "Job search"), N("opps", "Opportunities"), N("outcomes", "Outcomes & alumni")],
+  facilitator: [G("My work"), N("desk", "Grading desk"), N("grading", "All submissions"), G("My track"), N("students", "Students"), N("sessions", "Live sessions"), N("news", "Announcements"), N("content", "Content"), N("pods", "Pods"),
+    G("Supervision"), N("intern", "Internships"), G("Support"), N("support", "Help requests"), N("discussion", "Discussion")],
+  coach: [G("Today"), N("career", "Career desk"), G("Calls"), N("dc2", "Discovery Call 2"), G("Job search"), N("jobs", "Job search"), N("opps", "Opportunities"), N("outcomes", "Outcomes & alumni"),
+    G("Students"), N("students", "Students"), N("intern", "Internships"), N("pods", "Pods"), N("sessions", "Live sessions"), N("news", "Announcements"), N("support", "Help requests"), N("discussion", "Discussion")],
+  academy_admin: [G("Today"), N("ops", "Operations"), G("Work experience"), N("intern", "Internships"), N("opps", "Opportunities"), N("jobs", "Job search"), N("outcomes", "Outcomes & alumni"),
+    G("Cohort"), N("students", "Students"), N("sessions", "Live sessions"), N("news", "Announcements"), N("pods", "Pods"), N("content", "Content"), G("Support"), N("support", "Help requests"), N("discussion", "Discussion")],
+  adm_admin: [G("Today"), N("pipeline", "Pipeline"), G("Admissions"), N("decide", "Decisions"), N("apps", "Applications"), N("pay", "Payments"), G("Setup"), N("emails", "Emails"), N("settings", "Settings"), G("Academy"), N("students", "Students")],
+  adm_officer: [G("Today"), N("home", "Today's calls"), G("Admissions"), N("calls", "Calls"), N("times", "Call times"), N("apps", "Applications")]
+};
 function staffNav(role) {
-  const adm = [{ g: "Admissions" }];
-  if (["adm_officer", "super"].includes(role)) adm.push({ k: "home", l: "Home" }, { k: "calls", l: "Calls" }, { k: "times", l: "Call times" });
-  if (["adm_admin", "super"].includes(role)) adm.push({ k: "decide", l: "Decisions" }, { k: "pay", l: "Payments" });
-  adm.push({ k: "apps", l: "Applications" });
-  if (["adm_admin", "super"].includes(role)) adm.push({ g: "Setup" }, { k: "emails", l: "Emails" }, { k: "settings", l: "Settings" });
-  const ac = [{ g: "Academy" }, { k: "students", l: "Students" }];
-  if (["director", "cohort_manager", "facilitator", "super"].includes(role)) ac.push({ k: "grading", l: "Grading" });
-  if (["director", "cohort_manager", "academy_admin", "coach", "facilitator", "super"].includes(role)) ac.push({ k: "intern", l: "Internships" });
-  if (["director", "cohort_manager", "coach", "super"].includes(role)) ac.push({ k: "dc2", l: "Discovery Call 2" });
-  if (["director", "cohort_manager", "academy_admin", "facilitator", "coach", "super"].includes(role)) ac.push({ k: "pods", l: "Pods" });
-  if (["director", "cohort_manager", "academy_admin", "facilitator", "coach", "super"].includes(role)) ac.push({ k: "support", l: "Help requests" }, { k: "discussion", l: "Discussion" });
-  if (["director", "cohort_manager", "academy_admin", "coach", "super"].includes(role)) ac.push({ k: "opps", l: "Opportunities" });
-  if (["director", "cohort_manager", "academy_admin", "coach", "super"].includes(role)) ac.push({ k: "jobs", l: "Job search" });
-  if (["director", "cohort_manager", "academy_admin", "coach", "super"].includes(role)) ac.push({ k: "outcomes", l: "Outcomes" });
-  ac.push({ k: "sessions", l: "Live sessions" }, { k: "news", l: "Announcements" });
   if (role === "super") return SUPER_NAV;
-  if (role === "adm_admin") return [...adm, { g: "Academy" }, { k: "students", l: "Students" }];
-  if (role === "adm_officer") return adm;
-  return ac;
+  return ROLE_NAV[role] || [N("soon", "Home")];
 }
 // Number badges in the staff menu: how many things are waiting in each section.
 const BADGE_HELP = { attention: "things waiting on a decision", support: "open help requests", grading: "to grade or reply", intern: "students without a placement", dc2: "calls without a result", decide: "to decide", calls: "calls to complete", pods: "students not in a pod" };
@@ -609,7 +608,7 @@ async function pagePortal(tab, sub) {
   if (!(tab === "student" && sub && ["super", "director", "cohort_manager", "academy_admin", "facilitator", "coach"].includes(ME.role)) && !items.some((x) => x.k === tab)) tab = items[0].k;
   if (!ui.pinged) { ui.pinged = true; rpc("staff_ping").catch(() => {}); }
   if (ui.testMode === undefined && ["super", "adm_admin", "academy_admin"].includes(ME.role)) ui.testMode = await rpc("admin_test_mode", {}).catch(() => null);
-  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, intern: tabIntern, dc2: tabDc2, jobs: tabJobs, pods: tabPods, command: tabCommand, attention: tabAttention, student: () => tabStudent360(sub), support: tabSupport, discussion: tabDiscussion, opps: tabOpps, outcomes: tabOutcomes, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
+  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, intern: tabIntern, dc2: tabDc2, jobs: tabJobs, pods: tabPods, health: tabHealth, today: tabToday, desk: tabDesk, career: tabCareer, ops: tabOps, pipeline: tabPipeline, command: tabCommand, attention: tabAttention, student: () => tabStudent360(sub), support: tabSupport, discussion: tabDiscussion, opps: tabOpps, outcomes: tabOutcomes, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
   const counts = Promise.all([rpc("staff_counts").catch(() => ({})), rpc("staff_counts_extra").catch(() => ({}))]).then(([x, y]) => ({ ...(x || {}), ...(y || {}) }));
   try { await pages[tab](); }
   catch (e) { shell(tab, "Something went wrong", "", `<div class="notice">${esc(e.message)}</div>`); }
@@ -715,13 +714,14 @@ async function tabAttention() {
 /* ---------- full student record ---------- */
 const WK_ST = { pass: ["Passed", "ok"], fail: ["Failed", "bad"], grading: ["Waiting for grading", "info"], revise: ["Changes requested", "now"], open: ["In progress", "now"], locked: ["Not open", ""] };
 async function tabStudent360(id) {
-  const s = ui.s360 = await rpc("acad_student360", { p_app: id });
-  const tab = ui.s360t || "overview", nm = `${s.first_name} ${s.surname}`, F = s.fees, risk = s.reasons.length > 0;
+  const tab = ui.s360t || "overview";
+  const [s, D] = await Promise.all([rpc("acad_student360", { p_app: id }), tab === "docs" ? rpc("acad_student_docs", { p_app: id }).catch(() => null) : null]); ui.s360 = s;
+  const nm = `${s.first_name} ${s.surname}`, F = s.fees, risk = s.reasons.length > 0;
   const weeks = s.weeks.map((w) => ({ ...w, st: w.week > s.cur && w.state !== "pass" && !w.quiz && !w.proj ? "locked" : w.week === s.cur && w.state === "open" ? "open" : w.state }));
   const passed = weeks.filter((w) => w.st === "pass").length, avgs = weeks.filter((w) => w.avg != null).map((w) => w.avg), avg = avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
   const failW = weeks.find((w) => w.st === "fail"), conf = s.checkins.slice(-8), last = conf.at(-1);
   const wa = (s.phone || "").replace(/\D/g, ""), att = s.attend.past ? Math.round((s.attend.yes / s.attend.past) * 100) : null;
-  const tabs = [["overview", "Overview"], ["learning", "Learning"], ["payments", "Payments"], ["career", "Internship & career"], ["history", "History"]];
+  const tabs = [["overview", "Overview"], ["learning", "Learning"], ["payments", "Payments"], ["career", "Internship & career"], ["docs", "Documents & check-ins"], ["history", "History"]];
   const banner = [];
   if (s.failed_retake && failW) banner.push(`<div class="s3-dec"><div><b>Decision needed: Week ${failW.week} failed after the retake</b><span>Average ${failW.avg ?? "—"}% (assessment ${failW.quiz ?? "—"}%, project ${failW.proj ?? "—"}%)${last ? `. Last confidence check-in: ${last.conf} of 5` : ""}.</span></div>
     <div class="actions">${s.can.retake ? `<button class="btn sm" data-act="s3-retake" data-k="${failW.week}">Give one more retake</button>` : ""}<a class="btn sm ghost" href="#s3-note">Add a note</a></div></div>`);
@@ -750,6 +750,10 @@ async function tabStudent360(id) {
           ${s.team.map((p) => `<li><span class="sc-li"><span class="st-av">${staffIni(p.name)}</span><span class="sc-p-t"><b>${esc(p.name)}</b><span class="note">${ROLE_NAMES[p.role] || p.role}</span></span></span></li>`).join("")}</ul></div>
       <div class="card" id="s3-note"><div class="sc-h"><div><span class="eyebrow">Notes</span><h2>Private staff notes</h2></div><span class="note">Students never see these</span></div>
         <form class="form" id="s3-note-form" novalidate><label class="sr-only" for="s3-note-t">Add a note</label><textarea id="s3-note-t" rows="2" maxlength="3000" placeholder="e.g. Called her. She works night shifts this month and will catch up at weekends."></textarea><div><button class="btn sm" type="submit">Add note</button></div></form>
+        ${["cohort_manager", "facilitator", "coach", "academy_admin", "super"].includes(ME.role) ? `<details class="s3-esc"><summary class="link sm">Send a decision to the Programme Director</summary><form class="form" id="s3-esc-form" novalidate>
+          <div class="grid2"><div class="field"><label for="s3e-k">What kind</label><select id="s3e-k"><option value="retake">One more retake</option><option value="deferral">Move to the next cohort</option><option value="extension">Deadline extension</option><option value="appeal">Grade appeal</option><option value="withdrawal">Withdrawal</option><option value="other">Something else</option></select></div>
+            <div class="field"><label for="s3e-t">In one line</label><input id="s3e-t" maxlength="200" placeholder="e.g. One more Week ${s.cur} retake for ${esc(s.first_name)}"></div></div>
+          <div class="field"><label for="s3e-d">Why</label><textarea id="s3e-d" rows="2" placeholder="What happened and what you recommend"></textarea></div><div><button class="btn sm" type="submit">Send</button></div></form></details>` : ""}
         ${s.notes.length ? `<ul class="sc-act">${s.notes.map((n) => `<li><span class="mono note">${fmtDay(n.at)}</span><span>${lines(n.body)}<small class="note" style="display:block">${esc(n.by)} · ${agoS(n.at)} <button class="link sm" data-act="s3-note-del" data-k="${n.id}">Delete</button></small></span></li>`).join("")}</ul>` : `<p class="empty">No notes yet.</p>`}</div></section>`,
     learning: `<section class="card"><div class="sc-h"><div><span class="eyebrow">Learning</span><h2>Every week, every score</h2></div><span class="note">Pass mark ${s.pass}%. One retake is allowed per week.</span></div>
       <div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Week</th><th>Assessment</th><th>Week project</th><th>Average</th><th>Attempts</th><th>Status</th><th></th></tr></thead><tbody>
@@ -766,6 +770,22 @@ async function tabStudent360(id) {
       <div class="card"><span class="eyebrow">Career</span><h2 class="sc-h2">${s.outcome ? `Now: ${esc({ hired: "Employed", internship: "Internship", freelance: "Freelancing", study: "Studying", searching: "Still searching" }[s.outcome.status] || s.outcome.status)}` : "Career goals"}</h2>
         <dl class="s3-kv"><dt>Aiming for</dt><dd>${esc(s.career?.role || "—")}</dd><dt>Industries</dt><dd>${esc(s.career?.interests || "—")}</dd><dt>Discovery Call 2</dt><dd>${s.call2 ? `Scored ${s.call2.score}/10` : "Not yet"}</dd><dt>Applications</dt><dd>${s.apps_n || 0} tracked</dd>
           ${s.outcome?.company ? `<dt>Company</dt><dd>${esc(s.outcome.company)}${s.outcome.role ? ` · ${esc(s.outcome.role)}` : ""}</dd>` : ""}<dt>Certificate</dt><dd>${s.cert_id ? `<a class="link" href="#/certificate/${esc(s.cert_id)}" target="_blank" rel="noopener">${esc(s.cert_id)}</a>` : "Not issued"}</dd></dl></div></section>`,
+    docs: D ? `<section class="sc-2"><div class="card"><span class="eyebrow">Documents</span><h2 class="sc-h2">${esc(s.first_name)}'s documents</h2>
+        <ul class="sc-act">${[
+          D.letter ? ["Admission letter", `<a class="btn sm ghost" href="${esc(D.letter)}" target="_blank" rel="noopener">Open</a>`] : null,
+          ["Certificate of completion", D.cert_id ? `<a class="btn sm ghost" href="#/certificate/${esc(D.cert_id)}" target="_blank" rel="noopener">${esc(D.cert_id)}</a>` : `<span class="pill">Not issued</span>`],
+          ["Internship certificate", D.intern_cert ? `<a class="btn sm ghost" href="#/certificate/${esc(D.intern_cert)}" target="_blank" rel="noopener">${esc(D.intern_cert)}</a>` : `<span class="pill">After the host's evaluation</span>`],
+          ["CV", D.cv ? `<button class="btn sm ghost" data-act="s3-cv">View CV</button>` : `<span class="pill">Not started</span>`],
+          ["Elevator pitch", D.pitch ? `<span class="note">${(() => { const t = [D.pitch.a, D.pitch.b, D.pitch.c].filter(Boolean).join(" "); return esc(t.length > 160 ? t.slice(0, 157).trimEnd() + "…" : t); })()}</span>` : `<span class="pill">Not started</span>`]].filter(Boolean)
+          .map(([l, v]) => `<li><span style="flex:1"><b>${l}</b></span>${v}</li>`).join("")}</ul>
+        ${D.cv && ui.s3cv ? `<div style="margin-top:.8rem">${cvPreview(D.cv)}</div>` : ""}
+        <h3 style="margin:1.2rem 0 .4rem">Payment receipts</h3>${D.payments.length ? `<ul class="sc-act">${D.payments.map((y) => `<li><span class="mono note">${fmtDay(y.at)}</span><span>${naira(y.amount)} · ${{ full: "Full fee", part1: "1st instalment", part2: "2nd instalment" }[y.part] || esc(y.part || "")}<small class="note" style="display:block">Reference ${esc(y.reference || "")}</small></span></li>`).join("")}</ul>` : `<p class="empty">No payments yet.</p>`}</div>
+      <div class="stack"><div class="card"><span class="eyebrow">Submitted work</span><h2 class="sc-h2">${D.work.length} link${D.work.length === 1 ? "" : "s"}</h2>
+        ${D.work.length ? `<ul class="sc-act">${D.work.map((w) => `<li><span class="mono note">W${w.week}</span><span><a class="link" href="${esc(w.link)}" target="_blank" rel="noopener">${esc(w.title)}</a><small class="note" style="display:block">${w.status === "graded" ? `Graded ${w.score}%` : w.status === "revise" ? "Changes requested" : "Submitted"} · ${fmtDay(w.at)}</small></span></li>`).join("")}</ul>` : `<p class="empty">Nothing submitted yet.</p>`}</div>
+        <div class="card"><span class="eyebrow">After the programme</span><h2 class="sc-h2">30, 60 and 90-day check-ins</h2>
+          <ul class="sc-act">${[30, 60, 90].map((d) => { const c = D.checkins.find((x) => x.day === d); return `<li><b class="mono" style="width:44px;flex:none">${d}d</b><span>${c ? `${esc(OUT_L[c.status] || c.status)}${c.note ? ` · “${esc(c.note)}”` : ""}<small class="note" style="display:block">${fmtDay(c.at)}</small>` : `<span class="note">Not answered yet</span>`}</span></li>`; }).join("")}</ul>
+          ${D.survey ? `<p style="margin-top:.6rem"><b>Exit survey:</b> would recommend ${D.survey.recommend}/10${D.survey.testimonial ? ` · “${esc(D.survey.testimonial)}”` : ""}</p>` : ""}</div>
+        <div class="card"><span class="eyebrow">Calls from staff</span><h2 class="sc-h2">${D.calls.length} logged</h2>${D.calls.length ? `<ul class="sc-act">${D.calls.slice(0, 8).map((k) => `<li><span class="mono note">${fmtDay(k.at)}</span><span>${k.outcome === "reached" ? "Reached" : "No answer"}${k.note ? ` · ${esc(k.note)}` : ""}<small class="note" style="display:block">${esc(k.by)}</small></span></li>`).join("")}</ul>` : ""}</div></div></section>` : `<div class="card"><p class="empty">Documents couldn't load.</p></div>`,
     history: `<section class="card"><span class="eyebrow">History</span><h2 class="sc-h2">Everything on ${esc(s.first_name)}'s record</h2>${s.history.length ? `<ul class="sc-act">${s.history.slice(0, 120).map((h) => `<li><span class="mono note">${fmt(h.at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })}</span><span>${esc(h.text)}${h.by ? `<small class="note"> · ${esc(h.by)}</small>` : ""}</span><span class="pill info">${esc(h.kind)}</span></li>`).join("")}</ul>` : `<p class="empty">Nothing yet.</p>`}</section>` };
   shell("student", esc(nm), "", `<section class="card s3-head"><div class="s3-id">${s.photo ? `<img class="s3-av" src="${esc(s.photo)}" alt="">` : `<span class="s3-av">${staffIni(nm)}</span>`}
       <div class="s3-who"><div class="s3-pills">${risk ? `<span class="pill bad">At risk</span>` : ""}<span class="pill ${F.locked ? "bad" : "ok"}">${F.locked ? "Learning paused" : s.status === "Admitted" ? "Active" : esc(s.status)}</span>${s.cert_id ? `<span class="pill gold">Graduated</span>` : ""}</div>
@@ -775,6 +795,277 @@ async function tabStudent360(id) {
     <div class="s3-tabs" role="tablist" aria-label="Student sections">${tabs.map(([k, l]) => `<button role="tab" class="s3-tab" data-act="s3-tab" data-k="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}</div></section>
     ${banner.join("")}${body[tab]}`,
     { eyebrow: `<a class="link" href="#/portal/${ME.role === "super" ? "command" : "students"}">${ME.role === "super" ? "Command centre" : "Students"}</a> / <a class="link" href="#/portal/students">Students</a> / ${esc(nm)}` });
+}
+
+/* ================= role home pages ================= */
+const hello = (n) => { const h = +fmt(new Date(), { hour: "numeric", hour12: false }); return `${h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"}, ${esc((n || "").split(" ")[0])}`; };
+const todayEyebrow = (l) => `${l} · ${fmt(new Date(), { weekday: "long", day: "numeric", month: "long" })}`;
+const kpiBox = (l, v, n, extra = "", href = "") => `<${href ? `a href="${href}"` : "div"} class="card sc-kpi"><span class="eyebrow">${l}</span><b class="mono">${v}</b>${n ? `<span class="note">${n}</span>` : ""}${extra}</${href ? "a" : "div"}>`;
+const miniStat = (l, v, cls = "") => `<div class="rh-mini"><span class="eyebrow">${l}</span><b class="mono ${cls}">${v}</b></div>`;
+const waLink = (p) => p ? `https://wa.me/${String(p).replace(/\D/g, "").replace(/^0/, "234")}` : "";
+const ini = (n) => staffIni(n);
+const pct = (a, b) => (b ? Math.round((a / b) * 100) : null);
+function target(label, value, pctV, goal, note) {
+  const ok = pctV != null && pctV >= goal;
+  return `<div class="card sc-kpi"><span class="eyebrow">${label}</span><div class="rh-tv"><b class="mono">${value}</b>${pctV == null ? `<span class="pill">Not yet</span>` : `<span class="pill ${ok ? "ok" : "now"}">${ok ? "On target" : "Below target"}</span>`}</div>
+    <div class="rh-target" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, pctV || 0))}%" class="${ok ? "" : "warn"}"></i><b style="left:${goal}%"></b></div><span class="note">${note}</span></div>`;
+}
+
+/* ---------- Programme Director: programme health ---------- */
+const ESC_KIND = { retake: "Retake", deferral: "Deferral", extension: "Deadline", appeal: "Grade appeal", withdrawal: "Withdrawal", other: "Other" };
+async function tabHealth() {
+  const d = await rpc("director_home"), C = d.cohort, A = d.ahead, onCourse = A.on + A.ahead, open = d.escalations.filter((e) => e.status === "open");
+  const m = ui.dm || "pass", ML = { pass: "Pass rate", score: "Average score", att: "Attendance" };
+  const bars = (arr) => `<div class="rh-spark" aria-hidden="true">${(arr || []).map((v) => `<i style="height:${v == null ? 4 : Math.max(8, v)}%" class="${v == null ? "na" : v < 70 ? "bad" : v < 85 ? "warn" : ""}"></i>`).join("")}</div>`;
+  const F = d.feel || {}, fmax = Math.max(1, F.c1 || 0, F.c2 || 0, F.c3 || 0, F.c4 || 0, F.c5 || 0);
+  const behind = A.behind1 + A.behind2, fmaxN = Math.max(1, A.behind2, A.behind1, A.on, A.ahead);
+  shell("health", hello(d.me), `${esc(C.name)} · ${C.week < 1 ? `starts ${fmtDateD(C.start_date)}` : `Week ${C.week} of 17 (${STAGE_OF_WEEK(C.week)})`}. ${d.pass_rate != null ? `Pass rate is <b>${d.pass_rate}%</b>${d.pass_rate >= 80 ? ", above" : ", below"} the 80% target.` : ""} ${open.length ? `${open.length} decision${open.length === 1 ? " is" : "s are"} waiting for you.` : "Nothing is waiting for you."}`,
+    `<section class="sc-kpis">${target("Weekly pass rate", d.pass_rate != null ? d.pass_rate + "%" : "—", d.pass_rate, 80, `Target 80%${d.pass_last != null ? ` · last week ${d.pass_last}%` : ""}`)}
+      ${target("On course to graduate", d.students ? pct(onCourse, d.students) + "%" : "—", pct(onCourse, d.students), 85, `${onCourse} of ${d.students} students · target 85%`)}
+      ${target("Live class attendance", d.attend != null ? d.attend + "%" : "—", d.attend, 85, "Target 85%")}
+      ${target("Graded within 2 days", d.grading_fast != null ? d.grading_fast + "%" : "—", d.grading_fast, 90, "Target 90%")}
+      ${target("In work 90 days after", d.in_work != null ? d.in_work + "%" : "—", d.in_work, 70, "Target 70% · measured after Week 17")}</section>
+    <section class="sc-2">
+      <div class="card"><div class="sc-h"><div><span class="eyebrow">Escalated to you</span><h2>${open.length} decision${open.length === 1 ? "" : "s"} waiting</h2></div><span class="note">Cohort Managers, facilitators and coaches send these up from a student's page.</span></div>
+        ${d.escalations.length ? `<ul class="sc-ql">${d.escalations.map((e) => `<li class="sc-q"><span class="st-av">${ini(e.name || e.by)}</span><div class="sc-q-t"><div class="sc-q-h"><b>${esc(e.title)}</b><span class="pill info">${ESC_KIND[e.kind] || e.kind}</span></div>
+          ${e.detail ? `<span class="note">${esc(e.detail)}</span>` : ""}<span class="sc-q-m">Raised by <b>${esc(e.by)}</b> · ${agoS(e.at)}${e.app ? ` · <a class="link" href="#/portal/student/${e.app}">Student record</a>` : ""}</span></div>
+          <div class="sc-q-a">${e.status === "open" ? `<div class="actions"><button class="btn sm" data-act="esc-yes" data-k="${e.id}">${e.kind === "retake" ? "Give the retake" : "Approve"}</button><button class="btn sm ghost" data-act="esc-no" data-k="${e.id}">Decline</button></div>` : `<span class="pill ${e.status === "approved" ? "ok" : ""}">${e.status === "approved" ? "Approved" : "Declined"}</span>`}</div></li>`).join("")}</ul>` : `<p class="empty">Nothing has been escalated. 🎉</p>`}</div>
+      <div class="card"><span class="eyebrow">Graduation forecast</span><h2 class="sc-h2">${onCourse} of ${d.students} on course to graduate</h2><p class="note">Students by how far ahead or behind the cohort calendar they are.</p>
+        <div class="rh-fc" role="img" aria-label="${A.behind2} two or more weeks behind, ${A.behind1} one week behind, ${A.on} on the week, ${A.ahead} ahead">${[["2+ weeks behind", A.behind2, "bad"], ["1 week behind", A.behind1, "warn"], ["On the week", A.on, ""], ["Ahead", A.ahead, "ok2"]].map(([l, n, c]) => `<div><b class="mono">${n}</b><i class="${c}" style="height:${Math.max(6, (n / fmaxN) * 120)}px"></i><span class="note">${l}</span></div>`).join("")}</div>
+        ${behind ? `<div class="actions" style="margin-top:.8rem"><a class="btn sm ghost" href="#/portal/students">See students</a><a class="btn sm ghost" href="#/portal/sessions">Plan a catch-up session</a></div>` : ""}</div></section>
+    <section class="card"><div class="sc-h"><div><span class="eyebrow">Tracks side by side</span><h2>Where to put your attention</h2></div>
+        <div class="sc-tabs" role="group" aria-label="Measure">${Object.entries(ML).map(([k, l]) => `<button class="sc-tab" data-act="dm" data-k="${k}" aria-pressed="${m === k}">${l}</button>`).join("")}</div></div>
+      <div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Track</th><th>Students</th><th>${ML[m]} by week</th><th>Average score</th><th>Projects on time</th><th>Waiting for grading</th><th>Grading turnaround</th><th>Facilitator</th></tr></thead><tbody>
+        ${d.tracks.map((t) => { const s = t[m] || [], now = s.filter((v) => v != null).at(-1);
+          return `<tr><td data-label="Track"><b>${esc(t.name)}</b></td><td data-label="Students" class="mono">${t.n}</td><td data-label="${ML[m]}">${bars(s)}<span class="note mono">${now != null ? `now ${now}%` : "—"}</span></td>
+            <td data-label="Average" class="mono">${t.avg != null ? t.avg + "%" : "—"}</td><td data-label="On time" class="mono">${t.ontime != null ? t.ontime + "%" : "—"}</td><td data-label="Waiting" class="mono">${t.waiting}</td>
+            <td data-label="Turnaround">${t.turn != null ? `<span class="pill ${t.turn > 2 ? "bad" : t.turn > 1.5 ? "now" : "ok"}">${t.turn} days</span>` : `<span class="note">—</span>`}</td><td data-label="Facilitator">${t.fac ? esc(t.fac) : `<span class="pill bad">None</span>`}</td></tr>`; }).join("")}</tbody></table></div></section>
+    <section class="sc-2b">
+      <div class="card"><span class="eyebrow">Hardest content lately</span><h2 class="sc-h2">Questions most students miss</h2>
+        ${d.hard.length ? `<ul class="sc-act">${d.hard.map((h) => `<li><b class="mono rh-bad" style="width:52px;flex:none">${h.wrong}%</b><span><b>${esc(h.q)}</b><small class="note" style="display:block">${esc(h.track || "")} · Week ${h.week} assessment · ${h.n} answers</small></span></li>`).join("")}</ul><p class="note">Share these with facilitators, or cover them in a live class.</p>` : `<p class="empty">Not enough assessment answers yet.</p>`}</div>
+      <div class="card"><span class="eyebrow">How students feel</span><h2 class="sc-h2">${F.n ? `Confidence ${F.avg} of 5` : "No check-ins yet"}</h2>${F.n ? `<p class="note">From the latest weekly check-in · ${F.n} answers.</p>
+        <div class="rh-feel">${[[5, "5 · very sure", "c5"], [4, "4", "c4"], [3, "3", "c3"], [2, "2", "c2"], [1, "1 · lost", "c1"]].map(([k, l, c]) => `<div><span>${l}</span><div class="sc-meter"><i class="${c}" style="width:${(F["c" + k] / fmax) * 100}%"></i></div><b class="mono">${F["c" + k]}</b></div>`).join("")}</div>
+        ${d.notes.length ? `<p style="margin-top:.8rem">“${esc(d.notes[0])}” <span class="note">· latest check-in note</span></p>` : ""}` : ""}</div></section>`,
+    { eyebrow: todayEyebrow("Programme health"), actions: `<a class="btn ghost" href="#/portal/outcomes">Outcomes</a><a class="btn" href="#/portal/news">New announcement</a>` });
+}
+
+/* ---------- Cohort Manager: today ---------- */
+async function tabToday() {
+  const d = ui.cm = await rpc("cm_home"), C = d.cohort, today = new Date().toDateString();
+  const calledToday = (c) => c.call && new Date(c.call.at).toDateString() === today;
+  const left = d.calls.filter((c) => !calledToday(c)).length, dueIn = d.due.reduce((t, x) => t + x.in, 0), dueN = d.due.reduce((t, x) => t + x.n, 0);
+  const sessT = d.sessions.filter((s) => new Date(s.at).toDateString() === today), quiet = d.pods.filter((p) => p.n && p.active / p.n < 0.5);
+  shell("today", hello(d.me), `<b>${left} student${left === 1 ? "" : "s"} to call</b>, ${sessT.length} live class${sessT.length === 1 ? "" : "es"} today and ${d.help.length} help request${d.help.length === 1 ? "" : "s"} waiting.${dueN - dueIn > 0 ? ` ${dueN - dueIn} students haven't submitted this week's project.` : ""}`,
+    `<section class="sc-2"><div class="card"><div class="sc-h"><div><span class="eyebrow">Call list</span><h2>Students to reach</h2></div><span class="pill ok">${d.calls.length - left} of ${d.calls.length} logged today</span></div>
+        <p class="note">Most urgent first. Log each call so the team sees it on the student's record.</p>
+        ${d.calls.length ? `<ul class="sc-ql">${d.calls.slice(0, ui.cmAll ? 999 : 8).map((c) => `<li class="sc-q"><span class="st-av">${ini(c.name)}</span><div class="sc-q-t"><div class="sc-q-h"><a class="link" href="#/portal/student/${c.id}"><b>${esc(c.name)}</b></a><span class="note">${esc(c.track || "")} · Week ${c.week}</span></div>
+            <span class="sc-tags">${c.reasons.map((r) => `<span class="pill bad">${esc(r)}</span>`).join("")}</span>
+            ${c.note ? `<span class="note">Last note: ${esc(c.note)}</span>` : ""}${c.call ? `<span class="sc-q-m">Last call: ${c.call.outcome === "reached" ? "reached" : "no answer"} · ${agoS(c.call.at)} · ${esc(c.call.by)}</span>` : ""}</div>
+          <div class="sc-q-a">${calledToday(c) ? `<span class="pill ${c.call.outcome === "reached" ? "ok" : "now"}">${c.call.outcome === "reached" ? "Reached" : "No answer · try tomorrow"}</span>`
+            : `<div class="actions">${c.phone ? `<a class="btn sm ghost" href="${waLink(c.phone)}" target="_blank" rel="noopener">WhatsApp</a>` : ""}<button class="btn sm ghost" data-act="cm-call" data-k="${c.id}" data-v="no_answer">No answer</button><button class="btn sm" data-act="cm-call" data-k="${c.id}" data-v="reached">Reached</button></div>`}</div></li>`).join("")}</ul>${d.calls.length > 8 ? `<button class="btn sm ghost" data-act="cm-all" style="margin-top:.6rem">${ui.cmAll ? "Show the 8 most urgent" : `Show all ${d.calls.length}`}</button>` : ""}` : `<p class="empty">No one needs a call right now. 🎉</p>`}</div>
+      <div class="stack">
+        <div class="card"><span class="eyebrow">Live classes</span><h2 class="sc-h2">${d.sessions.length ? `${sessT.length} today${d.sessions.length > sessT.length ? `, ${d.sessions.length - sessT.length} tomorrow` : ""}` : "None today or tomorrow"}</h2>
+          ${d.sessions.length ? `<ul class="sc-act">${d.sessions.map((s) => `<li><span class="mono" style="width:56px;flex:none"><b>${fmt(s.at, { hour: "2-digit", minute: "2-digit", hour12: false })}</b><small class="note" style="display:block">${new Date(s.at).toDateString() === today ? "today" : "tomorrow"}</small></span><span><b>${esc(s.title)}</b><small class="note" style="display:block">${esc(s.track || "Everyone")}${s.host ? ` · ${esc(s.host)}` : ""} · ${s.minutes} min · ${s.joined}/${s.invited} joined</small></span>${s.link ? `<a class="btn sm ghost" href="${esc(s.link)}" target="_blank" rel="noopener">Open</a>` : `<span class="pill bad">No link</span>`}</li>`).join("")}</ul>` : ""}
+          <a class="link sm" href="#/portal/sessions">All sessions and attendance</a></div>
+        <div class="card"><div class="sc-h"><div><span class="eyebrow">Due ${fmtDay(d.due_at)}, 17:00</span><h2>Week ${Math.max(C.week, 1)} project</h2></div><b class="mono">${dueIn}/${dueN}</b></div>
+          <div class="sc-seats">${d.due.map((x) => `<div><span>${esc(x.track)}</span>${meter(pct(x.in, x.n))}<b class="mono">${x.in}/${x.n}</b></div>`).join("")}</div>
+          <div class="actions" style="margin-top:.8rem"><a class="btn sm" href="#/portal/news">Post a reminder</a></div></div>
+      </div></section>
+    <section class="sc-3">
+      <div class="card"><div class="sc-h"><div><span class="eyebrow">Help requests</span><h2>${d.help.length} waiting</h2></div><a class="btn sm ghost" href="#/portal/support">Open all</a></div>
+        ${d.help.length ? `<ul class="sc-act">${d.help.slice(0, 6).map((h) => { const late = Date.now() - new Date(h.at) > 864e5; return `<li><span class="sc-dot ${late ? "bad" : "warn"}" aria-hidden="true"></span><span><b>${esc(h.subject)}</b><small class="note" style="display:block">${esc(h.name)} · ${esc(h.category)} · ${agoS(h.at)}</small></span></li>`; }).join("")}</ul>` : `<p class="empty">All answered.</p>`}</div>
+      <div class="card"><div class="sc-h"><div><span class="eyebrow">Pods</span><h2>${quiet.length ? `${quiet.length} pod${quiet.length === 1 ? " has" : "s have"} gone quiet` : "Pods look active"}</h2></div><a class="btn sm ghost" href="#/portal/pods">Manage</a></div>
+        ${d.unpodded ? `<p class="note"><b>${d.unpodded}</b> student${d.unpodded === 1 ? " isn't" : "s aren't"} in a pod yet.</p>` : ""}
+        ${d.pods.length ? `<ul class="sc-act">${d.pods.slice(0, 8).map((p) => { const r = pct(p.active, p.n) ?? 0; return `<li><span style="flex:1"><b>${esc(p.name)}</b><small class="note" style="display:block">${p.n} students · ${p.active} active this week</small></span>${meter(r, r < 50 ? "warn" : "")}<span class="pill ${r < 50 ? "bad" : "ok"}">${r < 50 ? "Quiet" : "Active"}</span></li>`; }).join("")}</ul>` : `<p class="empty">No pods yet.</p>`}</div>
+      <div class="card"><div class="sc-h"><div><span class="eyebrow">Alumni check-ins</span><h2>${d.checkins_due.length ? `${d.checkins_due.length} graduate${d.checkins_due.length === 1 ? "" : "s"} to nudge` : "None due"}</h2></div><a class="btn sm ghost" href="#/portal/outcomes">Outcomes</a></div>
+        <p class="note">30, 60 and 90 days after the programme. These are open but not answered yet.</p>
+        ${d.checkins_due.length ? `<ul class="sc-act">${d.checkins_due.slice(0, 8).map((x) => `<li><span style="flex:1"><a class="link" href="#/portal/student/${x.id}"><b>${esc(x.name)}</b></a><small class="note" style="display:block">${x.day}-day check-in · open since ${fmtDay(x.opened)}</small></span>${x.phone ? `<a class="btn sm ghost" href="${waLink(x.phone)}" target="_blank" rel="noopener">WhatsApp</a>` : ""}</li>`).join("")}</ul>` : ""}</div></section>
+    <form class="card form" id="cm-news" novalidate><span class="eyebrow">Announcement</span><h2 class="sc-h2">Tell the cohort something</h2>
+      <div class="grid2"><div class="field"><label for="cmn-t">Title</label><input id="cmn-t" maxlength="120" placeholder="e.g. Week ${Math.max(C.week, 1)} project: extra office hours on Thursday"></div>
+        <div class="field"><label for="cmn-to">Who sees it</label><select id="cmn-to"><option value="">Everyone in ${esc(C.name)}</option>${(d.due || []).map((x) => `<option value="${x.code}">${esc(x.track)} only</option>`).join("")}</select></div></div>
+      <div class="field"><label for="cmn-b">Message</label><textarea id="cmn-b" rows="3" placeholder="Students see it on Home, as a portal alert, and by email if ticked."></textarea></div>
+      <label class="consent"><input type="checkbox" id="cmn-e" checked> Also email it</label><p class="err" id="cmn-err" role="alert"></p><div><button class="btn" type="submit">Post now</button></div></form>`,
+    { eyebrow: todayEyebrow("Today"), actions: `<a class="btn ghost" href="#/portal/discussion">Discussion</a><a class="btn" href="#cm-news">New announcement</a>` });
+}
+
+/* ---------- Facilitator: grading desk ---------- */
+const RUBRIC4 = [["Meets the brief", 40, "Answers every part of the task", [0, 10, 20, 30, 40]], ["Quality of work", 30, "Correct, clean and well reasoned", [0, 10, 20, 25, 30]],
+  ["Clear communication", 20, "A manager could act on it without asking", [0, 5, 10, 15, 20]], ["Professional delivery", 10, "Tidy, well named, shared with the right access", [0, 4, 6, 8, 10]]];
+const FB_SNIPS = ["Clear structure. Well done.", "Clean the data before you analyse it.", "Label every chart and axis.", "Add one line on what the manager should do next.", "Check spelling and names before you send."];
+async function tabDesk() {
+  const [h, q, M] = await Promise.all([rpc("fac_home"), rpc("acad_learn_queue"), rpc("acad_messages").catch(() => [])]); ui.lq = q; ui.msgs = M;
+  const wait = q.work.filter((x) => x.status === "submitted").sort((a, b) => new Date(a.at) - new Date(b.at));
+  if (!wait.some((x) => x.key + x.app === ui.deskSel)) ui.deskSel = wait[0] ? wait[0].key + wait[0].app : null;
+  const cur = wait.find((x) => x.key + x.app === ui.deskSel), R = (ui.rub || {})[ui.deskSel] || {}, picked = Object.keys(R).length;
+  const raw = Object.values(R).reduce((a, b) => a + b, 0), capped = cur && cur.cap != null && cur.cap < 1 ? Math.round(raw * cur.cap) : raw;
+  const msgs = (M || []).filter((m) => m.waiting).slice(0, 4);
+  const days = (t) => Math.max(0, Math.floor((Date.now() - new Date(t)) / 864e5));
+  shell("desk", `${wait.length} project${wait.length === 1 ? "" : "s"} to grade`, `${esc(h.track || "All tracks")} · ${h.students} students · Week ${Math.max(h.cohort.week, 1)}. Oldest first: week results stay open until these are graded.`,
+    `<section class="sc-kpis sc-kpis4">${kpiBox("Graded this week", h.graded_week, "by you")}${kpiBox("Average turnaround", h.turn != null ? h.turn + "d" : "—", "target 2 days", "")}${kpiBox("Waiting", wait.length, wait[0] ? `oldest ${days(wait[0].at)} day${days(wait[0].at) === 1 ? "" : "s"}` : "nothing waiting")}${kpiBox("Low confidence", h.low_conf, "in your track this week", "", "#/portal/students")}</section>
+    <section class="rh-desk"><div class="card rh-queue"><div class="sc-h"><b>Queue</b><span class="note">oldest first</span></div>
+        ${wait.length ? wait.map((x) => { const dd = days(x.at), on = x.key + x.app === ui.deskSel; return `<button class="rh-qi ${on ? "on" : ""}" data-act="desk-pick" data-k="${esc(x.key + x.app)}" aria-pressed="${on}"><span class="st-av">${ini(x.name)}</span><span class="sc-p-t"><b>${esc(x.name)}</b><span class="note">Week ${x.week} · ${esc(x.title)}</span></span><span class="pill ${dd > 2 ? "bad" : dd > 1 ? "now" : "ok"}">${dd ? dd + "d" : "today"}</span></button>`; }).join("") : `<p class="empty">All graded. Nice work. 🎉</p>`}
+        <a class="link sm" href="#/portal/grading">All submissions and staff steps</a></div>
+      <div class="card rh-grade">${cur ? `<div class="sc-h"><div><span class="eyebrow">Week ${cur.week} project · sent ${agoS(cur.at)}</span><h2>${esc(cur.name)} · ${esc(cur.title)}</h2><span class="note">${esc(cur.matric)} · ${esc(cur.track)}${cur.cap != null && cur.cap < 1 ? ` · <b>late, score capped at ${Math.round(cur.cap * 100)}%</b>` : " · on time"}</span></div>
+          <div class="actions"><a class="btn sm ghost" href="${esc(cur.link)}" target="_blank" rel="noopener">Open their work ↗</a><a class="btn sm ghost" href="#/portal/student/${cur.app}">Student record</a></div></div>
+        <div class="rh-rub">${RUBRIC4.map(([n, mx, hint, vals], k) => `<div class="rh-rr"><div><b>${n} <span class="mono note">/ ${mx}</span></b><span class="note">${hint}</span></div><div class="rh-sc" role="group" aria-label="${n}">${vals.map((v) => `<button class="rh-s ${R[k] === v ? "on" : ""}" data-act="rub" data-k="${k}" data-v="${v}" aria-pressed="${R[k] === v}">${v}</button>`).join("")}</div></div>`).join("")}</div>
+        <div class="rh-total ${picked < 4 ? "" : capped >= 70 ? "ok" : "bad"}"><div><span class="eyebrow">Project score</span><b class="mono">${picked < 4 ? "—" : capped + "%"}</b></div><span>${picked < 4 ? `Score all four parts. ${4 - picked} left.` : capped >= 70 ? "Passes the week project. With the assessment score, this decides the week result." : "Below 70%. If they can fix it this week, ask for changes instead."}</span></div>
+        <div class="field"><label for="desk-fb">Feedback for ${esc(cur.name.split(" ")[0])}</label><textarea id="desk-fb" rows="3" placeholder="What worked, what to fix, and one thing to try next week. Students see this with the grade.">${esc((ui.fb || {})[ui.deskSel] || "")}</textarea>
+          <div class="actions">${FB_SNIPS.map((t, i) => `<button class="btn sm ghost" type="button" data-act="fb-add" data-k="${i}">+ ${esc(t.split(".")[0])}</button>`).join("")}</div></div>
+        <div class="actions" style="justify-content:flex-end"><button class="btn ghost" data-act="desk-revise">Ask for changes</button><button class="btn" data-act="desk-save">Save grade and next →</button></div>`
+        : `<p class="empty">Nothing waiting. When students submit, their work appears here oldest first.</p>`}</div></section>
+    <section class="sc-3">
+      <div class="card"><span class="eyebrow">My track this week</span><h2 class="sc-h2">Week ${Math.max(h.cohort.week, 1)}${h.week_title ? ` · ${esc(h.week_title)}` : ""}</h2>
+        <div class="rh-minis">${miniStat("Lessons done", h.lessons_pct != null ? h.lessons_pct + "%" : "—")}${miniStat("Assessment taken", `${h.quiz_taken}/${h.students}`)}${miniStat("Projects in", `${h.proj_in}/${h.students}`)}${miniStat("Low confidence", h.low_conf, h.low_conf ? "rh-bad" : "")}</div></div>
+      <div class="card"><div class="sc-h"><div><span class="eyebrow">Project supervision</span><h2>${msgs.length ? `${msgs.length} waiting for a reply` : "No new messages"}</h2></div><a class="btn sm ghost" href="#/portal/grading">Open</a></div>
+        ${msgs.length ? `<ul class="sc-act">${msgs.map((m) => `<li><span class="st-av">${ini(m.name)}</span><span><b>${esc(m.name)}</b><small class="note" style="display:block">“${esc(((m.messages || []).at(-1)?.body || "").slice(0, 120))}” · ${agoS(m.last_at)}</small></span></li>`).join("")}</ul>` : `<p class="note">Students in the client project (Weeks 8–9) can message you from their project page.</p>`}</div>
+      <div class="card"><span class="eyebrow">Next live class</span>${h.next ? `<h2 class="sc-h2">${esc(h.next.title)}</h2><p class="note">${fmtAt(h.next.at)} · ${h.next.minutes} min</p>
+        <div class="actions">${h.next.link ? `<a class="btn" href="${esc(h.next.link)}" target="_blank" rel="noopener">Start class</a>` : ""}<a class="btn ghost" href="#/portal/sessions">Take attendance</a></div><p class="note">Students join from their portal, which marks them present.</p>` : `<h2 class="sc-h2">None scheduled</h2><a class="btn ghost" href="#/portal/sessions">Schedule one</a>`}</div></section>`,
+    { eyebrow: todayEyebrow("Grading desk") });
+}
+
+/* ---------- Career Coach: career desk ---------- */
+async function tabCareer() {
+  const [h, L] = await Promise.all([rpc("coach_home"), rpc("coach_calls")]); ui.dc2 = L;
+  const isCoach = ME.role === "coach", today = new Date().toDateString();
+  const mine = L.filter((x) => (x.mine || !isCoach)), booked = mine.filter((x) => x.app && new Date(x.at).getTime() > Date.now() - 864e5 * 1).sort((a, b) => new Date(a.at) - new Date(b.at));
+  const todays = booked.filter((x) => new Date(x.at).toDateString() === today), list = todays.length ? todays : booked.slice(0, 6);
+  if (!list.some((x) => x.id === ui.ccSel)) ui.ccSel = list[0]?.id;
+  const cur = L.find((x) => x.id === ui.ccSel), i = cur ? L.indexOf(cur) : -1, ch = cur?.cv ? atsChecks(cur.cv) : null;
+  const P = h.pipeline || {}, people = (st) => h.pipe_people.filter((p) => p.st === st).slice(0, 3);
+  const days = [...Array(10)].map((_, k) => new Date(Date.now() + (k + 1) * 864e5)).filter((d) => d.getDay() && d.getDay() < 6).slice(0, 5), TT = ["09:00", "10:00", "11:30", "14:00", "15:30"];
+  const slotAt = (d, t) => mine.find((x) => fmt(x.at, { year: "numeric", month: "2-digit", day: "2-digit" }) === fmt(d, { year: "numeric", month: "2-digit", day: "2-digit" }) && fmt(x.at, { hour: "2-digit", minute: "2-digit", hour12: false }) === t);
+  const iso = (d, t) => `${fmt(d, { year: "numeric", month: "2-digit", day: "2-digit" }).split("/").reverse().join("-")}T${t}:00+01:00`;
+  shell("career", todays.length ? `${todays.length} mock interview${todays.length === 1 ? "" : "s"} today` : "Career desk", `${h.to_book.length ? `${h.to_book.length} student${h.to_book.length === 1 ? " still needs" : "s still need"} to book Discovery Call 2. ` : ""}${h.chat.length ? `${h.chat.length} question${h.chat.length === 1 ? " is" : "s are"} waiting in the career chat.` : "The career chat is all answered."}`,
+    `<section class="rh-desk"><div class="card rh-queue"><div class="sc-h"><b>${todays.length ? "Today's calls" : "Next calls"}</b><a class="link sm" href="#/portal/dc2">All</a></div>
+        ${list.length ? list.map((x) => `<button class="rh-qi ${x.id === ui.ccSel ? "on" : ""}" data-act="cc-pick" data-k="${x.id}" aria-pressed="${x.id === ui.ccSel}"><b class="mono" style="width:52px;flex:none">${fmt(x.at, { hour: "2-digit", minute: "2-digit", hour12: false })}</b><span class="sc-p-t"><b>${esc(x.name)}</b><span class="note">${esc(x.track || "")}${new Date(x.at).toDateString() === today ? "" : ` · ${fmtDay(x.at)}`}</span></span><span class="pill ${x.result ? "ok" : new Date(x.at) < new Date() ? "now" : ""}">${x.result ? "Done" : new Date(x.at) < new Date() ? "To score" : "Booked"}</span></button>`).join("") : `<p class="empty">No calls booked yet. Open some times below.</p>`}</div>
+      <div class="card rh-grade">${cur ? `<div class="sc-h"><div><span class="eyebrow">Discovery Call 2 · ${fmtAt(cur.at)}</span><h2>${esc(cur.name)} · ${esc(cur.track || "")}</h2></div><div class="actions"><a class="btn sm ghost" href="#/portal/student/${cur.app}">Student record</a></div></div>
+          <div class="rh-minis">${miniStat("CV ATS check", ch ? `${ch.filter((x) => x[1]).length}/5` : "—")}${miniStat("Their note", cur.note ? "Yes" : "None")}${miniStat("Result", cur.result ? `${cur.result.score}/10` : "Not yet")}</div>
+          ${cur.note ? `<p><b>Their note:</b> “${esc(cur.note)}”</p>` : ""}${ch ? `<ul class="mini">${atsList(ch)}</ul>` : `<p class="note">No CV saved yet.</p>`}
+          <form class="form dc2-form" data-i="${i}" novalidate><div class="field"><span class="lbl">Interview Confidence Score (1–10)</span><div class="rh-sc">${[...Array(10)].map((_, k) => `<button type="button" class="rh-s ${(ui.ccScore?.[cur.id] ?? cur.result?.score) === k + 1 ? "on" : ""}" data-act="cc-score" data-k="${k + 1}">${k + 1}</button>`).join("")}</div><input type="hidden" id="dsc-${i}" value="${ui.ccScore?.[cur.id] ?? cur.result?.score ?? ""}"></div>
+            <div class="field"><label for="dno-${i}">Summary for the student</label><textarea id="dno-${i}" rows="2" placeholder="e.g. Strong pitch. Slow down and use numbers.">${esc(cur.result?.note || "")}</textarea></div>
+            <div class="field"><label for="dnx-${i}">Next steps (one per line)</label><textarea id="dnx-${i}" rows="3" placeholder="Apply to 5 roles a week&#10;Practise STAR answers">${esc((cur.result?.next || []).join("\n"))}</textarea></div>
+            <div class="actions"><button class="btn" type="submit">${cur.result ? "Update result" : "Save result"}</button></div></form>` : `<p class="empty">Pick a call to prepare.</p>`}</div></section>
+    <section class="card"><div class="sc-h"><div><span class="eyebrow">Job search board · ${esc(h.cohort.name)}</span><h2>Where students' applications are</h2></div><a class="btn sm ghost" href="#/portal/jobs">Open job search</a></div>
+      <div class="rh-pipe">${[["Interested", P.interested, "na", []], ["Applied", P.applied, "b", people("Applied")], ["Interviewing", P.interviewing, "w", people("Interviewing")], ["Offer", P.offer, "a", people("Offer")], ["In work", h.working, "n", []]]
+        .map(([l, n, c, ppl]) => `<div class="rh-col ${c}"><div class="sc-h"><b>${l}</b><b class="mono">${n || 0}</b></div>${ppl.map((p) => `<a class="rh-card" href="#/portal/student/${p.id}"><b>${esc(p.name)}</b><span class="note">${esc([p.role, p.org].filter(Boolean).join(" · "))}</span></a>`).join("")}</div>`).join("")}</div></section>
+    <section class="sc-2b">
+      <div class="card"><span class="eyebrow">My availability · next 5 working days</span><h2 class="sc-h2">${mine.filter((x) => !x.app && new Date(x.at) > new Date()).length} open · ${mine.filter((x) => x.app && new Date(x.at) > new Date()).length} booked</h2>
+        <p class="note">Tap a time to open or close it. Students book open times from their portal. Each call is 40 minutes.</p>
+        <div class="hm-wrap"><div class="rh-grid"><span></span>${days.map((d) => `<b>${fmt(d, { weekday: "short", day: "numeric" })}</b>`).join("")}
+          ${TT.map((t) => `<span class="mono note">${t}</span>${days.map((d) => { const s = slotAt(d, t); return s ? (s.app ? `<button class="rh-slot booked" disabled title="${esc(s.name)}">Booked</button>` : `<button class="rh-slot open" data-act="cc-close" data-k="${s.id}" aria-label="Close ${t}">Open</button>`) : `<button class="rh-slot" data-act="cc-open" data-k="${iso(d, t)}" aria-label="Open ${t}">+</button>`; }).join("")}`).join("")}</div></div></div>
+      <div class="card"><div class="sc-h"><div><span class="eyebrow">Career chat</span><h2>${h.chat.length} question${h.chat.length === 1 ? "" : "s"} waiting</h2></div><button class="btn sm ghost" data-act="go-disc" data-k="career">Answer</button></div>
+        ${h.chat.length ? `<ul class="sc-act">${h.chat.slice(0, 5).map((c) => `<li><span class="st-av">${ini(c.author)}</span><span><b>“${esc(c.body.slice(0, 140))}”</b><small class="note" style="display:block">${esc(c.author)} · ${agoS(c.at)}</small></span></li>`).join("")}</ul>` : `<p class="note">Nothing waiting.</p>`}
+        <div class="rh-minis" style="margin-top:.8rem">${miniStat("In work", h.working)}${miniStat("Interviewing", P.interviewing || 0)}${miniStat("Opportunities live", h.opps_live)}</div>
+        ${h.to_book.length ? `<p class="note" style="margin-top:.8rem"><b>Still to book Discovery Call 2:</b> ${h.to_book.slice(0, 6).map((x) => esc(x.name)).join(", ")}${h.to_book.length > 6 ? ` and ${h.to_book.length - 6} more` : ""}.</p>` : ""}</div></section>`,
+    { eyebrow: todayEyebrow("Career desk"), actions: `<a class="btn" href="#/portal/opps">Post an opportunity</a>` });
+}
+
+/* ---------- Academy Admin: operations ---------- */
+const OPS_ITEMS = (wk) => wk <= 1 ? [["Every student has a portal account", "Send set-up links to anyone missing"], ["Orientation class has a link", "Live sessions page"], ["Pods assigned", "Everyone in a pod before Week 2"]]
+  : wk <= 9 ? [["Confirm host spots", "Every host says how many interns they can take"], ["Match students to hosts", "By track, city and what they asked for"], ["Send supervisor links", "Each supervisor gets the logbook and evaluation link"], ["Brief students on the internship", "Announcement plus a live session"], ["Next week's classes have links", "Live sessions page"]]
+  : wk <= 13 ? [["Supervisors are signing logbooks", "Chase any supervisor more than a week behind"], ["Mid-internship check-in", "One message to each host"], ["Evaluations requested", "In Week 13, remind supervisors to evaluate"]]
+  : [["Certificates checked", "Names and tracks are right before issuing"], ["Graduation announcement", "Tell students what happens after Week 17"], ["Alumni check-ins planned", "30, 60 and 90 days after"]];
+async function tabOps() {
+  const [h, L] = await Promise.all([rpc("aa_home"), rpc("acad_placements")]); ui.places = L; ui.aa = h;
+  const tf = ui.opsT || "", tracks = [...new Set(L.map((x) => x.track).filter(Boolean))];
+  const F = L.filter((x) => !tf || x.track === tf), wk = h.cohort.week, items = OPS_ITEMS(wk), done = items.filter(([t]) => h.checks[t]).length;
+  const col = (title, cls, help, rows, act) => `<div class="rh-col ${cls}"><div class="sc-h"><b>${title}</b><b class="mono">${rows.length}</b></div><span class="note">${help}</span>${rows.slice(0, 6).map((x) => `<a class="rh-card" href="#/portal/intern"><b>${esc(x.name)}</b><span class="note">${esc(x.track || "")}${x.placement ? ` · ${esc(x.placement.org)}` : ""}</span><span class="link sm">${act}</span></a>`).join("")}${rows.length > 6 ? `<a class="link sm" href="#/portal/intern">+ ${rows.length - 6} more</a>` : ""}</div>`;
+  const need = F.filter((x) => !x.placement), placed = F.filter((x) => x.placement && !x.signed && !x.to_sign && !x.eval), active = F.filter((x) => x.placement && (x.signed || x.to_sign) && !x.eval), evald = F.filter((x) => x.eval);
+  const days = Math.ceil((new Date(h.intern_start + "T09:00:00+01:00") - Date.now()) / 864e5), used = h.hosts.reduce((t, x) => t + x.used, 0), spots = h.hosts.filter((x) => x.active).reduce((t, x) => t + x.spots, 0);
+  shell("ops", need.length && wk < 14 ? `${need.length} student${need.length === 1 ? " needs" : "s need"} a placement` : "Operations", `${days > 0 ? `Internships start ${fmtDateD(h.intern_start)}, in ${days} day${days === 1 ? "" : "s"}.` : "Internships are under way."} ${h.hosts.length ? `${h.hosts.filter((x) => x.active).length} host organisations have ${Math.max(0, spots - used)} open spot${spots - used === 1 ? "" : "s"}.` : "Add your host organisations to track their spots."}`,
+    `<section class="sc-kpis">${kpiBox("Need a placement", need.length, `of ${L.length} students`, "", "#/portal/intern")}${kpiBox("Placed", F.length - need.length, "supervisor link sent")}${kpiBox("Evaluated", evald.length, "internship certificates issued automatically")}${kpiBox("Not set up the portal", h.no_account, h.no_account ? "students" : "everyone is in")}${kpiBox("Classes without a link", h.sessions_nolink, "in the next 8 days", "", "#/portal/sessions")}</section>
+    <section class="card"><div class="sc-h"><div><span class="eyebrow">Placement board</span><h2>Internships, Weeks 10–13</h2></div>
+        <div class="sc-tabs" role="group" aria-label="Track"><button class="sc-tab" data-act="ops-t" data-k="" aria-pressed="${!tf}">All</button>${tracks.map((t) => `<button class="sc-tab" data-act="ops-t" data-k="${esc(t)}" aria-pressed="${tf === t}">${esc(t)}</button>`).join("")}</div></div>
+      <div class="hm-wrap"><div class="rh-pipe rh-pipe4">${col("Need a placement", "bad", "No host yet", need, "Add placement")}${col("Placed", "w", "Supervisor hasn't signed anything yet", placed, "Share the link again")}${col("Logbooks going", "a", "Supervisor is signing weekly logbooks", active, "View")}${col("Evaluated", "n", "Final evaluation in", evald, "View")}</div></div></section>
+    <section class="sc-2">
+      <div class="card"><div class="sc-h"><div><span class="eyebrow">Host organisations</span><h2>${h.hosts.length ? `${Math.max(0, spots - used)} open spots across ${h.hosts.filter((x) => x.active).length} hosts` : "No hosts added yet"}</h2></div><button class="btn sm" data-act="host-edit" data-k="new">Add a host</button></div>
+        ${ui.hostEdit ? (() => { const x = ui.hostEdit === "new" ? {} : h.hosts.find((y) => y.id === ui.hostEdit) || {}; return `<form class="form rh-hostf" id="host-form" data-id="${x.id || ""}" novalidate>
+          <div class="grid2"><div class="field"><label for="ho-n">Organisation</label><input id="ho-n" value="${esc(x.name || "")}" placeholder="e.g. Brightpath Logistics Ltd"></div><div class="field"><label for="ho-c">City</label><input id="ho-c" value="${esc(x.city || "")}" placeholder="e.g. Lagos · hybrid"></div></div>
+          <div class="grid2"><div class="field"><label for="ho-t">Tracks they take</label><input id="ho-t" value="${esc(x.tracks || "")}" placeholder="e.g. Data, Support"></div><div class="field"><label for="ho-s">Spots</label><input id="ho-s" type="number" min="0" max="200" value="${x.spots ?? 2}"></div></div>
+          <div class="grid2"><div class="field"><label for="ho-cn">Contact name</label><input id="ho-cn" value="${esc(x.contact_name || "")}"></div><div class="field"><label for="ho-cp">Contact WhatsApp</label><input id="ho-cp" value="${esc(x.contact_phone || "")}"></div></div>
+          <div class="field"><label for="ho-ce">Contact email</label><input id="ho-ce" type="email" value="${esc(x.contact_email || "")}"></div>
+          <label class="consent"><input type="checkbox" id="ho-a" ${x.active === false ? "" : "checked"}> Taking interns this cohort</label>
+          <div class="actions"><button class="btn sm" type="submit">Save host</button><button class="btn sm ghost" type="button" data-act="host-edit" data-k="">Cancel</button></div></form>`; })() : ""}
+        ${h.hosts.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Host</th><th>Tracks</th><th>Spots used</th><th>Contact</th><th></th></tr></thead><tbody>${h.hosts.map((x) => `<tr class="${x.active ? "" : "off"}"><td data-label="Host"><b>${esc(x.name)}</b><span class="note" style="display:block">${esc(x.city || "")}</span></td><td data-label="Tracks" class="note">${esc(x.tracks || "—")}</td>
+          <td data-label="Spots"><span class="pill ${x.used >= x.spots ? "info" : "ok"}">${x.used}/${x.spots}</span></td><td data-label="Contact">${esc(x.contact_name || "—")}${x.contact_phone ? ` · <a class="link" href="${waLink(x.contact_phone)}" target="_blank" rel="noopener">WhatsApp</a>` : ""}</td><td><button class="link sm" data-act="host-edit" data-k="${x.id}">Edit</button></td></tr>`).join("")}</tbody></table></div>` : ""}
+        ${h.unhosted_orgs.length ? `<p class="note">Placed at but not in this list: ${h.unhosted_orgs.map(esc).join(", ")}.</p>` : ""}</div>
+      <div class="stack">
+        <div class="card"><span class="eyebrow">Week ${Math.max(wk, 1)} checklist</span><h2 class="sc-h2">${done} of ${items.length} done</h2>
+          <ul class="rh-chk">${items.map(([t, n]) => `<li><label><input type="checkbox" data-change="ops-check" data-k="${esc(t)}" ${h.checks[t] ? "checked" : ""}><span><b class="${h.checks[t] ? "done" : ""}">${esc(t)}</b><small class="note">${esc(n)}${h.checks[t] ? ` · ${esc(h.checks[t].by)}, ${agoS(h.checks[t].at)}` : ""}</small></span></label></li>`).join("")}</ul></div>
+        <div class="card"><div class="sc-h"><div><span class="eyebrow">Student accounts</span><h2>${h.no_account ? `${h.no_account} haven't set up the portal` : "Everyone has an account"}</h2></div>${h.no_account ? `<button class="btn sm" data-act="invite">Email set-up links</button>` : ""}</div></div>
+        <div class="card"><div class="sc-h"><div><span class="eyebrow">Certificates</span><h2>${h.certs_ready ? `${h.certs_ready} student${h.certs_ready === 1 ? "" : "s"} ready for a certificate` : "No certificates waiting"}</h2></div><a class="btn sm ghost" href="#/portal/students">Students</a></div><p class="note">Issue them from the Students list once the programme steps are done. Internship certificates are issued automatically after the host's evaluation.</p></div>
+      </div></section>`,
+    { eyebrow: todayEyebrow(`Operations · Week ${Math.max(wk, 1)}`), actions: `<a class="btn ghost" href="#/portal/intern">Internships</a><button class="btn" data-act="host-edit" data-k="new">Add a host</button>` });
+}
+
+/* ---------- Admissions Admin: pipeline ---------- */
+const PIPE = [["pending", "Assessment pending", ["Assessment pending"]], ["book", "Call to book", ["Call to book"]], ["booked", "Call booked", ["Call booked"]], ["review", "Under review", ["Under review"]], ["offer", "Offer sent", ["Offer sent"]], ["admitted", "Admitted", ["Admitted"]]];
+async function tabPipeline() {
+  const [{ apps, ov }, h] = await Promise.all([loadAdm(), rpc("adm_home")]); ui.admApps = apps;
+  const st = ui.pipe || "review", stage = PIPE.find((p) => p[0] === st), L = apps.filter((a) => stage[2].includes(a.status));
+  const review = apps.filter((a) => a.status === "Under review"), soon = apps.filter((a) => a.status === "Offer sent" && a.offer_deadline && new Date(a.offer_deadline) - Date.now() < 2 * 864e5).sort((a, b) => new Date(a.offer_deadline) - new Date(b.offer_deadline));
+  const seats = ov.tracks.reduce((t, x) => t + x.seats, 0), used = ov.tracks.reduce((t, x) => t + x.used, 0);
+  const offers = (code) => apps.filter((a) => a.status === "Offer sent" && a.track_code === code).length, waitl = (code) => apps.filter((a) => a.status === "Waitlisted" && a.track_code === code).length;
+  const row = (a) => `<li class="sc-q"><span class="st-av">${ini(a.first_name + " " + a.surname)}</span><div class="sc-q-t"><div class="sc-q-h"><b>${esc(a.first_name)} ${esc(a.surname)}</b><span class="mono note">${esc(a.ref)}</span></div>
+      <span class="note">${esc(a.track_name || a.wanted || "")} · ${esc(a.city || "")} · ${esc(a.situation || "")}</span>
+      <span class="sc-tags">${a.score != null ? `<span class="pill info">Readiness ${a.score}%</span>` : ""}${a.dc1_score ? `<span class="pill info">Call ${a.dc1_score}/10</span>` : ""}${a.rec ? `<span class="pill ${a.rec.d === "offer" ? "ok" : a.rec.d === "waitlist" ? "now" : "bad"}">Officer: ${REC_L[a.rec.d]}</span>` : ""}${a.offer_deadline && a.status === "Offer sent" ? `<span class="pill now">Pay by ${fmtDay(a.offer_deadline)}</span>` : ""}</span>
+      ${a.rec?.why || a.dc1_note ? `<span class="note"><i>“${esc(a.rec?.why || a.dc1_note)}”</i>${a.officer_name ? ` · ${esc(a.officer_name)}` : ""}</span>` : ""}</div>
+    <div class="sc-q-a">${a.status === "Under review" ? `<div class="actions"><button class="btn sm" data-act="decide" data-x="offer" data-k="${a.id}">Offer</button><button class="btn sm ghost" data-act="decide" data-x="waitlist" data-k="${a.id}">Waitlist</button><button class="btn sm ghost" data-act="decide" data-x="reject" data-k="${a.id}">Decline</button></div>`
+      : a.status === "Offer sent" ? `<button class="btn sm ghost" data-act="extend" data-k="${a.id}" data-days="3">Give 3 more days</button>` : `<a class="link sm" href="#/portal/apps">Open</a>`}</div></li>`;
+  shell("pipeline", review.length ? `${review.length} applicant${review.length === 1 ? "" : "s"} waiting for a decision` : "Admissions pipeline", `${esc(ov.cohort?.name || "")} has <b>${used} of ${seats} seats</b> taken.${soon.length ? ` ${soon.length} offer${soon.length === 1 ? " expires" : "s expire"} in the next 48 hours.` : ""}`,
+    `<section class="rh-stages" role="group" aria-label="Pipeline stage">${PIPE.map(([k, l, s]) => { const n = apps.filter((a) => s.includes(a.status)).length; return `<button class="rh-stage" data-act="pipe" data-k="${k}" aria-pressed="${st === k}"><span>${l}</span><b class="mono">${n}</b></button>`; }).join("")}</section>
+    <section class="sc-2"><div class="card"><div class="sc-h"><div><span class="eyebrow">${stage[1]}</span><h2>${L.length} applicant${L.length === 1 ? "" : "s"}</h2></div>${st === "review" && review.filter((a) => a.rec).length > 1 ? `<button class="btn sm gold" data-act="approve-all">Approve all ${review.filter((a) => a.rec).length} recommendations</button>` : `<a class="btn sm ghost" href="#/portal/apps">All applications</a>`}</div>
+        ${L.length ? `<ul class="sc-ql">${L.slice(0, 30).map(row).join("")}</ul>${L.length > 30 ? `<a class="link sm" href="#/portal/apps">+ ${L.length - 30} more in Applications</a>` : ""}` : `<p class="empty">No one at this stage.</p>`}</div>
+      <div class="stack">
+        <div class="card"><div class="sc-h"><div><span class="eyebrow">Seats · ${esc(ov.cohort?.name || "")}</span><h2>${used} of ${seats} taken</h2></div><a class="btn sm ghost" href="#/portal/settings">Settings</a></div>
+          <div class="rh-seats">${ov.tracks.map((t) => `<div><div class="rh-seat-h"><b>${esc(t.name)}</b><span class="mono note">${t.used}/${t.seats}${waitl(t.code) ? ` · ${waitl(t.code)} waitlisted` : ""}</span></div><div class="sc-bar" style="margin:4px 0 0;height:10px"><i class="a" style="width:${t.seats ? (t.used / t.seats) * 100 : 0}%"></i><i class="b" style="width:${t.seats ? (offers(t.code) / t.seats) * 100 : 0}%"></i></div></div>`).join("")}</div>
+          <div class="sc-leg" style="margin-top:.6rem"><span><i class="a"></i>Paid</span><span><i class="b"></i>Offer sent, not paid</span></div></div>
+        <div class="card"><div class="sc-h"><div><span class="eyebrow">Offers expiring</span><h2>${soon.length ? `${soon.length} in the next 48 hours` : "None this week"}</h2></div></div>
+          ${soon.length ? `<ul class="sc-act">${soon.map((a) => { const hrs = Math.round((new Date(a.offer_deadline) - Date.now()) / 36e5); return `<li><span style="flex:1"><b>${esc(a.first_name)} ${esc(a.surname)}</b><small class="note" style="display:block">${esc(a.track_name || "")}</small></span><span class="pill ${hrs < 24 ? "bad" : "now"}">${hrs < 1 ? "under an hour" : hrs + " hours left"}</span><button class="btn sm ghost" data-act="extend" data-k="${a.id}" data-days="3">+3 days</button></li>`; }).join("")}</ul>` : ""}</div>
+        <div class="card"><span class="eyebrow">Money today</span><h2 class="sc-h2">${naira(h.money_today)} received</h2><p class="note">${h.pay_today} payment${h.pay_today === 1 ? "" : "s"}${h.pay_failed ? ` · ${h.pay_failed} failed` : ""}${h.pay_last ? ` · last ${agoS(h.pay_last)}` : ""}</p><a class="link sm" href="#/portal/pay">Payments</a></div>
+      </div></section>`,
+    { eyebrow: todayEyebrow("Admissions pipeline"), actions: `<a class="btn ghost" href="#/portal/apps">Applications</a><a class="btn" href="#/portal/pay">Record a bank transfer</a>` });
+}
+
+/* ---------- Admissions Officer: today's calls ---------- */
+async function tabHome() {
+  if (ME.role === "adm_admin") return tabPipeline();
+  const [{ apps, ov }, slots, h] = await Promise.all([loadAdm(), rpc("officer_slots"), rpc("adm_home")]);
+  const mine = apps.filter((a) => a.status === "Call booked" && (ME.role === "super" || a.officer_email === ME.email)).sort((x, y) => new Date(x.dc1_at) - new Date(y.dc1_at));
+  const today = new Date().toDateString(), todays = mine.filter((a) => new Date(a.dc1_at).toDateString() === today), overdue = mine.filter((a) => new Date(a.dc1_at) < new Date() && new Date(a.dc1_at).toDateString() !== today);
+  const list = [...overdue, ...(todays.length ? todays : mine.filter((a) => new Date(a.dc1_at) > new Date()).slice(0, 5))];
+  if (!list.some((a) => a.id === ui.ofSel)) ui.ofSel = list.find((a) => new Date(a.dc1_at) > Date.now() - 36e5)?.id || list[0]?.id;
+  const a = apps.find((x) => x.id === ui.ofSel), k = a?.id, sc = (ui.ofScore || {})[k], rc = (ui.ofRec || {})[k];
+  const waiting = apps.filter((x) => x.status === "Call to book").length, openT = slots.filter((s) => !s.booked_by && new Date(s.at) > new Date()).length;
+  const days = [...Array(10)].map((_, i) => new Date(Date.now() + (i + 1) * 864e5)).filter((d) => d.getDay() && d.getDay() < 6).slice(0, 5);
+  const dk = (d) => fmt(d, { year: "numeric", month: "2-digit", day: "2-digit" }), slotAt = (d, t) => slots.find((s) => dk(s.at) === dk(d) && fmt(s.at, { hour: "2-digit", minute: "2-digit", hour12: false }) === t);
+  const iso = (d, t) => `${dk(d).split("/").reverse().join("-")}T${t}:00+01:00`;
+  const next = mine.find((x) => new Date(x.dc1_at) > new Date());
+  shell("home", todays.length ? `${todays.length} Discovery Call${todays.length === 1 ? "" : "s"} today` : "Today's calls", `${next ? `Next call ${new Date(next.dc1_at).toDateString() === today ? "at" : "on"} <b>${new Date(next.dc1_at).toDateString() === today ? fmtTime(next.dc1_at) : fmtAt(next.dc1_at)}</b>.` : "No more calls booked."}${overdue.length ? ` ${overdue.length} earlier call${overdue.length === 1 ? " still needs" : "s still need"} notes.` : ""} ${openT < waiting ? `Only ${openT} call time${openT === 1 ? " is" : "s are"} open for ${waiting} applicants waiting to book.` : ""}`,
+    `<section class="rh-desk"><div class="card rh-queue"><div class="sc-h"><b>${todays.length ? "Today" : "Coming up"}</b><span class="note">15 min each</span></div>
+        ${list.length ? list.map((x) => { const past = new Date(x.dc1_at) < new Date(); return `<button class="rh-qi ${x.id === ui.ofSel ? "on" : ""}" data-act="of-pick" data-k="${x.id}" aria-pressed="${x.id === ui.ofSel}"><b class="mono" style="width:52px;flex:none">${fmt(x.dc1_at, { hour: "2-digit", minute: "2-digit", hour12: false })}</b><span class="sc-p-t"><b>${esc(x.first_name)} ${esc(x.surname)}</b><span class="note">${esc(x.track_name || "No track yet")}${new Date(x.dc1_at).toDateString() === today ? "" : ` · ${fmtDay(x.dc1_at)}`}</span></span><span class="pill ${past ? "now" : ""}">${past ? "Add notes" : "Booked"}</span></button>`; }).join("") : `<p class="empty">No calls booked. Open some call times below.</p>`}
+        <a class="link sm" href="#/portal/calls">All calls</a></div>
+      <div class="card rh-grade">${a ? `<div class="sc-h"><div><span class="eyebrow">${fmtAt(a.dc1_at)} · ${esc(a.ref)}</span><h2>${esc(a.first_name)} ${esc(a.surname)}</h2><span class="note">${esc(a.city || "")} · ${esc(a.phone || "")} · ${esc(a.email)}</span></div>
+          <div class="actions">${a.phone ? `<a class="btn sm ghost" href="${waLink(a.phone)}" target="_blank" rel="noopener">WhatsApp</a>` : ""}${INFO?.call_link || ov.call_link ? `<a class="btn sm" href="${esc(INFO?.call_link || ov.call_link)}" target="_blank" rel="noopener">Join call</a>` : ""}</div></div>
+        <div class="sc-2b"><dl class="s3-kv"><dt>Readiness</dt><dd>${a.score != null ? `${a.score}%` : "—"}${a.score_digital != null ? ` · digital ${a.score_digital}%, communication ${a.score_comms}%` : ""}</dd><dt>Background</dt><dd>${esc(a.edu || "")} · NYSC ${esc(a.nysc || "")}</dd><dt>Right now</dt><dd>${esc(a.situation || "")}</dd><dt>15 hours a week</dt><dd>${esc(a.hours || "")}</dd><dt>Laptop · internet</dt><dd>${esc(a.laptop || "")} · ${esc(a.internet || "")}</dd></dl>
+          <div class="stack"><div class="rh-quote"><span class="eyebrow">Why they applied</span><p>“${esc(a.motivation || "")}”</p></div>${a.zuri_summary ? `<div class="rh-quote gold"><span class="eyebrow">Zuri summary</span><p style="white-space:pre-line">${esc(a.zuri_summary)}</p></div>` : ""}
+            ${[a.hours !== "Yes" ? "They weren't sure about 15 hours a week. Ask what their evenings look like." : "", a.internet && a.internet !== "Yes" ? "Internet isn't reliable. Ask where they'll join live classes from." : "", a.laptop && a.laptop !== "Yes" ? "No laptop of their own. Ask how they'll do the work." : ""].filter(Boolean).map((t) => `<div class="rh-quote gold"><span class="eyebrow">Ask about</span><p>${t}</p></div>`).join("")}</div></div>
+        <form class="form call-form rh-callf" data-k="${k}" novalidate><b>After the call</b>
+          <div class="field"><span class="lbl">How ready are they? (1–10)</span><div class="rh-sc">${[...Array(10)].map((_, i) => `<button type="button" class="rh-s ${sc === i + 1 ? "on" : ""}" data-act="of-score" data-k="${i + 1}">${i + 1}</button>`).join("")}</div></div>
+          <div class="grid2"><div class="field"><label for="dt-${k}">Track you agreed</label><select id="dt-${k}" data-act-change="track" data-k="${k}"><option value="">Choose one</option>${ov.tracks.map((t) => `<option value="${t.code}" ${a.track_code === t.code ? "selected" : ""}>${esc(t.name)}</option>`).join("")}<option value="NONE">None of these fit</option></select></div>
+            <div class="field" id="wi-${k}" hidden><label for="wt-${k}">What are they interested in?</label><select id="wt-${k}" data-act-change="interest" data-k="${k}"><option>Software development</option><option>Product design</option><option>Cybersecurity</option><option>Sales</option><option>Other</option></select><input id="wo-${k}" hidden placeholder="Type it"></div></div>
+          <div id="ri-${k}"><div class="field"><span class="lbl">Your recommendation</span><div class="rh-sc">${Object.entries(REC_L).map(([v, l]) => `<label class="rh-rec ${rc === v ? "on" : ""}"><input type="radio" name="rec-${k}" value="${v}" ${rc === v ? "checked" : ""} data-act="of-rec"> ${l}</label>`).join("")}</div></div>
+            <div class="field"><label for="rw-${k}">One line on why</label><input id="rw-${k}" placeholder="e.g. Clear goals, laptop and internet confirmed"></div></div>
+          <div class="field"><label for="dn-${k}">Notes for the Admissions Admin (optional)</label><textarea id="dn-${k}" rows="2" placeholder="Anything they should know"></textarea></div>
+          <div class="actions"><button class="btn" type="submit">Save and send for a decision</button></div></form>` : `<p class="empty">Pick a call to see the applicant's brief.</p>`}</div></section>
+    <section class="sc-2b">
+      <div class="card" id="times"><span class="eyebrow">My call times · next 5 working days</span><h2 class="sc-h2">${openT} open</h2><p class="note">Tap a time to open or close it. Applicants book from their application page.</p>
+        <div class="hm-wrap"><div class="rh-grid"><span></span>${days.map((d) => `<b>${fmt(d, { weekday: "short", day: "numeric" })}</b>`).join("")}
+          ${CALL_TIMES.map((t) => `<span class="mono note">${t}</span>${days.map((d) => { const s = slotAt(d, t); return s ? (s.booked_by ? `<button class="rh-slot booked" disabled title="${esc(s.booked_by)}">Booked</button>` : `<button class="rh-slot open" data-act="rm-slot" data-k="${s.id}" aria-label="Close ${t}">Open</button>`) : `<button class="rh-slot" data-act="of-open" data-k="${iso(d, t)}" aria-label="Open ${t}">+</button>`; }).join("")}`).join("")}</div></div>
+        <a class="link sm" href="#/portal/times">More days</a></div>
+      <div class="card"><span class="eyebrow">My week</span><h2 class="sc-h2">${h.calls_week} call${h.calls_week === 1 ? "" : "s"} done</h2>
+        <div class="rh-minis">${miniStat("Recommended to offer", h.recs_week)}${miniStat("Average readiness score", h.avg_score ?? "—")}${miniStat("Waiting to book", waiting)}</div></div></section>`,
+    { eyebrow: todayEyebrow("Today's calls"), actions: `<a class="btn ghost" href="#/portal/apps">Applications</a><a class="btn" href="#times">Add call times</a>` });
 }
 
 function tabSoon() {
@@ -833,19 +1124,6 @@ async function loadAdm() {
 }
 
 /* ---------- admissions: tabs ---------- */
-async function tabHome() {
-  const [{ apps, ov }, slots] = await Promise.all([loadAdm(), rpc("officer_slots")]);
-  const mine = apps.filter((a) => a.status === "Call booked" && (ME.role === "super" || a.officer_email === ME.email)).sort((x, y) => new Date(x.dc1_at) - new Date(y.dc1_at));
-  const open = slots.filter((s) => !s.booked_by && new Date(s.at) > new Date()).length;
-  const todo = [[mine.length, "Discovery Calls to hold and complete", "calls"], [open ? 0 : 1, "Add call times so applicants can book", "times"]].filter((x) => x[0]);
-  const next = mine[0];
-  shell("home", "Admissions Officer", `${esc(ov.cohort?.name || "")} · Discovery Calls and recommendations.`, `<div class="grid2">
-    <div class="card"><div class="ch"><h3>Your to-do list</h3><span class="note">${todo.length ? `${todo.length} thing${todo.length === 1 ? "" : "s"}` : "All clear"}</span></div>
-      ${todo.length ? `<ul class="todo">${todo.map(([n, l, t]) => `<li><span class="mono cnt-b">${n}</span><span>${l}</span><a class="link sm" href="#/portal/${t}">Open →</a></li>`).join("")}</ul>` : empty("Nothing waiting for you. 🎉")}</div>
-    <div class="card"><h3>Next call</h3>${next ? `<p style="margin-top:.6rem"><b>${esc(next.first_name)} ${esc(next.surname)}</b><br><span class="note">${fmtLong(next.dc1_at)}, ${fmtTime(next.dc1_at)} WAT · 15 minutes</span></p><p class="note">${next.zuri_summary ? "Has a Zuri summary. Read it before the call." : "No Zuri summary. Explore their interests on the call."}</p><div class="actions"><a class="btn sm" href="#/portal/calls">Open call notes</a></div>` : empty("No calls booked.")}</div></div>
-    <div class="kpis" style="margin-top:1rem">${[["Calls booked", mine.length], ["Open call times", open], ["Waiting to book", apps.filter((a) => a.status === "Call to book").length], ["Applications", apps.length]].map(([l, v]) => `<div class="kpi card"><span class="eyebrow">${l}</span><b class="mono">${v}</b></div>`).join("")}</div>`);
-}
-
 async function tabCalls() {
   const { apps, ov } = await loadAdm();
   const calls = apps.filter((a) => a.status === "Call booked" && (ME.role !== "adm_officer" || a.officer_email === ME.email)).sort((x, y) => new Date(x.dc1_at) - new Date(y.dc1_at));
@@ -1751,7 +2029,7 @@ function lsGraduatePage() {
 
 /* ---------- staff: outcomes ---------- */
 async function tabOutcomes() {
-  const L = await rpc("acad_outcomes"), work = ["hired", "internship", "freelance"];
+  const O = await rpc("acad_outcomes2", { p_cohort: ui.coh || null }), L = O.rows, work = ["hired", "internship", "freelance"];
   const rep = L.filter((x) => x.outcome), emp = rep.filter((x) => work.includes(x.outcome.status)), sv = L.filter((x) => x.survey);
   const nps = sv.length ? Math.round(((sv.filter((x) => x.survey.recommend >= 9).length - sv.filter((x) => x.survey.recommend <= 6).length) / sv.length) * 100) : null;
   const pill = (st) => st ? `<span class="pill ${work.includes(st) ? "ok" : st === "searching" ? "now" : "info"}">${esc(OUT_L[st] || st)}</span>` : `<span class="pill">Not reported</span>`;
@@ -1766,7 +2044,7 @@ async function tabOutcomes() {
   shell("outcomes", "Outcomes", "Where graduates land, 30/60/90-day check-ins and exit survey results.",
     `<div class="kpis">${[["Certificates issued", L.filter((x) => x.cert).length], ["In work", `${emp.length}${L.length ? ` · ${Math.round((emp.length / L.length) * 100)}%` : ""}`], ["Reported so far", `${rep.length}/${L.length}`], ["Recommend score (NPS)", nps != null ? (nps > 0 ? "+" : "") + nps : "–"]].map(([l, v]) => `<div class="kpi card"><span class="eyebrow">${l}</span><b class="mono">${v}</b></div>`).join("")}</div>
     <div class="card" style="margin-top:1rem">${L.length ? `<div class="arows">${L.map(row5).join("")}</div>` : empty("No admitted students yet.")}</div>
-    ${quotes.length ? `<div class="card" style="margin-top:1rem"><h3>Testimonials you can share</h3><p class="note">These students agreed to share their words with their first name and track.</p><ul class="quotes">${quotes.map((x) => `<li><p>“${esc(x.survey.testimonial)}”</p><span class="note">${esc(x.name.split(" ")[0])}, ${esc(x.track || "")}</span></li>`).join("")}</ul></div>` : ""}`);
+    ${quotes.length ? `<div class="card" style="margin-top:1rem"><h3>Testimonials you can share</h3><p class="note">These students agreed to share their words with their first name and track.</p><ul class="quotes">${quotes.map((x) => `<li><p>“${esc(x.survey.testimonial)}”</p><span class="note">${esc(x.name.split(" ")[0])}, ${esc(x.track || "")}</span></li>`).join("")}</ul></div>` : ""}`, { actions: (O.cohorts || []).length > 1 ? `<label class="sr-only" for="coh-pick">Cohort</label><select id="coh-pick" class="st-sel"><option value="">All cohorts</option>${O.cohorts.map((c) => `<option value="${c.id}" ${String(c.id) === String(ui.coh || "") ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>` : "" });
 }
 
 /* ---------- More pages ---------- */
@@ -2264,8 +2542,9 @@ async function tabDiscussion() {
 const trackOpts = (tracks, mine, val) => (mine ? tracks.filter((t) => t.code === mine) : [{ code: "", name: "All tracks" }, ...tracks]).map((t) => `<option value="${t.code}" ${t.code === (val ?? "") ? "selected" : ""}>${esc(t.name)}</option>`).join("");
 const tName = (tracks, c) => c ? (tracks.find((t) => t.code === c)?.name || c) : "All tracks";
 
+const cohortPick = (L, cur) => (L || []).length > 1 ? `<label class="sr-only" for="coh-pick">Cohort</label><select id="coh-pick" class="st-sel">${L.map((c) => `<option value="${c.id}" ${String(c.id) === String(cur) ? "selected" : ""}>${esc(c.name)} · ${c.students} student${c.students === 1 ? "" : "s"}</option>`).join("")}${cur === "all" ? "" : ""}</select>` : "";
 async function tabStudents() {
-  const [d, certs, ls] = await Promise.all([rpc("acad_students"), rpc("acad_certificates").catch(() => ({})), rpc("acad_learn_stats").catch(() => ({}))]);
+  const [d, certs, ls] = await Promise.all([rpc("acad_students2", { p_cohort: ui.coh || null }), rpc("acad_certificates").catch(() => ({})), rpc("acad_learn_stats").catch(() => ({}))]);
   const canCert = ["director", "academy_admin", "super"].includes(ME.role);
   const S = d.students, set = S.filter((s) => s.account).length;
   const att = S.filter((s) => s.sessions_past).map((s) => s.sessions_attended / s.sessions_past);
@@ -2278,7 +2557,7 @@ async function tabStudents() {
         <td data-label="Portal">${s.account ? `<span class="pill ok">Set up</span>` : `<span class="pill">${s.invited_at ? `Invited ${fmtDay(s.invited_at)}` : "Not yet"}</span>`}</td>
         <td data-label="Progress" class="mono">${ls[s.id] ? `${ls[s.id].done}/${ls[s.id].total}${ls[s.id].avg != null ? ` · avg ${ls[s.id].avg}%` : ""}${ls[s.id].to_grade ? ` <span class="note">(${ls[s.id].to_grade} to grade)</span>` : ""}` : "–"}</td>
         <td data-label="Attendance" class="mono">${s.sessions_past ? `${s.sessions_attended}/${s.sessions_past}` : "–"}</td><td data-label="Fees">${s.balance ? `<span class="pill bad">Owes ${naira(s.balance)}</span>` : `<span class="pill ok">Paid</span>`}</td>
-        <td data-label="Certificate">${certs[s.id] ? `<a class="link sm" href="#/certificate/${esc(certs[s.id].cert_id)}" target="_blank" rel="noopener">View</a>${canCert ? ` · <button class="link sm" data-act="cert-revoke" data-k="${s.id}">Withdraw</button>` : ""}` : canCert ? `<button class="btn sm" data-act="cert-issue" data-k="${s.id}">Issue</button>` : `<span class="note">Not yet</span>`}</td></tr>`).join("")}</tbody></table></div>` : empty("No admitted students yet.")}</div>`);
+        <td data-label="Certificate">${certs[s.id] ? `<a class="link sm" href="#/certificate/${esc(certs[s.id].cert_id)}" target="_blank" rel="noopener">View</a>${canCert ? ` · <button class="link sm" data-act="cert-revoke" data-k="${s.id}">Withdraw</button>` : ""}` : canCert ? `<button class="btn sm" data-act="cert-issue" data-k="${s.id}">Issue</button>` : `<span class="note">Not yet</span>`}</td></tr>`).join("")}</tbody></table></div>` : empty("No admitted students yet.")}</div>`, { actions: cohortPick(d.cohorts, d.cohort.id) });
 }
 
 async function tabContent() {
@@ -2470,6 +2749,33 @@ document.addEventListener("click", async (e) => {
   if (a === "dp-reply") { ui.dpReply = ui.dpReply === +k ? null : +k; const f = $(`.dp-form[data-parent="${k}"]`); if (f) { f.hidden = ui.dpReply !== +k; if (!f.hidden) f.querySelector("textarea").focus(); } return; }
   if (a === "dp-del") { if (!confirm("Delete your post?")) return; try { await busy(t, () => rpc("disc_delete_mine", { p_id: +k })); lsRender(); } catch { /* shown */ } return; }
   if (a === "dp-hide" || a === "dp-pin") { try { await busy(t, () => rpc("acad_disc_moderate", { p_id: +k, p_hidden: a === "dp-hide" ? t.dataset.v === "1" : null, p_pinned: a === "dp-pin" ? t.dataset.v === "1" : null })); route(); } catch { /* shown */ } return; }
+  if (a === "dm") { ui.dm = k; return route(); }
+  if (a === "cm-all") { ui.cmAll = !ui.cmAll; return route(); }
+  if (a === "esc-yes" || a === "esc-no") { const note = a === "esc-no" ? prompt("Why? (optional, the person who raised it sees this)") : null;
+    try { await busy(t, () => rpc("escalation_decide", { p_id: +k, p_decision: a === "esc-yes" ? "approved" : "declined", p_note: note })); toast(a === "esc-yes" ? "Approved" : "Declined"); route(); } catch { /* shown */ } return; }
+  if (a === "cm-call") { const v = t.dataset.v, note = v === "reached" ? prompt("What did you agree? (optional, saved as a note)") : ""; if (note === null) return;
+    try { await busy(t, () => rpc("cm_call_log", { p_app: k, p_outcome: v, p_note: note || null })); toast(v === "reached" ? "Call logged" : "Logged · try again tomorrow"); route(); } catch { /* shown */ } return; }
+  if (a === "desk-pick") { const fb = $("#desk-fb"); if (fb) ui.fb = { ...(ui.fb || {}), [ui.deskSel]: fb.value }; ui.deskSel = k; return route(); }
+  if (a === "rub") { const fb = $("#desk-fb"); if (fb) ui.fb = { ...(ui.fb || {}), [ui.deskSel]: fb.value }; ui.rub = ui.rub || {}; ui.rub[ui.deskSel] = { ...(ui.rub[ui.deskSel] || {}), [k]: +t.dataset.v }; return route(); }
+  if (a === "fb-add") { const fb = $("#desk-fb"); if (fb) { fb.value = (fb.value.trim() ? fb.value.trim() + " " : "") + FB_SNIPS[+k]; fb.focus(); } return; }
+  if (a === "desk-save" || a === "desk-revise") {
+    const x = ui.lq.work.find((w) => w.key + w.app === ui.deskSel); if (!x) return; const R0 = (ui.rub || {})[ui.deskSel] || {}, fb = $("#desk-fb").value.trim();
+    if (a === "desk-save" && Object.keys(R0).length < 4) return toast("Score all four parts first");
+    if (a === "desk-revise" && !fb) { toast("Say what to change in the feedback box"); $("#desk-fb").focus(); return; }
+    const parts = Object.fromEntries(RUBRIC4.map(([n], i) => [n, R0[i] ?? 0]));
+    try { await busy(t, () => rpc("acad_learn_grade_parts", { p_app: x.app, p_key: x.key, p_status: a === "desk-save" ? "graded" : "revise", p_parts: parts, p_feedback: fb })); toast(a === "desk-save" ? "Grade sent" : "Changes requested"); ui.deskSel = null; route(); } catch { /* shown */ } return; }
+  if (a === "cc-pick") { ui.ccSel = +k; return route(); }
+  if (a === "cc-score") { ui.ccScore = { ...(ui.ccScore || {}), [ui.ccSel]: +k }; $$(".rh-sc .rh-s[data-act=cc-score]").forEach((b) => b.classList.toggle("on", b.dataset.k === k)); const hid = t.closest("form")?.querySelector("input[type=hidden]"); if (hid) hid.value = k; return; }
+  if (a === "cc-open") { try { await busy(t, () => rpc("coach_add_slots", { p_times: [k] })); toast("Time opened"); route(); } catch { /* shown */ } return; }
+  if (a === "cc-close") { try { await busy(t, () => rpc("coach_remove_slot", { p_id: +k })); toast("Time closed"); route(); } catch { /* shown */ } return; }
+  if (a === "go-disc") { ui.discCh = k; return go("#/portal/discussion"); }
+  if (a === "ops-t") { ui.opsT = k; return route(); }
+  if (a === "host-edit") { ui.hostEdit = k === "new" ? "new" : k ? +k : null; if (location.pathname !== "/portal/ops") return go("#/portal/ops"); await route(); $("#host-form")?.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+  if (a === "pipe") { ui.pipe = k; return route(); }
+  if (a === "of-pick") { ui.ofSel = k; return route(); }
+  if (a === "of-score") { ui.ofScore = { ...(ui.ofScore || {}), [ui.ofSel]: +k }; $$(".rh-s[data-act=of-score]").forEach((b) => b.classList.toggle("on", b.dataset.k === k)); return; }
+  if (a === "of-rec") { ui.ofRec = { ...(ui.ofRec || {}), [ui.ofSel]: t.value }; $$(".rh-rec").forEach((l) => l.classList.toggle("on", l.querySelector("input").checked)); return; }
+  if (a === "of-open") { try { await busy(t, () => rpc("officer_add_slots", { p_times: [k] })); toast("Time opened"); route(); } catch { /* shown */ } return; }
   if (a === "qtab") { ui.qtab = k; $$(".sc-tab[data-act=qtab]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.k === k)); const l = $(".sc-ql"); if (l && ui.ov) l.innerHTML = queueRows(ui.ov.queue, k); return; }
   if (a === "sc-refresh") { ui.ov = null; return route(); }
   if (a === "risk-f") { ui.riskF = k; return route(); }
@@ -2480,6 +2786,7 @@ document.addEventListener("click", async (e) => {
   if (a === "s3-tab") { e.preventDefault(); ui.s360t = k; await route(); if (t.getAttribute("href") === "#s3-extend") $("#s3-extend")?.scrollIntoView({ behavior: "smooth" }); return; }
   if (a === "s3-retake") { if (!confirm(`Give ${ui.s360?.first_name || "this student"} one more attempt at the Week ${k} assessment? They'll get an alert.`)) return;
     try { await busy(t, () => rpc("acad_grant_retake", { p_app: ui.s360.id, p_week: +k })); toast("One more attempt given"); route(); } catch { /* shown */ } return; }
+  if (a === "s3-cv") { ui.s3cv = !ui.s3cv; return route(); }
   if (a === "s3-unextend") { try { await busy(t, () => rpc("acad_fee_extend", { p_app: ui.s360.id, p_date: null })); toast("Extension removed"); route(); } catch { /* shown */ } return; }
   if (a === "s3-note-del") { if (!confirm("Delete this note?")) return; try { await busy(t, () => rpc("acad_note_delete", { p_id: +k })); toast("Note deleted"); route(); } catch { /* shown */ } return; }
   if (a === "sq-app") { ui.q = (t.dataset.ref || "").toLowerCase(); ui.admG = null; return go("#/portal/apps"); }
@@ -2584,6 +2891,7 @@ document.addEventListener("change", (e) => {
     rpc("acad_pod_assign", { p_app: el.dataset.app, p_pod: v === "0" ? null : +v }).then(() => { toast(v === "0" ? "Removed from pod" : "Moved"); route(); }).catch((x) => { toast(x.message); el.disabled = false; });
     return;
   }
+  if (el.dataset.change === "ops-check") { el.disabled = true; rpc("ops_check", { p_item: el.dataset.k, p_done: el.checked }).then(() => route()).catch((x) => { el.checked = !el.checked; el.disabled = false; toast(x.message); }); return; }
   if (el.dataset.change === "lmark") {
     el.disabled = true;
     rpc("acad_learn_mark", { p_app: el.dataset.app, p_key: el.dataset.key, p_done: el.checked }).then(() => toast(el.checked ? "Marked done" : "Marked not done"))
@@ -2597,6 +2905,7 @@ document.addEventListener("change", (e) => {
   if (el.id === "pf-photo-in") { photoPick(el.files[0]); el.value = ""; return; }
   if (el.dataset.cr && LS) { saveCareer(el); return; }
   if (el.dataset.ostat && LS) { const o = draft("opps", {}), st = { ...(o.st || {}) }; if (el.value) st[el.dataset.ostat] = el.value; else delete st[el.dataset.ostat]; saveDraft("opps", { ...o, st }, true); lsRender(); return; }
+  if (el.id === "coh-pick") { ui.coh = el.value || null; return route(); }
   if (el.id === "week-select") { ui.wtab = "tasks"; return go(el.value === "grad" ? "#/learn/graduate" : "#/learn/learning/" + el.value); }
   if (el.id === "g-state") fillTowns();
   if (el.id === "g-country") setCountry();
@@ -2667,6 +2976,7 @@ document.addEventListener("submit", async (e) => {
     else { rec = $(`input[name="rec-${k}"]:checked`)?.value; why = $("#rw-" + k).value.trim(); if (!rec) return toast("Choose your recommendation"); if (!why) return toast("Add one line on why"); }
     try {
       await busy(f.querySelector("button"), () => rpc("officer_complete_call", { p_id: k, p_note: $("#dn-" + k).value.trim(), p_track: tr === "NONE" ? null : tr, p_wanted: wanted, p_rec: rec, p_why: why }));
+      if ((ui.ofScore || {})[k]) await rpc("officer_call_score", { p_id: k, p_score: ui.ofScore[k] }).catch(() => {});
       toast(tr === "NONE" ? "Closed kindly · interest recorded" : "Call completed · sent to the Admissions Admin"); ui.open = null; route();
     } catch { /* shown */ }
     return;
@@ -2741,6 +3051,22 @@ document.addEventListener("submit", async (e) => {
     const c0 = $("#sp-cat").value, sub = $("#sp-sub").value.trim(), msg = $("#sp-msg").value.trim();
     if (!c0 || !sub || !msg) { $("#sp-err").textContent = "Choose what it's about, then add a subject and your message."; return; }
     try { const R = await busy(f.querySelector("button"), () => rpc("support_create", { p_category: c0, p_subject: sub, p_message: msg })); if (R) { LS.support = R; toast("Request sent. We'll reply within 1 working day."); lsRender(); } } catch { /* shown */ }
+    return;
+  }
+  if (f.id === "cm-news") {
+    const t0 = $("#cmn-t").value.trim(), b = $("#cmn-b").value.trim(); if (!t0 || !b) { $("#cmn-err").textContent = "Add a title and a message."; return; }
+    try { const n = await busy(f.querySelector("button"), () => rpc("acad_announce", { p_title: t0, p_body: b, p_track: $("#cmn-to").value || null, p_email: $("#cmn-e").checked })); toast(n ? `Posted and emailed to ${n}` : "Posted"); f.reset(); } catch (x) { $("#cmn-err").textContent = x.message; }
+    return;
+  }
+  if (f.id === "host-form") {
+    const v = (id) => $("#" + id).value.trim(), P = { id: f.dataset.id ? +f.dataset.id : null, name: v("ho-n"), city: v("ho-c"), tracks: v("ho-t"), spots: v("ho-s"), contact_name: v("ho-cn"), contact_phone: v("ho-cp"), contact_email: v("ho-ce"), active: $("#ho-a").checked };
+    if (!P.name) return toast("Add the organisation's name");
+    try { await busy(f.querySelector("button[type=submit]"), () => rpc("host_save", { p: P })); toast("Host saved"); ui.hostEdit = null; route(); } catch { /* shown */ }
+    return;
+  }
+  if (f.id === "s3-esc-form") {
+    const t0 = $("#s3e-t").value.trim(); if (!t0) return toast("Say what needs deciding");
+    try { await busy(f.querySelector("button"), () => rpc("escalation_raise", { p_app: ui.s360.id, p_kind: $("#s3e-k").value, p_title: t0, p_detail: $("#s3e-d").value, p_week: $("#s3e-k").value === "retake" ? ((ui.s360.weeks || []).find((w) => w.state === "fail")?.week ?? ui.s360.cur) : null })); toast("Sent to the Programme Director"); f.reset(); f.closest("details")?.removeAttribute("open"); } catch { /* shown */ }
     return;
   }
   if (f.id === "s3-note-form") {

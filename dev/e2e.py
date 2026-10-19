@@ -27,7 +27,7 @@ with sync_playwright() as p:
     # officer: sign up, add times
     pg.wait_for_timeout(500); pg.goto(U + "#/staff/signup"); pg.reload(); wait_text("Set up your staff account")
     pg.fill("#u-email", "kemi@test.ng"); pg.fill("#u-pass", "Kemi12345"); pg.fill("#u-pass2", "Kemi12345"); pg.click("#signup-form button[type=submit]")
-    wait_text("Your to-do list"); shot("officer-home")
+    wait_text("Today's calls"); shot("officer-home")
     pg.goto(U + "#/portal/times"); wait_text("Add times")
     pg.locator("label.chip-cb", has=pg.locator('input[name=day]')).nth(0).click(); pg.locator("label.chip-cb", has=pg.locator('input[name=day]')).nth(1).click()
     pg.locator("label.chip-cb", has=pg.locator('input[value="10:00"]')).click(); pg.locator("label.chip-cb", has=pg.locator('input[value="14:00"]')).click()
@@ -57,7 +57,7 @@ with sync_playwright() as p:
     log.append("status: " + sql(f"select status from applications where ref='{ref}'"))
     # officer completes call
     pg.goto(U + "#/staff"); wait_text("Sign in"); pg.fill("#s-email", "kemi@test.ng"); pg.fill("#s-pass", "Kemi12345"); pg.click("#signin-form button[type=submit]")
-    wait_text("Your to-do list"); pg.goto(U + "#/portal/calls"); wait_text("Discovery Calls"); shot("officer-calls")
+    wait_text("Today's calls"); pg.goto(U + "#/portal/calls"); wait_text("Discovery Calls"); shot("officer-calls")
     aid = sql(f"select id from applications where ref='{ref}'")
     pg.fill(f"#dn-{aid}", "Enjoys spreadsheets."); pg.select_option(f"#dt-{aid}", "DAT"); pg.locator(f'input[name="rec-{aid}"][value="offer"]').check(force=True); pg.fill(f"#rw-{aid}", "Clear interest in data")
     pg.locator(f'form.call-form[data-k="{aid}"] button').click(); pg.wait_for_timeout(800)
@@ -66,7 +66,7 @@ with sync_playwright() as p:
     # admin decides
     pg.wait_for_timeout(500); pg.goto(U + "#/staff/signup"); pg.reload(); wait_text("Set up your staff account")
     pg.fill("#u-email", "bayo@test.ng"); pg.fill("#u-pass", "Bayo12345"); pg.fill("#u-pass2", "Bayo12345"); pg.click("#signup-form button[type=submit]")
-    wait_text("Admission decisions"); shot("admin-decide")
+    wait_text("Admissions pipeline"); shot("admin-pipeline"); pg.goto(U + "#/portal/decide"); wait_text("Admission decisions"); shot("admin-decide")
     pg.click("text=Approve: Offer a place"); pg.wait_for_timeout(800)
     log.append("after decision: " + sql(f"select status from applications where ref='{ref}'"))
     pg.goto(U + "#/portal/apps"); wait_text("This batch"); pg.click('[data-act=group][data-k="waiting"]'); shot("admin-apps")
