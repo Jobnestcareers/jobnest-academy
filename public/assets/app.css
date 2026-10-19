@@ -368,7 +368,7 @@ a.fab{color:var(--brand-ink)}
 .cc-pick select{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px}
 .cc-pick:focus-within{outline:3px solid var(--accent);outline-offset:1px}
 /* Tablets and iPads: stages as a clear two-column grid instead of a squeezed strip */
-@media (min-width:601px) and (max-width:860px){
+@media (max-width:860px){
   .campus .rail{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:.6rem;overflow:visible;padding-bottom:0;align-items:start}
   .campus .rail .sg{margin:0}
   .campus .rail .sg[open]{grid-column:1/-1}
@@ -584,3 +584,4 @@ tr.off td{opacity:.55}
 .rh-rec{white-space:nowrap}
 @media (max-width:640px){.sc-q{flex-wrap:wrap}.sc-q-t{flex:1 1 calc(100% - 50px)}.sc-q-a{flex:1 1 100%;padding-left:46px}.rh-rr{grid-template-columns:1fr}}
 .sc-act li>.pill,.sc-act li>.btn{flex:none;align-self:center}
+@media (max-width:420px){.campus .rail .sg summary{grid-template-columns:26px 1fr;gap:.45rem;padding:.5rem}.campus .rail .sg-s{grid-column:2}.campus .rail .sg-n{width:26px;height:26px}.campus .rail .sg[open] .sg-w{grid-template-columns:1fr}}
