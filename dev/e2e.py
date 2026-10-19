@@ -19,7 +19,7 @@ with sync_playwright() as p:
     # --- staff setup
     pg.wait_for_timeout(500); pg.goto(U + "#/staff/signup"); pg.reload(); wait_text("Set up your staff account")
     pg.fill("#u-email", "owner@test.ng"); pg.fill("#u-pass", "Owner1234"); pg.fill("#u-pass2", "Owner1234"); pg.click("#signup-form button[type=submit]")
-    wait_text("Staff accounts"); shot("super-staff")
+    wait_text("Command centre"); shot("super-command"); pg.goto(U + "#/portal/staff"); wait_text("Add a staff member"); shot("super-staff")
     for em, nm, role in [("kemi@test.ng", "Kemi Adeyemi", "adm_officer"), ("bayo@test.ng", "Bayo Okon", "adm_admin")]:
         pg.fill("#sf-email", em); pg.fill("#sf-name", nm); pg.select_option("#sf-role", role); pg.click("#staff-form button"); pg.wait_for_timeout(600)
     log.append("staff rows: " + str(pg.locator(".tbl tbody tr").count()))
@@ -123,7 +123,7 @@ with sync_playwright() as p:
     log.append("first-time link: " + pg.inner_text(".notice"))
     pg.fill("#ls-m", "GEP/27A/001"); pg.fill("#ls-p", "wrong123"); pg.click("#lsignin-form button[type=submit]"); pg.wait_for_timeout(500); log.append("bad sign-in: " + pg.inner_text("#ls-err"))
     # staff adds a session and an announcement
-    pg.goto(U + "#/staff"); wait_text("Sign in"); pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Staff accounts")
+    pg.goto(U + "#/staff"); wait_text("Sign in"); pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Command centre")
     pg.goto(U + "#/portal/sessions"); wait_text("Schedule a session")
     import datetime
     st = datetime.datetime.utcnow() + datetime.timedelta(hours=1, minutes=10)
@@ -185,7 +185,7 @@ with sync_playwright() as p:
     # staff link while a student is still signed in
     pg.goto(U + "#/staff"); pg.wait_for_selector("#signin-form"); log.append("staff link while student: " + pg.inner_text(".notice")[:60])
     # staff grades the week project
-    pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Staff accounts")
+    pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Command centre")
     pg.goto(U + "#/portal/grading"); wait_text("To grade"); pg.locator("details.arow summary").first.click()
     pg.locator('input[name="lg-0"][value="graded"]').check(force=True); pg.fill("#lgg-0", "90"); pg.fill("#lgf-0", "Clear and well written."); shot("staff-grading")
     pg.click('form.lgrade-form[data-i="0"] button'); wait_text("Nothing waiting")
@@ -201,7 +201,7 @@ with sync_playwright() as p:
     pg.goto(U + "#/learn/learning/3"); pg.wait_for_selector(".wk-head"); log.append("week 3 unlocked: " + str(pg.locator(".item.locked").count() == 0))
     pg.goto(U + "#/learn"); pg.wait_for_selector("#t-today"); shot("campus-home-later")
     pg.locator(".ls-top [data-act=signout-learn]").click(); wait_text("Sign in")
-    pg.goto(U + "#/staff"); wait_text("Sign in"); pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Staff accounts")
+    pg.goto(U + "#/staff"); wait_text("Sign in"); pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Command centre")
     pg.locator("[data-act=signout]:visible").first.click(); wait_text("Sign in")
     pg.evaluate("localStorage.clear()")
     pg.goto(U + "#/check"); wait_text("Continue your application")
@@ -220,7 +220,7 @@ with sync_playwright() as p:
     pg.goto(U + "#/a/APP-XXXX/00000000-0000-0000-0000-000000000000"); wait_text("We couldn't open that application")
     # ---------- Phase 2 ----------
     sql("insert into app_settings(key, value) values ('unlock_weeks','on') on conflict (key) do update set value='on'")
-    pg.goto(U + "#/staff"); wait_text("Sign in"); pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Staff accounts")
+    pg.goto(U + "#/staff"); wait_text("Sign in"); pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Command centre")
     pg.goto(U + "#/portal/intern"); wait_text("Weeks 10–13"); pg.locator("details.arow summary").first.click()
     pg.fill("#po-0", "Brightpath Logistics Ltd"); pg.fill("#pr-0", "Data Analyst Intern"); pg.fill("#ps-0", "Funmi Bello"); pg.fill("#pp-0", "08030000000")
     pg.click("form.place-form button"); wait_text("Supervisor's link"); shot("staff-intern")
@@ -264,7 +264,7 @@ with sync_playwright() as p:
     log.append("signed: " + sql("select data->>'signed' from learn_progress where key='" + lb + "'"))
     pg.goto(U + "#/learn/learning/10/" + lb); pg.wait_for_selector("text=Signed by Funmi Bello"); log.append("student sees signature")
     pg.locator(".ls-top [data-act=signout-learn]").click(); wait_text("Sign in")
-    pg.goto(U + "#/staff"); wait_text("Sign in"); pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Staff accounts")
+    pg.goto(U + "#/staff"); wait_text("Sign in"); pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Command centre")
     pg.goto(U + "#/portal/grading"); wait_text("Project messages"); pg.locator("details[data-id=mg0] summary").click(); pg.fill("#mr-0", "Yes, plus one chart per finding."); pg.click("[data-act=msg-reply]"); pg.wait_for_timeout(800)
     pg.goto(U + "#/portal/dc2"); wait_text("Booked calls"); pg.locator("details.arow summary").first.click(); pg.fill("#dsc-0", "7"); pg.fill("#dno-0", "Strong pitch; slow down."); pg.fill("#dnx-0", "Apply to 5 roles a week\nPractise STAR answers"); pg.click("form.dc2-form button"); pg.wait_for_timeout(800); shot("staff-dc2-done")
     pg.goto(U + "#/portal/jobs"); wait_text("Weeks 14–17"); pg.locator("details.arow summary").first.click(); pg.wait_for_timeout(400); shot("staff-jobs")
@@ -283,7 +283,7 @@ with sync_playwright() as p:
     pg.select_option("#ck30-st", "hired"); pg.fill("#ck30-note", "Settling in well"); pg.click("form.grad-ck[data-day='30'] button"); pg.wait_for_selector("form.grad-ck[data-day='30'] .pill.ok"); shot("p3-graduate-done")
     log.append("grad: " + sql("select o.status||' '||o.company||' / survey '||s.recommend||' / ck '||(select count(*) from alumni_checkins) from learn_outcomes o, exit_surveys s"))
     pg.locator(".ls-top [data-act=signout-learn]").click(); wait_text("Sign in")
-    pg.goto(U + "#/staff"); wait_text("Sign in"); pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Staff accounts")
+    pg.goto(U + "#/staff"); wait_text("Sign in"); pg.fill("#s-email", "owner@test.ng"); pg.fill("#s-pass", "Owner1234"); pg.click("#signin-form button[type=submit]"); wait_text("Command centre")
     pg.goto(U + "#/portal/outcomes"); wait_text("Testimonials you can share"); pg.locator("details.arow summary").first.click(); pg.wait_for_timeout(300); shot("staff-outcomes")
     log.append("outcomes kpis: " + " | ".join(x.strip().replace("\n", " ") for x in pg.locator(".kpi").all_inner_texts()))
     pg.locator("[data-act=signout]:visible").first.click(); wait_text("Sign in")

@@ -537,6 +537,12 @@ const pwOk = (a, b, err) => {
 };
 
 /* ---------- staff: portal shell ---------- */
+const SUPER_NAV = [{ g: "Overview" }, { k: "command", l: "Command centre" }, { k: "attention", l: "Needs attention" },
+  { g: "Admissions" }, { k: "apps", l: "Applications" }, { k: "calls", l: "Calls" }, { k: "times", l: "Call times" }, { k: "decide", l: "Decisions" }, { k: "pay", l: "Payments" },
+  { g: "Academy" }, { k: "students", l: "Students" }, { k: "grading", l: "Grading" }, { k: "intern", l: "Internships" }, { k: "dc2", l: "Discovery Call 2" }, { k: "pods", l: "Pods" },
+  { k: "sessions", l: "Live sessions" }, { k: "news", l: "Announcements" }, { k: "support", l: "Help requests" }, { k: "discussion", l: "Discussion" }, { k: "content", l: "Content" },
+  { g: "Careers" }, { k: "jobs", l: "Job search" }, { k: "opps", l: "Opportunities" }, { k: "outcomes", l: "Outcomes & alumni" },
+  { g: "Organisation" }, { k: "staff", l: "Staff & access" }, { k: "emails", l: "Emails" }, { k: "settings", l: "Settings" }, { k: "audit", l: "Activity log" }];
 function staffNav(role) {
   const adm = [{ g: "Admissions" }];
   if (["adm_officer", "super"].includes(role)) adm.push({ k: "home", l: "Home" }, { k: "calls", l: "Calls" }, { k: "times", l: "Call times" });
@@ -553,35 +559,44 @@ function staffNav(role) {
   if (["director", "cohort_manager", "academy_admin", "coach", "super"].includes(role)) ac.push({ k: "jobs", l: "Job search" });
   if (["director", "cohort_manager", "academy_admin", "coach", "super"].includes(role)) ac.push({ k: "outcomes", l: "Outcomes" });
   ac.push({ k: "sessions", l: "Live sessions" }, { k: "news", l: "Announcements" });
-  if (role === "super") return [{ g: "Jobnest" }, { k: "staff", l: "Staff accounts" }, { k: "audit", l: "Activity log" }, ...adm, ...ac];
+  if (role === "super") return SUPER_NAV;
   if (role === "adm_admin") return [...adm, { g: "Academy" }, { k: "students", l: "Students" }];
   if (role === "adm_officer") return adm;
   return ac;
 }
 // Number badges in the staff menu: how many things are waiting in each section.
-const BADGE_HELP = { support: "open help requests", grading: "to grade or reply", intern: "students without a placement", dc2: "calls without a result", decide: "to decide", calls: "calls to complete", pods: "students not in a pod" };
+const BADGE_HELP = { attention: "things waiting on a decision", support: "open help requests", grading: "to grade or reply", intern: "students without a placement", dc2: "calls without a result", decide: "to decide", calls: "calls to complete", pods: "students not in a pod" };
 function paintBadges() {
-  const c = ui.counts || {}; let total = 0;
+  const c = { ...(ui.counts || {}), ...(ME?.role === "super" && ui.attnN != null ? { attention: ui.attnN } : {}) }; let total = 0;
   $$(".snav-i[href^='#/portal/']").forEach((a) => { const k = a.getAttribute("href").split("/").pop(), n = +c[k] || 0; a.querySelector(".cnt-b")?.remove();
     if (n > 0) { total += n; a.insertAdjacentHTML("beforeend", `<b class="cnt-b mono" title="${n} ${BADGE_HELP[k] || "waiting"}">${n}</b>`); } });
+  const bell = $(".st-bell"); if (bell) { bell.querySelector("b")?.remove(); const n = ME?.role === "super" ? c.attention || 0 : total; if (n) bell.insertAdjacentHTML("beforeend", `<b class="mono">${n > 99 ? "99+" : n}</b>`); bell.setAttribute("aria-label", `Waiting for you${n ? `, ${n}` : ""}`); }
   $$(".snav-m summary").forEach((sm) => { sm.querySelector(".cnt-b")?.remove(); if (total) sm.insertAdjacentHTML("beforeend", `<b class="cnt-b mono">${total}</b>`); });
 }
-function shell(tab, title, sub, body) {
+const staffIni = (n) => esc((n || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((x) => x[0]).join("").toUpperCase());
+function shell(tab, title, sub, body, opt = {}) {
   const items = staffNav(ME.role);
   const cur = items.find((x) => x.k === tab);
-  const nav = items.map((x) => x.g ? `<p class="snav-g">${x.g}</p>` : `<a class="snav-i" href="#/portal/${x.k}" aria-current="${x.k === tab ? "page" : "false"}"><span>${x.l}</span></a>`).join("")
-    + `<p class="snav-g">${esc(ME.name)}</p><button class="snav-i" data-act="signout"><span>Sign out</span></button>`;
-  const brand = ["adm_officer", "adm_admin"].includes(ME.role) ? "Jobnest Admissions" : ME.role === "super" ? "Jobnest" : "Jobnest Academy";
-  app.innerHTML = `<header class="adm-top role-top"><div class="shell-top"><div class="logo">${LOGO}${brand} · ${ROLE_NAMES[ME.role]}</div>
-    <div class="shell-tr"><span class="note" style="color:#C9D6E2">${esc(ME.name)}</span><button class="btn sm ghost" data-act="signout">Sign out</button></div></div></header>
-    <div class="shell"><aside class="snav" aria-label="Menu">${nav}</aside>
-    <main class="shell-main"><details class="snav-m"><summary><span>Menu</span><b>${cur ? cur.l : ""}</b></summary><nav class="snav-m-list">${nav}</nav></details>
-    <div class="wrap greet"><div><p class="eyebrow">${brand} · ${ROLE_NAMES[ME.role]}</p><h1 style="margin-top:.5rem">${title}</h1>${sub ? `<p class="note" style="font-size:.95rem;margin-top:.4rem;max-width:62ch">${sub}</p>` : ""}</div></div>
-    <section class="wrap pagebody">${body}</section></main></div>`;
+  const navI = (x) => x.g ? `<p class="snav-g st-g">${x.g}</p>` : `<a class="snav-i st-i" href="#/portal/${x.k}" aria-current="${x.k === tab || (tab === "student" && x.k === "students") ? "page" : "false"}"><span>${x.l}</span></a>`;
+  const nav = items.map(navI).join("");
+  const brand = ["adm_officer", "adm_admin"].includes(ME.role) ? "Jobnest Admissions" : "Jobnest Academy";
+  const total = Object.values(ui.counts || {}).reduce((t, n) => t + (+n || 0), 0), first = items.find((x) => x.k)?.k;
+  const mode = ui.testMode && ui.testMode !== "normal" ? `<a class="st-mode" href="#/portal/settings" title="Change in Settings, Testing">Testing mode: ${ui.testMode === "open" ? "all weeks open" : "progress only"}</a>` : "";
+  app.innerHTML = `<div class="st"><aside class="st-nav" aria-label="Menu"><a class="st-brand" href="#/portal">${LOGO}<span><b>${brand}</b><small>${ROLE_NAMES[ME.role]}</small></span></a>
+      <nav class="st-list">${nav}</nav><button class="st-i st-out" data-act="signout"><span>Sign out</span></button></aside>
+    <main class="shell-main st-main">
+      <header class="st-top"><details class="snav-m st-m"><summary><span>Menu</span><b>${cur ? cur.l : ""}</b></summary><nav class="snav-m-list">${nav}<button class="snav-i" data-act="signout"><span>Sign out</span></button></nav></details>
+        ${ME.role === "super" ? `<div class="st-search" role="search"><label class="sr-only" for="st-q">Search everything</label><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input id="st-q" type="search" autocomplete="off" placeholder="Search a name, matric number, JNA number or staff email" aria-controls="st-qres"><div class="st-qres" id="st-qres" hidden></div></div>` : `<div class="st-search-sp"></div>`}
+        ${mode}
+        <div class="st-tr"><a class="st-bell" href="#/portal/${ME.role === "super" ? "attention" : first}" aria-label="Waiting for you${total ? `, ${total}` : ""}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>${total ? `<b class="mono" id="st-bell-n">${total > 99 ? "99+" : total}</b>` : ""}</a>
+          <span class="st-me"><span class="st-av">${staffIni(ME.name)}</span><span class="st-me-t"><b>${esc(ME.name)}</b><small>${ROLE_NAMES[ME.role]}</small></span></span><button class="btn sm ghost st-so" data-act="signout">Sign out</button></div></header>
+      <div class="st-body"><div class="st-head"><div class="st-head-t"><p class="eyebrow">${opt.eyebrow || `${brand} · ${ROLE_NAMES[ME.role]}`}</p><h1>${title}</h1>${sub ? `<p class="st-sub">${sub}</p>` : ""}</div>${opt.actions ? `<div class="st-acts">${opt.actions}</div>` : ""}</div>
+        <section class="pagebody st-page">${body}</section></div></main></div>`;
   paintBadges();
 }
 
-async function pagePortal(tab) {
+async function pagePortal(tab, sub) {
   if (!auth.session) return go("#/staff");
   if (isStudent()) return go("#/learn");
   loading();
@@ -591,12 +606,175 @@ async function pagePortal(tab) {
     return;
   }
   const items = staffNav(ME.role).filter((x) => x.k);
-  if (!items.some((x) => x.k === tab)) tab = items[0].k;
-  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, intern: tabIntern, dc2: tabDc2, jobs: tabJobs, pods: tabPods, support: tabSupport, discussion: tabDiscussion, opps: tabOpps, outcomes: tabOutcomes, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
+  if (!(tab === "student" && sub && ["super", "director", "cohort_manager", "academy_admin", "facilitator", "coach"].includes(ME.role)) && !items.some((x) => x.k === tab)) tab = items[0].k;
+  if (!ui.pinged) { ui.pinged = true; rpc("staff_ping").catch(() => {}); }
+  if (ui.testMode === undefined && ["super", "adm_admin", "academy_admin"].includes(ME.role)) ui.testMode = await rpc("admin_test_mode", {}).catch(() => null);
+  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, intern: tabIntern, dc2: tabDc2, jobs: tabJobs, pods: tabPods, command: tabCommand, attention: tabAttention, student: () => tabStudent360(sub), support: tabSupport, discussion: tabDiscussion, opps: tabOpps, outcomes: tabOutcomes, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
   const counts = Promise.all([rpc("staff_counts").catch(() => ({})), rpc("staff_counts_extra").catch(() => ({}))]).then(([x, y]) => ({ ...(x || {}), ...(y || {}) }));
   try { await pages[tab](); }
   catch (e) { shell(tab, "Something went wrong", "", `<div class="notice">${esc(e.message)}</div>`); }
   ui.counts = await counts; paintBadges();
+}
+
+/* ---------- Super Admin: command centre ---------- */
+const STAGE_OF_WEEK = (w) => w <= 1 ? "Orientation" : w <= 3 ? "Fundamentals" : w <= 7 ? "Core skills" : w <= 9 ? "Client project" : w <= 13 ? "Internship" : w === 14 ? "CV & portfolio" : w === 15 ? "Discovery Call 2" : "Job search";
+const agoS = (t) => { if (!t) return "—"; const m = Math.round((Date.now() - new Date(t)) / 6e4); return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} day${Math.round(m / 1440) === 1 ? "" : "s"} ago`; };
+const waitS = (t) => { if (!t) return ""; const h = Math.max(0, (Date.now() - new Date(t)) / 36e5); return h < 1 ? "under an hour" : h < 48 ? `${Math.round(h)} hours` : `${Math.round(h / 24)} days`; };
+const nairaK = (n) => n >= 1e6 ? "₦" + (n / 1e6).toFixed(2).replace(/\.?0+$/, "") + "m" : n >= 1e4 ? "₦" + Math.round(n / 1e3) + "k" : naira(n);
+const SEV = { 1: ["Urgent", "bad"], 2: ["Today", "warn"], 3: ["Soon", "info"] };
+const spark = (a, cls) => a && a.length ? `<div class="sc-spark ${cls || ""}" aria-hidden="true">${a.map((v) => { const m = Math.max(...a, 1); return `<i style="height:${Math.max(6, Math.round((v / m) * 100))}%"></i>`; }).join("")}</div>` : "";
+const meter = (pct, cls) => `<div class="sc-meter ${cls || ""}" aria-hidden="true"><i style="width:${Math.max(0, Math.min(100, pct || 0))}%"></i></div>`;
+const queueHref = (q) => q.tab === "student" && q.id ? `#/portal/student/${q.id}` : q.tab === "risk" ? "#/portal/attention" : q.tab === "overview" ? "#/portal/command" : `#/portal/${q.tab}`;
+function queueRows(Q, filter) {
+  const L = Q.filter((q) => !filter || filter === "all" || q.cat === filter);
+  return L.length ? L.map((q) => { const [sv, sc] = SEV[q.rank] || SEV[3];
+    return `<li class="sc-q"><span class="sc-dot ${sc}" aria-hidden="true"></span><div class="sc-q-t"><div class="sc-q-h"><b>${esc(q.title)}</b><span class="pill ${sc === "warn" ? "now" : sc}">${sv}</span></div>
+      <span class="note">${esc(q.detail || "")}</span><span class="sc-q-m">${esc({ academy: "Academy", money: "Payments", admissions: "Admissions", system: "System" }[q.cat] || "")} · Owner: <b>${esc(q.owner || "—")}</b>${q.oldest ? ` · waiting ${waitS(q.oldest)}` : ""}</span></div>
+      <div class="sc-q-a">${q.act ? `<button class="btn sm" data-act="${q.act}">${esc(q.action)}</button>` : `<a class="btn sm" href="${queueHref(q)}">${esc(q.action)}</a>`}</div></li>`; }).join("")
+    : `<li class="empty">Nothing waiting here. 🎉</li>`;
+}
+async function tabCommand() {
+  const d = ui.ov = await rpc("super_overview");
+  ui.attnN = d.queue.length; ui.testMode = d.mode;
+  const K = d.kpis, M = d.money, C = d.cohort, wk = C.week, first = (ME.name || "").split(" ")[0];
+  const urgent = d.queue.filter((q) => q.rank === 1).length, h = +fmt(new Date(), { hour: "numeric", hour12: false });
+  const qt = ui.qtab || "all", qc = (k) => k === "all" ? d.queue.length : d.queue.filter((q) => q.cat === k).length;
+  const att = K.attend_past ? Math.round((K.attend_yes / K.attend_past) * 100) : null, onT = K.students ? Math.round((K.on_track / K.students) * 100) : null;
+  const top = Math.max(1, d.funnel[0]?.n || 1);
+  const kpis = [
+    ["On track", onT != null ? onT + "%" : "—", `${K.on_track} of ${K.students} students are up to date with Week ${Math.max(wk, 1)}`, meter(onT, onT >= 80 ? "" : "warn"), "#/portal/students"],
+    ["Grading queue", K.grading, K.grading ? `Oldest waiting ${waitS(K.grading_oldest)}` : "Nothing waiting", spark(K.spark_sub, "") + `<small class="note">Submissions per day, last 12 days</small>`, "#/portal/grading"],
+    ["Help requests", `${K.help_open} open`, K.help_late ? `${K.help_late} past the 1 working day reply time` : "All answered on time", spark(K.spark_help, "gold"), "#/portal/support"],
+    ["Live class attendance", att != null ? att + "%" : "—", K.attend_past ? `${K.attend_yes} of ${K.attend_past} seats filled at past classes` : "No classes held yet", meter(att, att >= 75 ? "" : "warn"), "#/portal/sessions"],
+    ["Average score", K.avg_score != null ? K.avg_score + "%" : "—", "Assessments and week projects, all tracks", meter(K.avg_score, K.avg_score >= 70 ? "" : "warn"), "#/portal/grading"],
+    [`Applications · ${esc(d.admissions.name.split(" · ")[0])}`, K.apps_admissions, `${K.apps_today} today · applications ${d.admissions.open ? "open" : "closed"}`, spark(K.spark_apps, "navy"), "#/portal/apps"]];
+  const cell = (v, g) => { const live = g >= wk && v != null, cls = v == null ? "na" : live ? "" : v >= 95 ? "c4" : v >= 85 ? "c3" : v >= 70 ? "c2" : "c1";
+    return `<span class="hm-c ${cls} ${live ? "live" : ""}" title="Week ${g}: ${v == null ? "not reached yet" : `${v}% passed${live ? " so far (in progress)" : ""}`}">${v == null ? "" : v}</span>`; };
+  const S = d.systems, sys = [
+    ["Email sending", `${S.mail_today} sent today${S.mail_failed ? ` · ${S.mail_failed} failed` : ""}`, S.mail_failed ? ["warn", `${S.mail_failed} failed`] : ["ok", "Working"]],
+    ["Email queue", S.mail_pending ? `${S.mail_pending} waiting · oldest ${agoS(S.mail_oldest_pending)}` : "Nothing waiting to send", S.mail_pending && Date.now() - new Date(S.mail_oldest_pending) > 15 * 6e4 ? ["bad", "Stuck"] : ["ok", "Working"]],
+    ["Payments (Paystack)", S.pay_last ? `Last payment confirmed ${agoS(S.pay_last)}${S.pay_failed_week ? ` · ${S.pay_failed_week} failed this week` : ""}` : "No payments yet", ["ok", "Working"]],
+    ["Reminders", S.reminders_last ? `Last reminder sent ${agoS(S.reminders_last)}` : "No reminders sent yet (they start when the cohort starts)", ["ok", S.reminders_last ? "Working" : "Waiting"]],
+    ["Student portal", d.mode === "normal" ? "Weeks open by progress and dates" : d.mode === "open" ? "Testing: every week is open" : "Testing: dates ignored, weeks open by progress", d.mode === "normal" ? ["ok", "Live"] : ["warn", "Testing"]]];
+  shell("command", `${h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"}, ${esc(first)}`,
+    `${esc(C.name)} is ${wk < 1 ? `starting on <b>${fmtDateD(C.start_date)}</b>` : wk > C.weeks ? "finished" : `in <b>Week ${wk} of ${C.weeks}</b> (${STAGE_OF_WEEK(wk)})`}. ${d.queue.length ? `${d.queue.length} thing${d.queue.length === 1 ? " needs" : "s need"} a decision${urgent ? `, ${urgent} of them urgent` : ""}.` : "Nothing is waiting on a decision."}`,
+    `${d.launch.length ? `<div class="sc-launch"><span class="pill gold">Launch check</span><span>${d.launch.map(esc).join(" · ")}. Fix ${d.launch.length === 1 ? "this" : "these"} before students sign in.</span><a class="btn sm gold" href="#/portal/settings">Review settings</a></div>` : ""}
+    <section class="card sc-funnel"><div class="sc-h"><div><span class="eyebrow">Student journey · all cohorts</span><h2>From application to first job</h2></div><span class="note">Each step shows how many moved on from the step before.</span></div>
+      <ol class="sc-steps">${d.funnel.map((f, i) => `<li><span class="sc-st-l">${esc(f.label)}</span><b class="mono">${f.n}</b>${meter(Math.round((f.n / top) * 100), i >= 6 ? "gold" : "")}<span class="note">${i === 0 ? "everyone who applied" : d.funnel[i - 1].n ? `${Math.round((f.n / d.funnel[i - 1].n) * 100)}% of the step before` : "—"}</span></li>`).join("")}</ol></section>
+    <section class="sc-kpis">${kpis.map(([l, v, n, viz, href]) => `<a class="card sc-kpi" href="${href}"><span class="eyebrow">${l}</span><b class="mono">${v}</b><span class="note">${n}</span>${viz}</a>`).join("")}</section>
+    <section class="sc-2">
+      <div class="card" id="attention"><div class="sc-h"><div><span class="eyebrow">Needs attention</span><h2>Decisions waiting on someone</h2></div>
+        <div class="sc-tabs" role="group" aria-label="Filter">${[["all", "All"], ["admissions", "Admissions"], ["academy", "Academy"], ["money", "Money"], ["system", "System"]].map(([k, l]) => `<button class="sc-tab" data-act="qtab" data-k="${k}" aria-pressed="${qt === k}">${l} <span class="mono">${qc(k)}</span></button>`).join("")}</div></div>
+        <ul class="sc-ql">${queueRows(d.queue, qt)}</ul></div>
+      <div class="stack">
+        <div class="card"><div class="sc-h"><div><span class="eyebrow">Money · ${esc(C.name)}</span><h2>${nairaK(M.collected)} collected of ${nairaK(M.expected)}</h2></div><a class="btn sm ghost" href="#/portal/pay">Payments</a></div>
+          ${(() => { const e = Math.max(M.expected, 1), od = M.overdue.reduce((t, o) => t + o.balance, 0); return `<div class="sc-bar" aria-hidden="true"><i class="a" style="width:${(M.full_sum / e) * 100}%"></i><i class="b" style="width:${(M.two_sum / e) * 100}%"></i><i class="c" style="width:${(od / e) * 100}%"></i></div>
+          <div class="sc-leg"><span><i class="a"></i>Paid in full <b class="mono">${nairaK(M.full_sum)}</b> · ${M.full_n}</span><span><i class="b"></i>Instalments <b class="mono">${nairaK(M.two_sum)}</b> · ${M.two_n}</span><span><i class="c"></i>Overdue <b class="mono">${nairaK(od)}</b> · ${M.overdue.length}</span></div>`; })()}
+          ${M.overdue.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Overdue 2nd instalment</th><th>Balance</th><th>Late</th></tr></thead><tbody>${M.overdue.slice(0, 5).map((o) => `<tr><td><a class="link" href="#/portal/student/${o.id}"><b>${esc(o.name)}</b></a><span class="note mono" style="display:block">${esc(o.matric)}</span></td><td class="mono">${naira(o.balance)}</td><td><span class="pill bad">${o.days} day${o.days === 1 ? "" : "s"}</span></td></tr>`).join("")}</tbody></table></div>
+            <div class="actions" style="margin-top:.6rem"><button class="btn sm" data-act="fee-remind-all">Remind all ${M.overdue.length}</button></div><p class="note">Learning is paused for these students until they pay. Home and Help stay open.</p>` : `<p class="note">No one is behind on payments.</p>`}</div>
+        <div class="card"><div class="sc-h"><div><span class="eyebrow">Seats · ${esc(d.admissions.name)}</span><h2>${d.seats.reduce((t, x) => t + x.n, 0)} of ${d.seats.reduce((t, x) => t + x.seats, 0)} filled</h2></div>${d.admissions.open ? `<span class="pill ok">Applications open</span>` : `<span class="pill">Applications closed</span>`}</div>
+          <div class="sc-seats">${d.seats.map((x) => `<div><span>${esc(x.track)}${x.paused ? ` <span class="pill">Paused</span>` : ""}</span>${meter(Math.round((x.n / Math.max(x.seats, 1)) * 100))}<b class="mono">${x.n}/${x.seats}</b></div>`).join("")}</div></div>
+      </div></section>
+    <section class="card"><div class="sc-h"><div><span class="eyebrow">Cohort health · ${esc(C.name)}</span><h2>Share of each track that has passed each week</h2></div>
+        <div class="hm-leg"><span>Below 70%</span><i class="c1"></i><i class="c2"></i><i class="c3"></i><i class="c4"></i><span>95%+</span><span class="hm-live-k"><i class="live"></i>still in progress</span></div></div>
+      <div class="hm-wrap"><div class="hm" style="--n:${C.weeks}"><span class="hm-hd">Track</span>${[...Array(C.weeks)].map((_, i) => `<span class="hm-hd ${i + 1 === wk ? "now" : ""}">W${i + 1}</span>`).join("")}<span class="hm-hd r">At risk</span>
+        ${d.heat.map((t) => `<b class="hm-t">${esc(t.track)}<small class="note">${t.n} students</small></b>${t.cells.map((v, i) => cell(v, i + 1)).join("")}<a class="hm-r mono" href="#/portal/attention">${t.risk}</a>`).join("")}</div></div></section>
+    <section class="sc-2b">
+      <div class="card"><div class="sc-h"><div><span class="eyebrow">At risk</span><h2>Students to reach this week</h2></div><a class="btn sm ghost" href="#/portal/attention">All ${d.risk_n}</a></div>
+        ${d.risk.length ? `<ul class="sc-people">${d.risk.map((r) => `<li><a href="#/portal/student/${r.id}"><span class="st-av">${staffIni(r.name)}</span><span class="sc-p-t"><b>${esc(r.name)}</b><span class="note">${esc(r.track || "")} · Week ${r.week} · ${esc(r.reasons.join(" · "))}</span></span><span class="pill bad">${r.reasons.length}</span></a></li>`).join("")}</ul>` : `<p class="empty">No one is at risk right now.</p>`}</div>
+      <div class="card"><div class="sc-h"><div><span class="eyebrow">Team</span><h2>Who is carrying the load</h2></div><a class="btn sm ghost" href="#/portal/staff">Staff &amp; access</a></div>
+        <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Staff</th><th>Queue</th><th>Oldest</th><th>Last active</th></tr></thead><tbody>${d.staff.map((s) => { const old = s.oldest ? (Date.now() - new Date(s.oldest)) / 864e5 : 0;
+          return `<tr><td><b>${esc(s.name)}</b><span class="note" style="display:block">${ROLE_NAMES[s.role] || s.role}${s.track ? ` · ${esc(s.track)}` : ""}</span></td><td class="mono">${s.q == null ? "—" : `<b>${s.q}</b> <span class="note">${esc(s.what)}</span>`}</td>
+            <td>${s.oldest ? `<span class="pill ${old > 2 ? "bad" : old > 1 ? "now" : "ok"}">${waitS(s.oldest)}</span>` : `<span class="note">—</span>`}</td><td class="note">${s.last_seen ? agoS(s.last_seen) : "never"}</td></tr>`; }).join("")}</tbody></table></div></div></section>
+    <section class="sc-2b">
+      <div class="card"><span class="eyebrow">Live activity</span><h2 class="sc-h2">What just happened</h2>
+        ${d.activity.length ? `<ul class="sc-act">${d.activity.map((a) => `<li><span class="mono note">${fmt(a.at, { hour: "2-digit", minute: "2-digit", hour12: false })}</span><span><b>${esc(a.who)}</b> ${esc(a.what)}<small class="note"> · ${agoS(a.at)}</small></span></li>`).join("")}</ul>` : `<p class="empty">Nothing yet.</p>`}
+        <a class="link sm" href="#/portal/audit">Full activity log</a></div>
+      <div class="card"><span class="eyebrow">Systems</span><h2 class="sc-h2">${sys.every((x) => x[2][0] === "ok") ? "Everything running" : "Check these"}</h2>
+        <ul class="sc-sys">${sys.map(([n, dt, [c, l]]) => `<li><span class="sc-dot ${c}" aria-hidden="true"></span><span class="sc-p-t"><b>${n}</b><span class="note">${esc(dt)}</span></span><span class="pill ${c === "warn" ? "now" : c}">${l}</span></li>`).join("")}</ul></div></section>`,
+    { eyebrow: `Command centre · ${fmt(new Date(), { weekday: "long", day: "numeric", month: "long", year: "numeric" })}`,
+      actions: `<button class="btn ghost" data-act="sc-refresh">Refresh</button><a class="btn" href="#/portal/news">New announcement</a>` });
+}
+
+/* ---------- Super Admin: needs attention (everything waiting + every at-risk student) ---------- */
+async function tabAttention() {
+  const [d, R] = await Promise.all([ui.ov && Date.now() - (ui.ovAt || 0) < 6e4 ? ui.ov : rpc("super_overview"), rpc("super_risk")]);
+  ui.ov = d; ui.ovAt = Date.now(); ui.attnN = d.queue.length;
+  const rk = (x) => (/^Confidence/.test(x) ? "Low confidence" : x), has = (r, x) => r.reasons.some((y) => rk(y) === x);
+  const f = ui.riskF || "", reasons = [...new Set(R.flatMap((r) => r.reasons.map(rk)))];
+  const L = R.filter((r) => !f || has(r, f));
+  shell("attention", "Needs attention", "Every decision that's waiting, and every student who needs a call this week.",
+    `<section class="sc-2"><div class="card"><div class="sc-h"><div><span class="eyebrow">Decisions</span><h2>${d.queue.length} waiting</h2></div></div><ul class="sc-ql">${queueRows(d.queue, "all")}</ul></div>
+      <div class="card"><div class="sc-h"><div><span class="eyebrow">At risk</span><h2>${R.length} student${R.length === 1 ? "" : "s"} to reach</h2></div></div>
+        <div class="sc-tabs" role="group" aria-label="Filter by reason" style="margin-bottom:.6rem"><button class="sc-tab" data-act="risk-f" data-k="" aria-pressed="${!f}">All <span class="mono">${R.length}</span></button>${reasons.map((x) => `<button class="sc-tab" data-act="risk-f" data-k="${esc(x)}" aria-pressed="${f === x}">${esc(x)} <span class="mono">${R.filter((r) => has(r, x)).length}</span></button>`).join("")}</div>
+        ${L.length ? `<ul class="sc-people">${L.map((r) => `<li><a href="#/portal/student/${r.id}"><span class="st-av">${staffIni(r.name)}</span><span class="sc-p-t"><b>${esc(r.name)}</b><span class="note">${esc(r.track || "")} · Week ${r.week} · last active ${r.last_at ? agoS(r.last_at) : "never"}</span>
+          <span class="sc-tags">${r.reasons.map((x) => `<span class="pill bad">${esc(x)}</span>`).join("")}</span>${r.note ? `<span class="note sc-lastnote">Last note: ${esc(r.note)}</span>` : ""}</span></a></li>`).join("")}</ul>` : `<p class="empty">No one here.</p>`}</div></section>`,
+    { actions: `<a class="btn ghost" href="#/portal/command">Command centre</a>` });
+}
+
+/* ---------- full student record ---------- */
+const WK_ST = { pass: ["Passed", "ok"], fail: ["Failed", "bad"], grading: ["Waiting for grading", "info"], revise: ["Changes requested", "now"], open: ["In progress", "now"], locked: ["Not open", ""] };
+async function tabStudent360(id) {
+  const s = ui.s360 = await rpc("acad_student360", { p_app: id });
+  const tab = ui.s360t || "overview", nm = `${s.first_name} ${s.surname}`, F = s.fees, risk = s.reasons.length > 0;
+  const weeks = s.weeks.map((w) => ({ ...w, st: w.week > s.cur && w.state !== "pass" && !w.quiz && !w.proj ? "locked" : w.week === s.cur && w.state === "open" ? "open" : w.state }));
+  const passed = weeks.filter((w) => w.st === "pass").length, avgs = weeks.filter((w) => w.avg != null).map((w) => w.avg), avg = avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : null;
+  const failW = weeks.find((w) => w.st === "fail"), conf = s.checkins.slice(-8), last = conf.at(-1);
+  const wa = (s.phone || "").replace(/\D/g, ""), att = s.attend.past ? Math.round((s.attend.yes / s.attend.past) * 100) : null;
+  const tabs = [["overview", "Overview"], ["learning", "Learning"], ["payments", "Payments"], ["career", "Internship & career"], ["history", "History"]];
+  const banner = [];
+  if (s.failed_retake && failW) banner.push(`<div class="s3-dec"><div><b>Decision needed: Week ${failW.week} failed after the retake</b><span>Average ${failW.avg ?? "—"}% (assessment ${failW.quiz ?? "—"}%, project ${failW.proj ?? "—"}%)${last ? `. Last confidence check-in: ${last.conf} of 5` : ""}.</span></div>
+    <div class="actions">${s.can.retake ? `<button class="btn sm" data-act="s3-retake" data-k="${failW.week}">Give one more retake</button>` : ""}<a class="btn sm ghost" href="#s3-note">Add a note</a></div></div>`);
+  if (F.locked) banner.push(`<div class="s3-dec bad"><div><b>Learning paused: second instalment overdue</b><span>${naira(F.total - F.paid)} was due on ${fmtDateD(F.due_date)}. Home and Help stay open.</span></div>
+    ${s.can.money ? `<div class="actions"><button class="btn sm" data-act="s3-remind">Send a reminder</button><a class="btn sm ghost" href="#s3-extend" data-act="s3-tab" data-k="payments">Give more time</a></div>` : ""}</div>`);
+  const body = {
+    overview: `<section class="card"><div class="sc-h"><div><span class="eyebrow">Progress</span><h2>Week ${s.cur} of ${weeks.length} · ${passed} passed${avg != null ? ` · average ${avg}%` : ""}</h2></div>
+        <div class="s3-leg"><span><i class="ok"></i>Passed</span><span><i class="bad"></i>Failed</span><span><i class="now"></i>In progress</span><span><i class="lk"></i>Not open</span></div></div>
+      <div class="hm-wrap"><div class="s3-weeks">${weeks.map((w) => `<span class="s3-w ${WK_ST[w.st][1] || "lk"}" title="Week ${w.week}${w.title ? `: ${esc(w.title)}` : ""} · ${WK_ST[w.st][0]}${w.avg != null ? ` · ${w.avg}%` : ""}"><small>W${w.week}</small><b class="mono">${w.avg != null ? w.avg : w.st === "pass" ? "✓" : w.st === "lk" || w.st === "locked" ? "·" : "…"}</b></span>`).join("")}</div></div>
+      <p class="note" style="margin-top:.6rem">Now in <b>${STAGE_OF_WEEK(s.cur)}</b>${s.cal_week >= 1 ? ` · the cohort calendar is in Week ${s.cal_week}` : ""} · last active ${s.last_at ? agoS(s.last_at) : "never"}${s.account ? "" : " · <b>hasn't set up a portal account</b>"}</p></section>
+    <section class="sc-3">
+      <div class="card"><span class="eyebrow">Engagement</span><h2 class="sc-h2">${risk ? "Needs a check-in" : "Doing fine"}</h2>
+        <div class="s3-mini"><div><span class="eyebrow">Live classes</span><b class="mono">${s.attend.past ? `${s.attend.yes}/${s.attend.past}` : "—"}</b><span class="note">${att != null ? att + "% attended" : "none held yet"}</span></div>
+          <div><span class="eyebrow">Projects late</span><b class="mono">${s.ontime.late}/${s.ontime.n}</b><span class="note">submitted after Friday</span></div></div>
+        <p class="s3-lbl">Weekly confidence check-in</p>${conf.length ? `<div class="s3-conf" role="img" aria-label="Confidence by week: ${conf.map((c) => c.conf).join(", ")}">${conf.map((c) => `<span><i class="${c.conf <= 2 ? "bad" : c.conf === 3 ? "now" : "ok"}" style="height:${c.conf * 20}%"></i><small>W${c.week}</small></span>`).join("")}</div>` : `<p class="note">No check-ins yet.</p>`}
+        ${risk ? `<div class="sc-tags" style="margin-top:.6rem">${s.reasons.map((x) => `<span class="pill bad">${esc(x)}</span>`).join("")}</div>` : ""}</div>
+      <div class="card"><span class="eyebrow">Admission</span><h2 class="sc-h2">${s.admission.score != null ? `Readiness ${s.admission.score}%` : "Admitted"}</h2>
+        <dl class="s3-kv"><dt>Application</dt><dd class="mono">${esc(s.ref)}</dd><dt>Applied</dt><dd>${fmtDay(s.admission.applied)}</dd>${s.admission.digital != null ? `<dt>Scores</dt><dd>Digital ${s.admission.digital}% · communication ${s.admission.comms}%</dd>` : ""}
+          ${s.admission.dc1_at ? `<dt>Discovery call</dt><dd>${fmtDay(s.admission.dc1_at)}${s.admission.officer ? ` · ${esc(s.admission.officer)}` : ""}</dd>` : ""}${s.admission.dc1_note ? `<dt>Call note</dt><dd class="s3-q">“${esc(s.admission.dc1_note)}”</dd>` : ""}
+          <dt>Background</dt><dd>${esc([s.admission.edu, s.admission.situation].filter(Boolean).join(" · "))}</dd>${s.admission.admitted_at ? `<dt>Admitted</dt><dd>${fmtDay(s.admission.admitted_at)}</dd>` : ""}</dl></div>
+      <div class="card"><span class="eyebrow">Fees</span><h2 class="sc-h2">${F.plan === "two" ? "Paying in 2 instalments" : "Paid in full"}</h2>
+        <dl class="s3-kv"><dt>Total</dt><dd class="mono">${naira(F.total)}</dd><dt>Paid</dt><dd class="mono">${naira(F.paid)}</dd>${F.total > F.paid ? `<dt>Balance</dt><dd><span class="pill ${F.locked ? "bad" : "now"}">${naira(F.total - F.paid)}</span></dd><dt>Due</dt><dd>${fmtDateD(F.due_date)}${F.extended ? " · extended" : ""}</dd>` : `<dt>Balance</dt><dd><span class="pill ok">Nothing owed</span></dd>`}</dl></div></section>
+    <section class="sc-2b">
+      <div class="card"><span class="eyebrow">Support team</span><h2 class="sc-h2">Who looks after ${esc(s.first_name)}</h2>
+        <ul class="sc-people">${s.pod ? `<li><span class="sc-li"><span class="st-av">PD</span><span class="sc-p-t"><b>${esc(s.pod.name)}</b><span class="note">Pod · ${s.pod.n} students</span></span></span></li>` : `<li><span class="sc-li"><span class="sc-p-t"><b>Not in a pod yet</b><a class="link sm" href="#/portal/pods">Assign a pod</a></span></span></li>`}
+          ${s.team.map((p) => `<li><span class="sc-li"><span class="st-av">${staffIni(p.name)}</span><span class="sc-p-t"><b>${esc(p.name)}</b><span class="note">${ROLE_NAMES[p.role] || p.role}</span></span></span></li>`).join("")}</ul></div>
+      <div class="card" id="s3-note"><div class="sc-h"><div><span class="eyebrow">Notes</span><h2>Private staff notes</h2></div><span class="note">Students never see these</span></div>
+        <form class="form" id="s3-note-form" novalidate><label class="sr-only" for="s3-note-t">Add a note</label><textarea id="s3-note-t" rows="2" maxlength="3000" placeholder="e.g. Called her. She works night shifts this month and will catch up at weekends."></textarea><div><button class="btn sm" type="submit">Add note</button></div></form>
+        ${s.notes.length ? `<ul class="sc-act">${s.notes.map((n) => `<li><span class="mono note">${fmtDay(n.at)}</span><span>${lines(n.body)}<small class="note" style="display:block">${esc(n.by)} · ${agoS(n.at)} <button class="link sm" data-act="s3-note-del" data-k="${n.id}">Delete</button></small></span></li>`).join("")}</ul>` : `<p class="empty">No notes yet.</p>`}</div></section>`,
+    learning: `<section class="card"><div class="sc-h"><div><span class="eyebrow">Learning</span><h2>Every week, every score</h2></div><span class="note">Pass mark ${s.pass}%. One retake is allowed per week.</span></div>
+      <div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Week</th><th>Assessment</th><th>Week project</th><th>Average</th><th>Attempts</th><th>Status</th><th></th></tr></thead><tbody>
+      ${weeks.map((w) => `<tr><td data-label="Week"><b>Week ${w.week}</b><span class="note" style="display:block">${esc(w.title || STAGE_OF_WEEK(w.week))}</span></td><td data-label="Assessment" class="mono">${w.quiz != null ? w.quiz + "%" : "—"}</td><td data-label="Project" class="mono">${w.proj != null ? w.proj + "%" : "—"}</td>
+        <td data-label="Average" class="mono"><b>${w.avg != null ? w.avg + "%" : "—"}</b></td><td data-label="Attempts" class="mono">${w.attempt || (w.quiz != null ? 1 : "—")}${w.repeats ? ` · repeated ${w.repeats - 1}×` : ""}</td>
+        <td data-label="Status"><span class="pill ${WK_ST[w.st][1]}">${WK_ST[w.st][0]}</span></td><td>${w.st === "fail" && s.can.retake ? `<button class="btn sm ghost" data-act="s3-retake" data-k="${w.week}">One more retake</button>` : ""}</td></tr>`).join("")}</tbody></table></div></section>`,
+    payments: `<section class="sc-2"><div class="card"><div class="sc-h"><div><span class="eyebrow">Payments</span><h2>${naira(F.paid)} paid${F.total > F.paid ? ` · ${naira(F.total - F.paid)} to pay` : " · nothing owed"}</h2></div></div>
+        ${s.payments.length ? `<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Date</th><th>What</th><th>Amount</th><th>Reference</th><th>Status</th></tr></thead><tbody>${s.payments.map((y) => `<tr><td>${fmtDay(y.at)}</td><td>${{ full: "Full fee", part1: "1st instalment", part2: "2nd instalment" }[y.part] || esc(y.part || "")}${y.by ? `<span class="note" style="display:block">recorded by ${esc(y.by)}</span>` : ""}</td><td class="mono">${naira(y.amount)}</td><td class="mono">${esc(y.reference || "")}</td><td><span class="pill ${y.status === "success" ? "ok" : y.status === "failed" ? "bad" : ""}">${y.status === "success" ? "Confirmed" : esc(y.status)}</span></td></tr>`).join("")}</tbody></table></div>` : `<p class="empty">No payments yet.</p>`}</div>
+      ${F.plan === "two" && F.total > F.paid && s.can.money ? `<form class="card form" id="s3-extend" novalidate><span class="eyebrow">Second instalment</span><h2 class="sc-h2">Give more time to pay</h2><p class="note">Due ${fmtDateD(F.due_date)}${F.extended ? " (already extended)" : ""}. A new date opens their learning straight away and sends them an alert.</p>
+        <div class="field"><label for="s3-date">New due date</label><input id="s3-date" type="date" min="${new Date().toISOString().slice(0, 10)}" value="${F.extended ? F.due_date : ""}"></div><p class="err" id="s3-ext-err" role="alert"></p>
+        <div class="actions"><button class="btn sm" type="submit">Save new date</button>${F.extended ? `<button class="btn sm ghost" type="button" data-act="s3-unextend">Remove extension</button>` : ""}<button class="btn sm ghost" type="button" data-act="s3-remind">Send a reminder</button></div></form>` : ""}</section>`,
+    career: `<section class="sc-2"><div class="card"><span class="eyebrow">Internship · Weeks 10–13</span>${s.placement ? `<h2 class="sc-h2">${esc(s.placement.role)} at ${esc(s.placement.org)}</h2><dl class="s3-kv"><dt>Supervisor</dt><dd>${esc(s.placement.sup_name || "—")}${s.placement.sup_email ? ` · <a href="mailto:${esc(s.placement.sup_email)}">${esc(s.placement.sup_email)}</a>` : ""}</dd><dt>Evaluation</dt><dd>${s.eval ? `Received${s.eval.overall ? ` · ${esc(String(s.eval.overall))}` : ""}` : "Not yet"}</dd></dl>`
+        : `<h2 class="sc-h2">Not placed yet</h2><p class="note">Placements are matched before Week 10.</p><a class="btn sm" href="#/portal/intern">Assign a placement</a>`}</div>
+      <div class="card"><span class="eyebrow">Career</span><h2 class="sc-h2">${s.outcome ? `Now: ${esc({ hired: "Employed", internship: "Internship", freelance: "Freelancing", study: "Studying", searching: "Still searching" }[s.outcome.status] || s.outcome.status)}` : "Career goals"}</h2>
+        <dl class="s3-kv"><dt>Aiming for</dt><dd>${esc(s.career?.role || "—")}</dd><dt>Industries</dt><dd>${esc(s.career?.interests || "—")}</dd><dt>Discovery Call 2</dt><dd>${s.call2 ? `Scored ${s.call2.score}/10` : "Not yet"}</dd><dt>Applications</dt><dd>${s.apps_n || 0} tracked</dd>
+          ${s.outcome?.company ? `<dt>Company</dt><dd>${esc(s.outcome.company)}${s.outcome.role ? ` · ${esc(s.outcome.role)}` : ""}</dd>` : ""}<dt>Certificate</dt><dd>${s.cert_id ? `<a class="link" href="#/certificate/${esc(s.cert_id)}" target="_blank" rel="noopener">${esc(s.cert_id)}</a>` : "Not issued"}</dd></dl></div></section>`,
+    history: `<section class="card"><span class="eyebrow">History</span><h2 class="sc-h2">Everything on ${esc(s.first_name)}'s record</h2>${s.history.length ? `<ul class="sc-act">${s.history.slice(0, 120).map((h) => `<li><span class="mono note">${fmt(h.at, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })}</span><span>${esc(h.text)}${h.by ? `<small class="note"> · ${esc(h.by)}</small>` : ""}</span><span class="pill info">${esc(h.kind)}</span></li>`).join("")}</ul>` : `<p class="empty">Nothing yet.</p>`}</section>` };
+  shell("student", esc(nm), "", `<section class="card s3-head"><div class="s3-id">${s.photo ? `<img class="s3-av" src="${esc(s.photo)}" alt="">` : `<span class="s3-av">${staffIni(nm)}</span>`}
+      <div class="s3-who"><div class="s3-pills">${risk ? `<span class="pill bad">At risk</span>` : ""}<span class="pill ${F.locked ? "bad" : "ok"}">${F.locked ? "Learning paused" : s.status === "Admitted" ? "Active" : esc(s.status)}</span>${s.cert_id ? `<span class="pill gold">Graduated</span>` : ""}</div>
+        <p class="s3-meta"><b class="mono">${esc(s.matric || s.ref)}</b><span>${esc(s.track || "")}</span><span>${esc(s.cohort)}</span>${s.pod ? `<span>Pod: ${esc(s.pod.name)}</span>` : ""}${s.city ? `<span>${esc(s.city)}</span>` : ""}</p>
+        <p class="s3-meta note"><a href="mailto:${esc(s.email)}">${esc(s.email)}</a>${s.phone ? `<a href="tel:${esc(s.phone)}">${esc(s.phone)}</a>` : ""}<span>Last active ${s.last_at ? agoS(s.last_at) : "never"}</span></p></div>
+      <div class="actions s3-btns">${wa ? `<a class="btn ghost" href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>` : ""}<a class="btn ghost" href="mailto:${esc(s.email)}">Email</a><a class="btn" href="#s3-note">Add note</a></div></div>
+    <div class="s3-tabs" role="tablist" aria-label="Student sections">${tabs.map(([k, l]) => `<button role="tab" class="s3-tab" data-act="s3-tab" data-k="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}</div></section>
+    ${banner.join("")}${body[tab]}`,
+    { eyebrow: `<a class="link" href="#/portal/${ME.role === "super" ? "command" : "students"}">${ME.role === "super" ? "Command centre" : "Students"}</a> / <a class="link" href="#/portal/students">Students</a> / ${esc(nm)}` });
 }
 
 function tabSoon() {
@@ -793,21 +971,54 @@ async function tabSettings() {
     </div><p class="err" id="st-err" role="alert"></p><div class="actions" style="margin-top:1rem"><button class="btn" type="submit">Save settings</button></div></form>`);
 }
 
+const PERM_AREAS = [["Applications & calls", ["apps", "calls"]], ["Decisions & offers", ["decide"]], ["Payments", ["pay"]], ["Students", ["students"]], ["Grading", ["grading"]],
+  ["Internships", ["intern"]], ["Career, DC2 & jobs", ["dc2", "jobs"]], ["Pods, help & discussion", ["pods", "support"]], ["Content", ["content"]], ["Settings & emails", ["settings"]], ["Staff & access", ["staff"]]];
+const TRACKED = ["facilitator", "coach"];
+const ROLE_SHORT = { super: "SA", adm_admin: "AD", adm_officer: "AO", director: "PD", cohort_manager: "CM", facilitator: "FA", coach: "CC", academy_admin: "AC" };
 async function tabStaff() {
-  const L = await rpc("super_staff");
-  await info().catch(() => null);
+  const [d, ov] = await Promise.all([rpc("super_staff2"), ui.ov && Date.now() - (ui.ovAt || 0) < 12e4 ? ui.ov : rpc("super_overview").catch(() => null)]);
+  if (ov) { ui.ov = ov; ui.ovAt = Date.now(); }
+  const L = d.staff, act = L.filter((x) => x.active), load = Object.fromEntries((ov?.staff || []).map((x) => [x.email, x]));
+  const wk = (x) => x.last_seen_at && Date.now() - new Date(x.last_seen_at) < 7 * 864e5;
+  const f = ui.staffF || "all", roles = [...new Set(L.map((x) => x.role))];
+  const shown = L.filter((x) => f === "all" || x.role === f), pr = ui.permRole || "facilitator";
+  const stat = (x) => !x.active ? ["Off", ""] : !x.account ? [x.invited_at ? `Invited ${fmtDay(x.invited_at)}` : "Not set up", "now"] : ["Active", "ok"];
+  const scope = (x) => x.role === "super" ? "Everything" : ["adm_admin", "adm_officer"].includes(x.role) ? "Admissions" : x.track ? esc(x.track) : "All tracks";
   const opts = Object.entries(ROLE_NAMES).map(([k, l]) => `<option value="${k}">${l}</option>`).join("");
-  shell("staff", "Staff accounts", "Add someone here, then they create their password from “First time? Set up your account” on the staff sign-in page.",
-    `<div class="grid2"><form class="card form" id="staff-form" novalidate><h3>Add or change a staff member</h3>
-      <div class="field"><label for="sf-email">Work email</label><input id="sf-email" placeholder="e.g. kemi@jobnestcareers.com" type="email"></div>
-      <div class="field"><label for="sf-name">Full name</label><input id="sf-name" placeholder="e.g. Kemi Adeyemi"></div>
-      <div class="field"><label for="sf-role">Role</label><select id="sf-role">${opts}</select></div>
-      <div class="field"><label for="sf-track">Track (facilitators)</label><select id="sf-track"><option value="">All tracks</option>${(INFO?.tracks || []).map((t) => `<option value="${t.code}">${esc(t.name)}</option>`).join("")}</select><span class="note">A facilitator with a track only sees and marks that track.</span></div>
-      <label class="consent"><input type="checkbox" id="sf-active" checked> Active (can sign in)</label>
-      <p class="err" id="sf-err" role="alert"></p><div><button class="btn" type="submit">Save</button></div></form>
-    <div class="card"><h3>Everyone</h3><div class="tbl-wrap"><table class="tbl"><thead><tr><th>Person</th><th>Role</th><th>Status</th><th></th></tr></thead><tbody>
-      ${L.map((s) => `<tr><td><b>${esc(s.full_name)}</b><span class="note" style="display:block">${esc(s.email)}</span></td><td>${ROLE_NAMES[s.role] || s.role}${s.track_code ? `<span class="note" style="display:block">${esc(s.track_code)}</span>` : ""}</td><td>${s.active ? `<span class="pill ok">Active</span>` : `<span class="pill bad">Suspended</span>`}</td>
-        <td><button class="link sm" data-act="edit-staff" data-email="${esc(s.email)}" data-name="${esc(s.full_name)}" data-role="${s.role}" data-active="${s.active}" data-track="${s.track_code || ""}">Edit</button></td></tr>`).join("")}</tbody></table></div></div></div>`);
+  const cellP = (r, ks) => { const nav = staffNav(r).map((x) => x.k), ok = ks.some((k) => nav.includes(k)); return !ok ? `<span class="pv no">—</span>` : TRACKED.includes(r) && !["pay", "settings", "staff", "decide"].includes(ks[0]) ? `<span class="pv tr">Own track</span>` : `<span class="pv yes">Yes</span>`; };
+  const check = [...L.filter((x) => x.active && !x.account).map((x) => [x, `${x.invited_at ? `Invited ${fmtDay(x.invited_at)}` : "Never invited"} and hasn't set up their account.`, "Send invite"]),
+    ...L.filter((x) => x.active && x.account && x.last_seen_at && Date.now() - new Date(x.last_seen_at) > 10 * 864e5).map((x) => [x, `Last signed in ${agoS(x.last_seen_at)}. Switch the account off if they've left.`, "Edit"])];
+  shell("staff", "Staff &amp; access", `${act.length} active staff account${act.length === 1 ? "" : "s"}${check.length ? `, ${check.length} to check` : ""}. Each person only sees the pages, and the tracks, their role needs.`,
+    `<section class="sc-kpis sc-kpis4">${[["Active staff", act.length, `across ${new Set(act.map((x) => x.role)).size} roles`], ["Not set up yet", act.filter((x) => !x.account).length, "added but no password yet"],
+        ["Signed in this week", `${act.filter(wk).length} of ${act.length}`, `${act.filter((x) => !wk(x)).length} not seen for 7+ days`], ["Full access", L.filter((x) => x.active && ["super", "director"].includes(x.role)).length, "Super Admin and Programme Director"]]
+      .map(([l, v, n]) => `<div class="card sc-kpi"><span class="eyebrow">${l}</span><b class="mono">${v}</b><span class="note">${n}</span></div>`).join("")}</section>
+    <section class="card" style="padding:0;overflow:hidden"><div class="sc-h" style="padding:1.1rem 1.25rem .4rem"><h2>Team</h2>
+        <div class="sc-tabs" role="group" aria-label="Filter by role"><button class="sc-tab" data-act="staff-f" data-k="all" aria-pressed="${f === "all"}">All <span class="mono">${L.length}</span></button>${roles.map((r) => `<button class="sc-tab" data-act="staff-f" data-k="${r}" aria-pressed="${f === r}">${ROLE_NAMES[r]} <span class="mono">${L.filter((x) => x.role === r).length}</span></button>`).join("")}</div></div>
+      <div class="tbl-wrap" style="border:0"><table class="tbl cards"><thead><tr><th>Name</th><th>Role</th><th>Scope</th><th>Workload</th><th>Last sign-in</th><th>Status</th><th></th></tr></thead><tbody>
+      ${shown.map((x) => { const [st, sc] = stat(x), w = load[x.email];
+        return `<tr class="${x.active ? "" : "off"}"><td data-label="Name"><span class="sc-li"><span class="st-av">${staffIni(x.full_name)}</span><span class="sc-p-t"><b>${esc(x.full_name)}</b><span class="note">${esc(x.email)}</span></span></span></td>
+          <td data-label="Role">${ROLE_NAMES[x.role] || x.role}</td><td data-label="Scope" class="note">${scope(x)}</td><td data-label="Workload" class="mono">${w && w.q != null ? `<b>${w.q}</b> <span class="note">${esc(w.what)}</span>` : "—"}</td>
+          <td data-label="Last sign-in" class="note">${x.last_seen_at ? agoS(x.last_seen_at) : "never"}</td><td data-label="Status"><span class="pill ${sc}">${st}</span></td>
+          <td class="sc-row-a">${x.active && !x.account ? `<button class="btn sm ghost" data-act="staff-invite" data-k="${esc(x.email)}">${x.invited_at ? "Resend invite" : "Send invite"}</button>` : ""}<button class="btn sm ghost" data-act="edit-staff" data-email="${esc(x.email)}" data-name="${esc(x.full_name)}" data-role="${x.role}" data-active="${x.active}" data-track="${x.track_code || ""}">Edit</button></td></tr>`; }).join("")}</tbody></table></div></section>
+    <section class="sc-2">
+      <div class="card"><span class="eyebrow">Permissions</span><h2 class="sc-h2">What each role can open</h2><p class="note">Pick a role to highlight it. The database checks the role on every request too, so a page someone can't open also can't be reached by typing its address.</p>
+        <div class="sc-tabs" role="group" aria-label="Highlight a role" style="margin:.7rem 0">${Object.entries(ROLE_NAMES).map(([k, l]) => `<button class="sc-tab" data-act="perm-r" data-k="${k}" aria-pressed="${pr === k}">${l}</button>`).join("")}</div>
+        <div class="tbl-wrap"><table class="tbl perm"><thead><tr><th>Area</th>${Object.entries(ROLE_NAMES).map(([k, l]) => `<th class="${pr === k ? "hi" : ""}" title="${l}">${ROLE_SHORT[k]}</th>`).join("")}</tr></thead>
+          <tbody>${PERM_AREAS.map(([a, ks]) => `<tr><td><b>${a}</b></td>${Object.keys(ROLE_NAMES).map((r) => `<td class="${pr === r ? "hi" : ""}">${cellP(r, ks)}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
+        <p class="note" style="margin-top:.6rem">${Object.entries(ROLE_SHORT).map(([k, v]) => `${v} ${ROLE_NAMES[k]}`).join(" · ")}.<br>“Own track”: a facilitator or career coach with a track only sees students on that track.</p></div>
+      <div class="stack">
+        <form class="card form" id="staff-form" novalidate><span class="eyebrow">Invite</span><h2 class="sc-h2" id="sf-h">Add a staff member</h2>
+          <div class="field"><label for="sf-email">Work email</label><input id="sf-email" placeholder="name@jobnestcareers.com" type="email"></div>
+          <div class="field"><label for="sf-name">Full name</label><input id="sf-name" placeholder="e.g. Folake Adeyemi"></div>
+          <div class="grid2"><div class="field"><label for="sf-role">Role</label><select id="sf-role">${opts}</select></div>
+            <div class="field"><label for="sf-track">Track</label><select id="sf-track"><option value="">All tracks</option>${d.tracks.map((t) => `<option value="${t.code}">${esc(t.name)}</option>`).join("")}</select></div></div>
+          <label class="consent"><input type="checkbox" id="sf-active" checked> Active (can sign in)</label>
+          <label class="consent"><input type="checkbox" id="sf-invite" checked> Email them a link to set up their account</label>
+          <p class="err" id="sf-err" role="alert"></p><div class="actions"><button class="btn" type="submit">Save</button><button class="btn ghost" type="reset">Clear</button></div></form>
+        <div class="card"><span class="eyebrow">Accounts to check</span><h2 class="sc-h2">${check.length ? `${check.length} to look at` : "All accounts look fine"}</h2>
+          ${check.length ? `<ul class="sc-people">${check.map(([x, why, btn]) => `<li><span class="sc-li"><span class="st-av">${staffIni(x.full_name)}</span><span class="sc-p-t"><b>${esc(x.full_name)}</b><span class="note">${why}</span></span>${btn === "Send invite" ? `<button class="btn sm ghost" data-act="staff-invite" data-k="${esc(x.email)}">${x.invited_at ? "Resend" : "Send invite"}</button>` : `<button class="btn sm ghost" data-act="edit-staff" data-email="${esc(x.email)}" data-name="${esc(x.full_name)}" data-role="${x.role}" data-active="${x.active}" data-track="${x.track_code || ""}">Edit</button>`}</span></li>`).join("")}</ul>` : `<p class="note">Everyone has set up their account and signed in recently.</p>`}
+          <a class="link sm" href="#/portal/audit">Activity log: every grade, payment, decision and setting change</a></div></div></section>`,
+    { eyebrow: "Organisation", actions: `<a class="btn" href="#staff-form" data-act="sf-new">Invite staff</a>` });
 }
 
 async function tabAudit() {
@@ -2063,7 +2274,7 @@ async function tabStudents() {
     `<div class="kpis">${[["Students", S.length], ["Accounts set up", `${set}/${S.length}`], ["Waiting for grading", S.reduce((t, s) => t + (ls[s.id]?.to_grade || 0), 0)], ["Average attendance", att.length ? Math.round((att.reduce((a, b) => a + b, 0) / att.length) * 100) + "%" : "–"]].map(([l, v]) => `<div class="kpi card"><span class="eyebrow">${l}</span><b class="mono">${v}</b></div>`).join("")}</div>
     ${canInvite && S.length > set ? `<div class="notice" style="margin-top:1rem"><span>${S.length - set} student${S.length - set === 1 ? " hasn't" : "s haven't"} set up their portal account yet.</span><button class="btn sm" data-act="invite">Email them a set-up link</button></div>` : ""}
     <div class="card" style="margin-top:1rem">${S.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Student</th><th>Track</th><th>Portal</th><th>Progress</th><th>Attendance</th><th>Fees</th><th>Certificate</th></tr></thead><tbody>
-      ${S.map((s) => `<tr><td data-label="Student"><b>${esc(s.first_name)} ${esc(s.surname)}</b><span class="note" style="display:block"><span class="mono">${esc(s.matric)}</span> · ${esc(s.phone)}</span></td><td data-label="Track">${esc(s.track || "")}</td>
+      ${S.map((s) => `<tr><td data-label="Student"><a class="link" href="#/portal/student/${s.id}"><b>${esc(s.first_name)} ${esc(s.surname)}</b></a><span class="note" style="display:block"><span class="mono">${esc(s.matric)}</span> · ${esc(s.phone)}</span></td><td data-label="Track">${esc(s.track || "")}</td>
         <td data-label="Portal">${s.account ? `<span class="pill ok">Set up</span>` : `<span class="pill">${s.invited_at ? `Invited ${fmtDay(s.invited_at)}` : "Not yet"}</span>`}</td>
         <td data-label="Progress" class="mono">${ls[s.id] ? `${ls[s.id].done}/${ls[s.id].total}${ls[s.id].avg != null ? ` · avg ${ls[s.id].avg}%` : ""}${ls[s.id].to_grade ? ` <span class="note">(${ls[s.id].to_grade} to grade)</span>` : ""}` : "–"}</td>
         <td data-label="Attendance" class="mono">${s.sessions_past ? `${s.sessions_attended}/${s.sessions_past}` : "–"}</td><td data-label="Fees">${s.balance ? `<span class="pill bad">Owes ${naira(s.balance)}</span>` : `<span class="pill ok">Paid</span>`}</td>
@@ -2180,6 +2391,7 @@ async function tabNews() {
 document.addEventListener("click", async (e) => {
   if (ui.lsMore && LS && !e.target.closest(".morepanel,#more")) { ui.lsMore = false; lsRender(); }
   if (ui.lsBell && LS && !e.target.closest(".bellpanel,.bell")) { ui.lsBell = false; LS.N.unread = 0; lsRender(); }
+  if (!e.target.closest(".st-search")) { const b = $("#st-qres"); if (b && !b.hidden) b.hidden = true; }
   const t = e.target.closest("[data-act]");
   if (!t) return;
   const a = t.dataset.act, k = t.dataset.k;
@@ -2258,6 +2470,19 @@ document.addEventListener("click", async (e) => {
   if (a === "dp-reply") { ui.dpReply = ui.dpReply === +k ? null : +k; const f = $(`.dp-form[data-parent="${k}"]`); if (f) { f.hidden = ui.dpReply !== +k; if (!f.hidden) f.querySelector("textarea").focus(); } return; }
   if (a === "dp-del") { if (!confirm("Delete your post?")) return; try { await busy(t, () => rpc("disc_delete_mine", { p_id: +k })); lsRender(); } catch { /* shown */ } return; }
   if (a === "dp-hide" || a === "dp-pin") { try { await busy(t, () => rpc("acad_disc_moderate", { p_id: +k, p_hidden: a === "dp-hide" ? t.dataset.v === "1" : null, p_pinned: a === "dp-pin" ? t.dataset.v === "1" : null })); route(); } catch { /* shown */ } return; }
+  if (a === "qtab") { ui.qtab = k; $$(".sc-tab[data-act=qtab]").forEach((b) => b.setAttribute("aria-pressed", b.dataset.k === k)); const l = $(".sc-ql"); if (l && ui.ov) l.innerHTML = queueRows(ui.ov.queue, k); return; }
+  if (a === "sc-refresh") { ui.ov = null; return route(); }
+  if (a === "risk-f") { ui.riskF = k; return route(); }
+  if (a === "fee-remind-all" || a === "s3-remind") {
+    const one = a === "s3-remind" ? ui.s360?.id : null;
+    if (!one && !confirm("Send a payment reminder (email and portal alert) to every student with an overdue balance?")) return;
+    try { const n = await busy(t, () => rpc("acad_fee_remind", { p_app: one })); toast(n ? `Reminder sent to ${n} student${n === 1 ? "" : "s"}` : "No one has an overdue balance"); } catch { /* shown */ } return; }
+  if (a === "s3-tab") { e.preventDefault(); ui.s360t = k; await route(); if (t.getAttribute("href") === "#s3-extend") $("#s3-extend")?.scrollIntoView({ behavior: "smooth" }); return; }
+  if (a === "s3-retake") { if (!confirm(`Give ${ui.s360?.first_name || "this student"} one more attempt at the Week ${k} assessment? They'll get an alert.`)) return;
+    try { await busy(t, () => rpc("acad_grant_retake", { p_app: ui.s360.id, p_week: +k })); toast("One more attempt given"); route(); } catch { /* shown */ } return; }
+  if (a === "s3-unextend") { try { await busy(t, () => rpc("acad_fee_extend", { p_app: ui.s360.id, p_date: null })); toast("Extension removed"); route(); } catch { /* shown */ } return; }
+  if (a === "s3-note-del") { if (!confirm("Delete this note?")) return; try { await busy(t, () => rpc("acad_note_delete", { p_id: +k })); toast("Note deleted"); route(); } catch { /* shown */ } return; }
+  if (a === "sq-app") { ui.q = (t.dataset.ref || "").toLowerCase(); ui.admG = null; return go("#/portal/apps"); }
   if (a === "disc-ch") { ui.discCh = k; return route(); }
   if (a === "opp-f") { ui.oppF = k; return lsRender(); }
   if (a === "opp-save") { const o = draft("opps", {}), sv = { ...(o.saved || {}) }; if (sv[k]) delete sv[k]; else sv[k] = 1; saveDraft("opps", { ...o, saved: sv }, true); return lsRender(); }
@@ -2306,7 +2531,11 @@ document.addEventListener("click", async (e) => {
     return;
   }
   if (a === "extend") { try { await busy(t, () => rpc("admin_extend_offer", { p_id: k, p_days: +t.dataset.days })); toast(`Offer extended by ${t.dataset.days} days. We've emailed them.`); ui.open = k; route(); } catch { /* shown */ } return; }
-  if (a === "edit-staff") { $("#sf-email").value = t.dataset.email; $("#sf-name").value = t.dataset.name; $("#sf-role").value = t.dataset.role; $("#sf-active").checked = t.dataset.active === "true"; $("#sf-track").value = t.dataset.track || ""; $("#sf-name").focus(); return; }
+  if (a === "staff-f") { ui.staffF = k; return route(); }
+  if (a === "perm-r") { ui.permRole = k; return route(); }
+  if (a === "staff-invite") { try { await busy(t, () => rpc("super_staff_invite", { p_email: k })); toast("Invite sent"); route(); } catch { /* shown */ } return; }
+  if (a === "sf-new") { e.preventDefault(); $("#staff-form")?.reset(); $("#sf-h").textContent = "Add a staff member"; $("#staff-form")?.scrollIntoView({ behavior: "smooth" }); setTimeout(() => $("#sf-email")?.focus(), 300); return; }
+  if (a === "edit-staff") { $("#staff-form")?.scrollIntoView({ behavior: "smooth" }); if ($("#sf-h")) $("#sf-h").textContent = "Change " + t.dataset.name; if ($("#sf-invite")) $("#sf-invite").checked = false; $("#sf-email").value = t.dataset.email; $("#sf-name").value = t.dataset.name; $("#sf-role").value = t.dataset.role; $("#sf-active").checked = t.dataset.active === "true"; $("#sf-track").value = t.dataset.track || ""; $("#sf-name").focus(); return; }
 });
 
 document.addEventListener("toggle", async (e) => {
@@ -2337,6 +2566,13 @@ document.addEventListener("input", (e) => {
   if (e.target.dataset?.pitch && LS) { const pt = { ...draft("pitch", {}) }; $$("[data-pitch]").forEach((x) => (pt[x.dataset.pitch] = x.value)); saveDraft("pitch", pt);
     const w = [pt.a, pt.b, pt.c].join(" ").trim().split(/\s+/).filter(Boolean).length; $("#pitch-count").textContent = `${w} words · about ${Math.round(w / 2.3)} seconds spoken (aim for 120–150 words)`; return; }
   if (e.target.dataset?.cr && LS && e.target.type !== "checkbox" && e.target.tagName !== "SELECT") { saveCareer(e.target); return; }
+  if (e.target.id === "st-q") { clearTimeout(ui.sqT); const q = e.target.value.trim(), box = $("#st-qres");
+    if (q.length < 2) { box.hidden = true; return; }
+    ui.sqT = setTimeout(async () => { let r = []; try { r = await rpc("super_search", { p_q: q }); } catch { return; } if ($("#st-q")?.value.trim() !== q) return;
+      box.innerHTML = r.length ? r.map((x) => x.kind === "student" ? `<a class="st-qr" href="#/portal/student/${x.id}"><span class="pill ok">Student</span><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></a>`
+        : x.kind === "staff" ? `<a class="st-qr" href="#/portal/staff"><span class="pill info">Staff</span><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></a>`
+        : `<button class="st-qr" data-act="sq-app" data-ref="${esc(x.sub.split(" · ")[0])}"><span class="pill">Applicant</span><b>${esc(x.title)}</b><small>${esc(x.sub)}</small></button>`).join("") : `<p class="st-qr none">No one matches “${esc(q)}”.</p>`;
+      box.hidden = false; }, 220); return; }
   if (e.target.id === "adm-q") { ui.q = e.target.value.trim().toLowerCase(); applyFilter(); }
 });
 document.addEventListener("change", (e) => {
@@ -2507,6 +2743,16 @@ document.addEventListener("submit", async (e) => {
     try { const R = await busy(f.querySelector("button"), () => rpc("support_create", { p_category: c0, p_subject: sub, p_message: msg })); if (R) { LS.support = R; toast("Request sent. We'll reply within 1 working day."); lsRender(); } } catch { /* shown */ }
     return;
   }
+  if (f.id === "s3-note-form") {
+    const v = $("#s3-note-t").value.trim(); if (!v) return toast("Write the note first");
+    try { await busy(f.querySelector("button"), () => rpc("acad_note_add", { p_app: ui.s360.id, p_body: v })); toast("Note added"); route(); } catch { /* shown */ }
+    return;
+  }
+  if (f.id === "s3-extend") {
+    const v = $("#s3-date").value; if (!v) { $("#s3-ext-err").textContent = "Choose the new due date."; return; }
+    try { await busy(f.querySelector("button[type=submit]"), () => rpc("acad_fee_extend", { p_app: ui.s360.id, p_date: v })); toast("New due date saved. Their learning is open."); route(); } catch (x) { $("#s3-ext-err").textContent = x.message; }
+    return;
+  }
   if (f.id === "opp-form") {
     const v = (id) => $("#" + id).value.trim(), P = { id: f.dataset.id ? +f.dataset.id : null, kind: v("op-kind"), track: v("op-track"), title: v("op-title"), org: v("op-org"), location: v("op-loc"), deadline: v("op-dl"),
       description: v("op-desc"), requirements: v("op-req"), skills: v("op-skills"), link: v("op-link"), active: $("#op-active").checked };
@@ -2640,7 +2886,9 @@ document.addEventListener("submit", async (e) => {
     return;
   }
   if (f.id === "staff-form") {
-    try { await busy(f.querySelector("button"), () => rpc("super_save_staff", { p_email: $("#sf-email").value, p_name: $("#sf-name").value, p_role: $("#sf-role").value, p_active: $("#sf-active").checked, p_track: $("#sf-track").value || null })); toast("Saved"); route(); }
+    try { await busy(f.querySelector("button"), () => rpc("super_save_staff", { p_email: $("#sf-email").value, p_name: $("#sf-name").value, p_role: $("#sf-role").value, p_active: $("#sf-active").checked, p_track: $("#sf-track").value || null }));
+      let sent = false; if ($("#sf-invite")?.checked && $("#sf-active").checked) { try { await rpc("super_staff_invite", { p_email: $("#sf-email").value }); sent = true; } catch { /* shown */ } }
+      toast(sent ? "Saved and invite sent" : "Saved"); route(); }
     catch (x) { $("#sf-err").textContent = x.message; }
   }
 });
@@ -2814,7 +3062,7 @@ async function route() {
       if (auth.session && isStudent()) { await auth.signOut(); CAMPUS = null; LS = null; return pageStaffSignIn("You were signed in to the student portal on this browser, so we signed you out. Sign in with your staff email."); }
       return auth.session ? go("#/portal") : pageStaffSignIn();
     }
-    if (p0 === "portal") return pagePortal(p1 || "");
+    if (p0 === "portal") return pagePortal(p1 || "", p2);
     if (p0 === "learn") {
       if (p1 === "signin") return auth.session && isStudent() ? go("#/learn") : pageLearnSignIn();
       if (p1 === "forgot") return pageLearnForgot();
