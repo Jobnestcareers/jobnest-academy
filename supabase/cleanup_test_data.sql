@@ -1,6 +1,7 @@
 -- Jobnest Academy: clear TEST data before launch.
 -- Deletes every application and everything attached to it, so the first real student gets GEP/27A/001.
--- KEEPS: staff accounts, settings, programme, cohort, tracks, the readiness question bank and email templates.
+-- Also clears portal work: progress, quizzes, logbooks, placements, pods, discussion, help requests, alerts, coach times.
+-- KEEPS: staff accounts, settings, programme, cohort, tracks, course content, question banks and email templates.
 -- Run ONLY before real applicants arrive. This cannot be undone.
 
 -- 1. Check first: run just this SELECT to see what would be deleted.
@@ -23,6 +24,9 @@ delete from payments;
 delete from outbox;
 delete from app_events;
 delete from slots;
+delete from coach_slots;
+delete from discussion_posts;
+delete from pods;
 delete from applications;
 delete from announcements;
 delete from sessions;

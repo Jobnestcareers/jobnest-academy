@@ -1,4 +1,4 @@
-// Every minute: expires unpaid offers, queues reminders, then sends queued admissions emails.
+// Every minute: expires unpaid offers, queues reminders (admissions and student portal), then sends queued emails.
 // Needs these Netlify environment variables (Site configuration → Environment variables):
 //   RESEND_API_KEY        secret key from resend.com
 //   SUPABASE_SECRET_KEY   Supabase secret key (sb_secret_...) — never put this in the code
@@ -19,6 +19,9 @@ export async function sendQueued({ fetchFn = fetch, env = process.env, limit = 2
   let jobs = null;
   try { const t = await db("rpc/jobs_tick", { method: "POST", body: "{}", headers: { Prefer: "return=representation" } }); jobs = t.ok ? await t.json().catch(() => null) : `jobs ${t.status}`; }
   catch (e) { jobs = String(e.message || e); }
+  // Student reminders (deadlines, check-ins, new weeks, live classes): alerts in the portal plus emails.
+  try { const t = await db("rpc/learn_reminders_tick", { method: "POST", body: "{}", headers: { Prefer: "return=representation" } }); jobs = { jobs, reminders: t.ok ? await t.json().catch(() => null) : `reminders ${t.status}` }; }
+  catch (e) { jobs = { jobs, reminders: String(e.message || e) }; }
   const res = await db(`outbox?select=id,to_email,subject,body,link,cta,attempts&sent_at=is.null&attempts=lt.${MAX_ATTEMPTS}&order=created_at.asc&limit=${limit}`);
   if (!res.ok) return { error: `Could not read the outbox: ${res.status} ${await res.text()}` };
   const rows = await res.json();
