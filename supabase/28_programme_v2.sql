@@ -54,6 +54,10 @@ delete from tracks where code in ('ADM', 'CSP', 'DAT', 'DMK');
 
 -- Fee for the 20-week programme: ₦180,000 in full, or ₦190,000 in two parts (₦95,000 + ₦95,000).
 -- 6% extra gives ₦190,800, which update 27 rounds to the nearest ₦5,000: ₦190,000. Staff can still change both in Settings.
+-- Certificates and admission letters are signed by the Programme Director, Shekemi Odeyemi.
+insert into app_settings(key, value) values ('signer_name', 'Shekemi Odeyemi'), ('signer_title', 'Programme Director')
+  on conflict (key) do update set value = excluded.value;
+
 update programmes set weeks = 20, fee = 180000, inst_pct = 6,
   tagline = 'From graduate to work-ready in 20 weeks: core skills, examinations, a practical project, an internship and job-search coaching.'
 where code = 'GEP';

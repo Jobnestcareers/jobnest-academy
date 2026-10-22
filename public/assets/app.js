@@ -171,7 +171,7 @@ function pageHome() {
         <li><b>A practical project</b><span>In your portfolio, graded with feedback you can show employers.</span></li>
         <li><b>Internship experience</b><span>Four weeks with a partner company.</span></li>
         <li><b>A job-ready CV and LinkedIn</b><span>Reviewed with your Career Coach.</span></li></ul>
-        <div class="nl-certwrap"><div class="cert-box nl-cert" aria-label="Example certificate">${certHTML({ name: "Aiden Ivwurie", programme: p.name || "Graduate Employability Programme", weeks, track: "", class: "Merit", completed_on: null, cert_id: "JNA-GEP27A-001", signer_name: INFO.signer_name || "Shekemi Odeyemi", signer_title: INFO.signer_title || "Programme Director", year: String(new Date().getFullYear() + 1) })}</div></div>
+        <div class="nl-certwrap"><div class="cert-box nl-cert" aria-label="Example certificate">${certHTML({ name: "Aiden Ivwurie", programme: p.name || "Graduate Employability Programme", weeks, track: "Business Operations", class: "Merit", completed_on: null, cert_id: "JNA-GEP27A-001", signer_name: INFO.signer_name || "Shekemi Odeyemi", signer_title: INFO.signer_title || "Programme Director", year: String(new Date().getFullYear() + 1) })}</div></div>
       </div></div></section>
     <section class="nl-route"><div class="wrap"><div class="nl-route-h"><h2 class="nl-h2">The ${weeks} weeks.</h2><a class="nl-more" href="#/tracks">See what you can learn →</a></div>
       <ol class="nl-weeks">${ROUTE_STOPS.map(([w, t], i) => `<li class="${i === ROUTE_STOPS.length - 1 ? "end" : ""}"><span>${w}</span><b>${t}</b></li>`).join("")}</ol></div></section>
@@ -3532,27 +3532,52 @@ document.addEventListener("submit", async (e) => {
 
 
 /* ---------- certificate ---------- */
-const CERT_SEAL = `<svg width="210" height="210" viewBox="0 0 210 210" aria-hidden="true"><defs><path id="cring" d="M105 105 m-78 0 a78 78 0 1 1 156 0 a78 78 0 1 1 -156 0"/></defs>
-  <circle cx="105" cy="105" r="100" fill="#FFFFFF" stroke="#F4B740" stroke-width="3"/><circle cx="105" cy="105" r="93" fill="none" stroke="#10263D" stroke-width="1.5" stroke-dasharray="2 4"/>
-  <circle cx="105" cy="105" r="62" fill="none" stroke="#10263D" stroke-width="1.5"/>
-  <text font-family="DM Sans, sans-serif" font-size="14" font-weight="700" letter-spacing="3.2" fill="#10263D"><textPath href="#cring">JOBNEST ACADEMY · BECOME WORK-READY ·</textPath></text>
-  <g transform="translate(83 72) scale(1.22)"><rect width="36" height="36" rx="10" fill="#0F7B6C"/><path d="M8 20c1.5 6 18.5 6 20 0" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="18" cy="14" r="4.2" fill="#F4B740"/></g>`;
-const CERT_WAVES = Array.from({ length: 35 }, (_, i) => { const y = 40 + i * 22; return `<path d="M0 ${y} Q 140 ${y - 30} 280 ${y} T 560 ${y} T 840 ${y} T 1120 ${y}" fill="none" stroke="#0F7B6C" stroke-opacity="0.05" stroke-width="1"/>`; }).join("");
+// One design for every class of award. The class sets the colour and the stars on the seal; a Fail never gets a certificate.
+const CERT_LOOK = { Distinction: ["#9A6B00", "★★★"], Merit: ["#0B5E53", "★★"], Pass: ["#10263D", "★"] };
+const CERT_STAGES = ["Orientation", "Fundamentals", "Core Skills", "Examinations", "Project", "Internship", "CV & Portfolio", "Discovery Call"];
+const CERT_ROSETTE = Array.from({ length: 48 }, (_, i) => { const a = Math.PI * 2 * i / 48 - Math.PI / 2, r = i % 2 ? 96 : 108;
+  return `${(110 + r * Math.cos(a)).toFixed(1)},${(110 + r * Math.sin(a)).toFixed(1)}`; }).join(" ");
+const CERT_LOGO = `<rect width="36" height="36" rx="10" fill="#0F7B6C"/><path d="M8 20c1.5 6 18.5 6 20 0" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="18" cy="14" r="4.2" fill="#F4B740"/>`;
+function certInfo(c) {
+  const intern = c.kind === "internship", look = intern ? ["#0B5E53", ""] : (CERT_LOOK[c.class] || ["#0B5E53", ""]);
+  const name = c.name || "", n = name.length;
+  return { intern, acc: look[0], stars: look[1], award: intern ? "" : (CERT_LOOK[c.class] ? c.class : ""),
+    nameSize: n > 30 ? 42 : n > 24 ? 50 : 60,
+    ring: intern ? "INTERNSHIP · JOBNEST ACADEMY ·" : `${(CERT_LOOK[c.class] ? c.class : "GRADUATE").toUpperCase()} · JOBNEST ACADEMY · GEP ·`,
+    done: c.completed_on ? fmtDateD(c.completed_on).replace(/^\w+ /, "") : "",
+    year: c.year || String(new Date().getFullYear()) };
+}
+// Body text as runs, so the page and the PDF say exactly the same thing.
+function certRuns(c) {
+  if (c.kind === "internship") return [["has completed a 4-week internship as ", 0], [c.role || "", 1], [" at ", 0], [c.org || "", 1], [`${c.sup_name ? `, supervised by ${c.sup_name}` : ""}.`, 0]];
+  return [[`has completed the ${c.weeks || 20}-week `, 0], [c.programme || "Graduate Employability Programme", 1], ...(c.track ? [[" in ", 0], [c.track, 1]] : []),
+    [", including examinations, a practical project, an internship and a Discovery Call with a career coach.", 0]];
+}
 function certHTML(c) {
-  const done = c.completed_on ? fmtDateD(c.completed_on).replace(/^\w+ /, "") : "";
-  return `<div class="cert"><div class="cert-in">
-    <svg class="cert-bg" viewBox="0 0 1120 800" preserveAspectRatio="none" aria-hidden="true">${CERT_WAVES}</svg>
+  const k = certInfo(c);
+  return `<div class="cert" style="--acc:${k.acc}"><div class="cert-in">
+    <svg class="cert-rings" width="620" height="620" viewBox="0 0 620 620" aria-hidden="true"><g fill="none" stroke="#0F7B6C" stroke-width="1.2">${[300, 270, 240, 210, 180, 150, 120, 90].map((r) => `<circle cx="310" cy="310" r="${r}"/>`).join("")}</g></svg>
+    <div class="cert-top"><span class="cert-logo"><svg width="46" height="46" viewBox="0 0 36 36" aria-hidden="true">${CERT_LOGO}</svg><span><b>Jobnest</b><span>Academy</span></span></span><span class="cert-no">No. ${esc(c.cert_id || "")}</span></div>
     <div class="cert-main">
-      <div class="cert-logo"><svg width="64" height="64" viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" rx="10" fill="#0F7B6C"/><path d="M8 20c1.5 6 18.5 6 20 0" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="18" cy="14" r="4.2" fill="#F4B740"/></svg><span>Jobnest<br><span>Academy</span></span></div>
-      <span class="cert-date">${esc(done)}</span>
-      <span class="cert-name">${esc(c.name)}</span>
-      <span class="cert-sm">${c.kind === "internship" ? "has successfully completed an internship as" : "has successfully completed"}</span>
-      <span class="cert-prog">${esc(c.kind === "internship" ? c.role : c.programme)}</span>${c.kind !== "internship" && c.class ? `<span class="cert-class">${esc(c.class)}</span>` : ""}
-      <span class="cert-sm">${c.kind === "internship" ? `at ${esc(c.org)} · 4 weeks · supervised by ${esc(c.sup_name)}` : `${c.track ? `${esc(c.track)} track · ` : ""}a ${c.weeks || 20}-week online programme by Jobnest Academy`}</span>
+      <span class="cert-eyebrow">Certificate of ${k.intern ? "Internship" : "Completion"}</span>
+      <span class="cert-sm">This certifies that</span>
+      <span class="cert-name" style="font-size:${k.nameSize}px">${esc(c.name)}</span>
+      <span class="cert-body">${certRuns(c).map(([t, b]) => b ? `<b>${esc(t)}</b>` : esc(t)).join("")}</span>
+      ${k.award ? `<span class="cert-award"><i>awarded with</i><span class="cert-class">${esc(k.award)}</span></span>` : ""}
     </div>
-    <div class="cert-sig"><img src="/assets/signature-pd.png" alt="Signature of ${esc(c.signer_name)}"><span class="cert-line"></span><b>${esc(c.signer_name)}</b><span>${esc(c.signer_title)}, Jobnest Academy</span></div>
-    <div class="cert-ribbon"><span class="cert-title">CERTIFICATE<br>OF<br>${c.kind === "internship" ? "INTERNSHIP" : "COMPLETION"}</span><i></i><div class="cert-seal">${CERT_SEAL}<text x="105" y="140" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#10263D">${esc(c.year || "")}</text></svg></div></div>
-    <div class="cert-verify">Verify at ${esc(location.host)}/verify/<b>${esc(c.cert_id)}</b><br>Jobnest Academy confirms this person completed the ${c.kind === "internship" ? "internship" : "programme"}.</div>
+    <svg class="cert-seal" role="img" aria-label="${esc(k.award || (k.intern ? "Internship" : "Jobnest Academy"))} seal" width="220" height="220" viewBox="0 0 220 220">
+      <defs><path id="cert-ring" d="M110,110 m-68,0 a68,68 0 1,1 136,0 a68,68 0 1,1 -136,0"/></defs>
+      <polygon points="${CERT_ROSETTE}" fill="${k.acc}"/><circle cx="110" cy="110" r="88" fill="#FBF8F1"/><circle cx="110" cy="110" r="84" fill="none" stroke="${k.acc}" stroke-width="2"/><circle cx="110" cy="110" r="54" fill="${k.acc}"/>
+      <text font-family="DM Sans, sans-serif" font-size="11.5" font-weight="700" letter-spacing="3.2" fill="${k.acc}"><textPath href="#cert-ring" startOffset="2%">${esc(k.ring)}</textPath></text>
+      ${k.stars ? `<text x="110" y="104" text-anchor="middle" font-family="DM Sans, sans-serif" font-size="22" font-weight="700" fill="#FFFFFF">${k.stars}</text><text x="110" y="132" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="15" font-weight="700" fill="#FFFFFF">${esc(k.year)}</text>`
+        : `<g transform="translate(92 76)">${CERT_LOGO}</g><text x="110" y="138" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="14" font-weight="700" fill="#FFFFFF">${esc(k.year)}</text>`}
+    </svg>
+    ${k.intern ? "" : `<ol class="cert-route" aria-label="The route completed">${CERT_STAGES.map((s, i) => `<li class="${i === CERT_STAGES.length - 1 ? "end" : ""}"><i></i>${esc(s)}</li>`).join("")}</ol>`}
+    <div class="cert-foot">
+      <div class="cert-sig"><img src="/assets/signature-pd.png" alt="Signature of ${esc(c.signer_name || "")}"><span class="cert-line"></span><b>${esc(c.signer_name || "")}</b><span>${esc(c.signer_title || "Programme Director")}, Jobnest Academy</span></div>
+      <div class="cert-when">${k.done ? `<b>Completed ${esc(k.done)}</b>` : `<b>${esc(k.intern ? "Internship" : c.programme || "Graduate Employability Programme")}</b>`}<span>${k.intern ? "4 weeks" : `${c.weeks || 20} weeks · online`}</span></div>
+      <div class="cert-verify"><b>Verify this certificate</b><span>${esc(location.host)}/verify</span><span class="mono">${esc(c.cert_id || "")}</span></div>
+    </div>
   </div></div>`;
 }
 function fitCert() {
@@ -3596,59 +3621,83 @@ async function pageCertificate(code) {
 
 /* Draws the certificate on a canvas (same layout as the page) and saves it as a one-page A4 PDF. */
 async function certCanvas(c, k = 2) {
-  const fonts = ['500 46px "Playfair Display"', 'italic 500 20px "Playfair Display"', '800 40px "Bricolage Grotesque"', '400 16px "DM Sans"', '700 16px "DM Sans"', '700 14px "JetBrains Mono"'];
+  const fonts = ['800 60px "Bricolage Grotesque"', 'italic 500 22px "Bricolage Grotesque"', '400 17px "DM Sans"', '700 17px "DM Sans"', '600 13px "DM Sans"', '500 12px "JetBrains Mono"', '700 15px "JetBrains Mono"'];
   try { await Promise.all(fonts.map((f) => document.fonts.load(f))); } catch { /* fall back to system fonts */ }
   const sig = await new Promise((res) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = "/assets/signature-pd.png"; });
-  const W = 1123, H = 794, cv = document.createElement("canvas"); cv.width = W * k; cv.height = H * k;
+  const ci = certInfo(c), A = ci.acc, W = 1123, H = 794, cv = document.createElement("canvas"); cv.width = W * k; cv.height = H * k;
   const x = cv.getContext("2d"); x.scale(k, k); x.textBaseline = "alphabetic";
   const F = (f) => (x.font = f);
-  x.fillStyle = "#EEF1F0"; x.fillRect(0, 0, W, H);
-  const ox = 14, oy = 14, iw = W - 28, ih = H - 28;
-  x.fillStyle = "#FFFFFF"; x.fillRect(ox, oy, iw, ih); x.strokeStyle = "#C9D6D2"; x.lineWidth = 1; x.strokeRect(ox + .5, oy + .5, iw - 1, ih - 1);
-  x.save(); x.beginPath(); x.rect(ox, oy, iw, ih); x.clip();
-  x.strokeStyle = "rgba(15,123,108,0.05)"; const sx = iw / 1120, sy = ih / 800;
-  for (let y = 40; y < 800; y += 22) { x.beginPath(); x.moveTo(ox, oy + y * sy); for (let s0 = 0; s0 < 1120; s0 += 280) { const up = (s0 / 280) % 2 === 0 ? -30 : 30; x.quadraticCurveTo(ox + (s0 + 140) * sx, oy + (y + up) * sy, ox + (s0 + 280) * sx, oy + y * sy); } x.stroke(); }
-  const L = ox + 90;
-  // logo
+  const spaced = (t, px, py, ls) => { for (const ch of t) { x.fillText(ch, px, py); px += x.measureText(ch).width + ls; } return px; };
+  // paper, frame and rules
+  x.fillStyle = "#10263D"; x.fillRect(0, 0, W, H); x.fillStyle = "#FBF8F1"; x.fillRect(16, 16, W - 32, H - 32);
+  x.save(); x.beginPath(); x.rect(16, 16, W - 32, H - 32); x.clip();
+  x.globalAlpha = .13; x.strokeStyle = "#0F7B6C"; x.lineWidth = 1.2;
+  for (let r = 90; r <= 300; r += 30) { x.beginPath(); x.arc(W + 170 - 310, -150 + 310, r, 0, Math.PI * 2); x.stroke(); }
+  x.globalAlpha = 1; x.restore();
+  x.strokeStyle = A; x.lineWidth = 1.5; x.strokeRect(26.75, 26.75, W - 53.5, H - 53.5);
+  x.globalAlpha = .5; x.lineWidth = .75; x.strokeRect(31.4, 31.4, W - 62.8, H - 62.8); x.globalAlpha = 1;
+  // logo and number
   const logo = (lx, ly, s) => { x.save(); x.translate(lx, ly); x.scale(s / 36, s / 36); x.fillStyle = "#0F7B6C"; x.beginPath(); x.roundRect(0, 0, 36, 36, 10); x.fill();
     x.strokeStyle = "#FFFFFF"; x.lineWidth = 2.6; x.lineCap = "round"; x.beginPath(); x.moveTo(8, 20); x.bezierCurveTo(9.5, 26, 26.5, 26, 28, 20); x.stroke();
     x.fillStyle = "#F4B740"; x.beginPath(); x.arc(18, 14, 4.2, 0, Math.PI * 2); x.fill(); x.restore(); };
-  logo(L, oy + 80, 64);
-  F('800 40px "Bricolage Grotesque", sans-serif'); x.fillStyle = "#10263D"; x.fillText("Jobnest", L + 80, oy + 108); x.fillStyle = "#0F7B6C"; x.fillText("Academy", L + 80, oy + 150);
-  const done = c.completed_on ? fmtDateD(c.completed_on).replace(/^\w+ /, "") : "";
-  F('700 14px "JetBrains Mono", monospace'); x.fillStyle = "#5B6B7B"; x.fillText(done, L, oy + 226);
-  F('500 46px "Playfair Display", serif'); x.fillStyle = "#10263D"; let nf = 46; while (x.measureText(c.name).width > 600 && nf > 28) { nf -= 2; F(`500 ${nf}px "Playfair Display", serif`); } x.fillText(c.name, L, oy + 290);
-  F('400 16px "DM Sans", sans-serif'); x.fillStyle = "#3E5266"; x.fillText(c.kind === "internship" ? "has successfully completed an internship as" : "has successfully completed", L, oy + 332);
-  F('500 28px "Playfair Display", serif'); x.fillStyle = "#10263D"; x.fillText(c.kind === "internship" ? c.role : c.programme, L, oy + 374);
-  F('400 16px "DM Sans", sans-serif'); x.fillStyle = "#3E5266"; x.fillText(c.kind === "internship" ? `at ${c.org} · 4 weeks · supervised by ${c.sup_name}` : `${c.track ? `${c.track} track · ` : ""}a ${c.weeks || 20}-week online programme by Jobnest Academy`, L, oy + 408);
-  // signature
-  const sb = oy + ih - 80, lineY = sb - 46;
-  x.strokeStyle = "#9AAAB9"; x.lineWidth = 1.5; x.beginPath(); x.moveTo(L, lineY); x.lineTo(L + 260, lineY); x.stroke();
-  if (sig) { const h = 92, w = sig.width * h / sig.height; x.drawImage(sig, L + 130 - w / 2, lineY + 8 - h, w, h); }
-  F('700 15px "DM Sans", sans-serif'); x.fillStyle = "#10263D"; x.fillText(c.signer_name || "", L, lineY + 26);
-  F('400 13px "DM Sans", sans-serif'); x.fillStyle = "#5B6B7B"; x.fillText(`${c.signer_title || "Programme Director"}, Jobnest Academy`, L, lineY + 45);
-  // ribbon
-  const rx = ox + iw - 70 - 270, rw = 270, rh = 640;
-  x.fillStyle = "#10263D"; x.beginPath(); x.moveTo(rx, oy); x.lineTo(rx + rw, oy); x.lineTo(rx + rw, oy + rh); x.lineTo(rx + rw / 2, oy + rh * .88); x.lineTo(rx, oy + rh); x.closePath(); x.fill();
-  F('500 26px "Playfair Display", serif'); x.fillStyle = "#FFFFFF"; x.textAlign = "center";
-  const spaced = (t, cx, cy) => { const ls = 26 * .14; const w = [...t].reduce((a, ch) => a + x.measureText(ch).width + ls, -ls); let px = cx - w / 2; x.textAlign = "left"; for (const ch of t) { x.fillText(ch, px, cy); px += x.measureText(ch).width + ls; } x.textAlign = "center"; };
-  spaced("CERTIFICATE", rx + rw / 2, oy + 100); spaced("OF", rx + rw / 2, oy + 135); spaced(c.kind === "internship" ? "INTERNSHIP" : "COMPLETION", rx + rw / 2, oy + 170);
-  x.fillStyle = "#F4B740"; x.beginPath(); x.roundRect(rx + rw / 2 - 28, oy + 197, 56, 4, 2); x.fill();
+  const L = 76, R = W - 76;
+  logo(L, 64, 46);
+  F('800 22px "Bricolage Grotesque", sans-serif'); x.fillStyle = "#10263D"; x.fillText("Jobnest", L + 58, 85);
+  F('600 13px "DM Sans", sans-serif'); x.fillStyle = "#0B5E53"; spaced("ACADEMY", L + 58, 103, 2.1);
+  F('500 12px "JetBrains Mono", monospace'); x.fillStyle = "#5B6B7B"; x.textAlign = "right"; x.fillText(`No. ${c.cert_id || ""}`, R, 92); x.textAlign = "left";
+  // main text
+  F('700 13px "DM Sans", sans-serif'); x.fillStyle = "#0B5E53"; spaced(`CERTIFICATE OF ${ci.intern ? "INTERNSHIP" : "COMPLETION"}`, L, 164, 3.1);
+  F('400 17px "DM Sans", sans-serif'); x.fillStyle = "#3E5266"; x.fillText("This certifies that", L, 196);
+  let ns = ci.nameSize; F(`800 ${ns}px "Bricolage Grotesque", sans-serif`); while (x.measureText(c.name || "").width > 660 && ns > 30) { ns -= 2; F(`800 ${ns}px "Bricolage Grotesque", sans-serif`); }
+  x.fillStyle = "#10263D"; x.fillText(c.name || "", L, 210 + ns * .86);
+  // body: word-wrapped runs, bold where the page is bold
+  const words = certRuns(c).flatMap(([t, b]) => t.split(/(\s+)/).filter(Boolean).map((w) => [w, b]));
+  let lx = L, ly = 210 + ns + 40; const maxX = L + 660;
+  for (const [w, b] of words) {
+    F(`${b ? 700 : 400} 17px "DM Sans", sans-serif`); const ww = x.measureText(w).width;
+    if (/^\s+$/.test(w)) { if (lx > L) lx += ww; continue; }
+    if (lx + ww > maxX && lx > L) { lx = L; ly += 25.5; }
+    x.fillStyle = b ? "#10263D" : "#3E5266"; x.fillText(w, lx, ly); lx += ww;
+  }
+  if (ci.award) {
+    const ay = ly + 84; F('italic 500 22px "Bricolage Grotesque", sans-serif'); x.fillStyle = "#3E5266"; x.fillText("awarded with", L, ay);
+    const aw = x.measureText("awarded with").width; F('800 72px "Bricolage Grotesque", sans-serif'); x.fillStyle = A; x.fillText(ci.award, L + aw + 14, ay);
+  }
   // seal
-  const cx = rx + rw / 2, cy = oy + 375;
-  x.fillStyle = "#FFFFFF"; x.beginPath(); x.arc(cx, cy, 100, 0, Math.PI * 2); x.fill(); x.strokeStyle = "#F4B740"; x.lineWidth = 3; x.stroke();
-  x.strokeStyle = "#10263D"; x.lineWidth = 1.5; x.setLineDash([2, 4]); x.beginPath(); x.arc(cx, cy, 93, 0, Math.PI * 2); x.stroke(); x.setLineDash([]);
-  x.beginPath(); x.arc(cx, cy, 62, 0, Math.PI * 2); x.stroke();
-  F('700 14px "DM Sans", sans-serif'); x.fillStyle = "#10263D"; x.textAlign = "center";
-  const ring = "JOBNEST ACADEMY · BECOME WORK-READY · "; let ang = Math.PI;
-  for (const ch of ring) { const wch = x.measureText(ch).width + 3.2; const a1 = ang + (wch / 2) / 78; x.save(); x.translate(cx + 78 * Math.cos(a1), cy + 78 * Math.sin(a1)); x.rotate(a1 + Math.PI / 2); x.fillText(ch, 0, 5); x.restore(); ang += wch / 78; }
-  logo(cx - 22, cy - 33, 44);
-  F('700 12px "JetBrains Mono", monospace'); x.fillText(c.year || String(new Date().getFullYear()), cx, cy + 35);
-  // verify
-  x.textAlign = "right"; F('400 13px "DM Sans", sans-serif'); x.fillStyle = "#5B6B7B";
-  const vr = ox + iw - 70; F('700 13px "JetBrains Mono", monospace'); const cw = x.measureText(c.cert_id).width; x.fillStyle = "#10263D"; x.fillText(c.cert_id, vr, oy + ih - 62);
-  F('400 13px "DM Sans", sans-serif'); x.fillStyle = "#5B6B7B"; x.fillText(`Verify at ${location.host}/verify/`, vr - cw, oy + ih - 62); x.fillText(`Jobnest Academy confirms this person completed the ${c.kind === "internship" ? "internship" : "programme"}.`, vr, oy + ih - 41);
-  x.restore();
+  const sx = W - 92 - 110, sy = 196 + 110;
+  x.fillStyle = A; x.beginPath(); CERT_ROSETTE.split(" ").forEach((p, i) => { const [px, py] = p.split(",").map(Number); x[i ? "lineTo" : "moveTo"](sx - 110 + px, sy - 110 + py); }); x.closePath(); x.fill();
+  x.fillStyle = "#FBF8F1"; x.beginPath(); x.arc(sx, sy, 88, 0, Math.PI * 2); x.fill();
+  x.strokeStyle = A; x.lineWidth = 2; x.beginPath(); x.arc(sx, sy, 84, 0, Math.PI * 2); x.stroke();
+  x.fillStyle = A; x.beginPath(); x.arc(sx, sy, 54, 0, Math.PI * 2); x.fill();
+  F('700 11.5px "DM Sans", sans-serif'); x.textAlign = "center"; let ang = Math.PI + (2 * Math.PI * .02);
+  for (const ch of ci.ring) { const wch = x.measureText(ch).width + 3.2, a1 = ang + (wch / 2) / 68; x.save(); x.translate(sx + 68 * Math.cos(a1), sy + 68 * Math.sin(a1)); x.rotate(a1 + Math.PI / 2); x.fillText(ch, 0, 0); x.restore(); ang += wch / 68; }
+  x.fillStyle = "#FFFFFF";
+  if (ci.stars) { F('700 22px "DM Sans", sans-serif'); x.fillText(ci.stars, sx, sy - 6); F('700 15px "JetBrains Mono", monospace'); x.fillText(ci.year, sx, sy + 22); }
+  else { logo(sx - 18, sy - 34, 36); F('700 14px "JetBrains Mono", monospace'); x.fillStyle = "#FFFFFF"; x.fillText(ci.year, sx, sy + 28); }
+  // route
+  if (!ci.intern) {
+    const ry = 558, colW = (R - L - 42) / 8;
+    x.strokeStyle = A; x.lineWidth = 2; x.setLineDash([8, 6]); x.beginPath(); x.moveTo(L + 10, ry + 1); x.lineTo(R - 10, ry + 1); x.stroke(); x.setLineDash([]);
+    F('600 11px "DM Sans", sans-serif');
+    CERT_STAGES.forEach((s, i) => { const cx = L + i * (colW + 6) + colW / 2, end = i === CERT_STAGES.length - 1;
+      x.fillStyle = "#FBF8F1"; x.beginPath(); x.arc(cx, ry, end ? 16 : 14, 0, Math.PI * 2); x.fill();
+      if (end) { x.fillStyle = A; x.beginPath(); x.arc(cx, ry, 16, 0, Math.PI * 2); x.fill(); x.fillStyle = "#FBF8F1"; x.beginPath(); x.arc(cx, ry, 14, 0, Math.PI * 2); x.fill(); }
+      x.fillStyle = end ? "#F4B740" : A; x.beginPath(); x.arc(cx, ry, 10, 0, Math.PI * 2); x.fill();
+      x.fillStyle = "#3E5266"; x.fillText(s, cx, ry + 30); });
+  }
+  // signature, completion, verify
+  const lineY = 695; x.textAlign = "left";
+  if (sig) { const h = 80, w = sig.width * h / sig.height; x.drawImage(sig, L + 20, lineY + 10 - h, w, h); }
+  x.strokeStyle = "#10263D"; x.lineWidth = 1.5; x.beginPath(); x.moveTo(L, lineY); x.lineTo(L + 250, lineY); x.stroke();
+  F('700 14px "DM Sans", sans-serif'); x.fillStyle = "#10263D"; x.fillText(c.signer_name || "", L, lineY + 20);
+  F('400 12px "DM Sans", sans-serif'); x.fillStyle = "#5B6B7B"; x.fillText(`${c.signer_title || "Programme Director"}, Jobnest Academy`, L, lineY + 38);
+  x.textAlign = "center"; F('700 14px "DM Sans", sans-serif'); x.fillStyle = "#10263D";
+  x.fillText(ci.done ? `Completed ${ci.done}` : (ci.intern ? "Internship" : c.programme || "Graduate Employability Programme"), W / 2, lineY + 20);
+  F('400 12px "DM Sans", sans-serif'); x.fillStyle = "#5B6B7B"; x.fillText(ci.intern ? "4 weeks" : `${c.weeks || 20} weeks · online`, W / 2, lineY + 38);
+  x.textAlign = "right"; F('700 12px "DM Sans", sans-serif'); x.fillStyle = "#10263D"; x.fillText("Verify this certificate", R, lineY + 4);
+  F('400 11px "DM Sans", sans-serif'); x.fillStyle = "#5B6B7B"; x.fillText(`${location.host}/verify`, R, lineY + 21);
+  F('500 12px "JetBrains Mono", monospace'); x.fillStyle = "#10263D"; x.fillText(c.cert_id || "", R, lineY + 38);
+  x.textAlign = "left";
   return cv;
 }
 function jpegToPdf(jpeg, w, h) {
