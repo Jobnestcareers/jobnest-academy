@@ -220,7 +220,7 @@ function pageApply() {
     <div class="field"><label for="g-nysc">NYSC status</label>${select("g-nysc", ["Completed", "Currently serving", "Exempted", "Not yet"])}</div></div>
     <div class="field"><label for="g-sit">Which best describes you now?</label>${select("g-sit", ["Final-year student", "Recent graduate", "Currently serving (NYSC)"])}</div>
     <h3>Readiness</h3>
-    <div class="field"><span class="lbl">Can you commit at least 15 hours a week for ${prog().weeks || 17} weeks?</span>${radios("g-hours", ["Yes", "Not sure", "No"])}</div>
+    <div class="field"><span class="lbl">Can you commit at least 15 hours a week for ${prog().weeks || 20} weeks?</span>${radios("g-hours", ["Yes", "Not sure", "No"])}</div>
     <div class="grid2"><div class="field"><span class="lbl">Do you have a laptop?</span>${radios("g-laptop", ["Yes", "No"])}</div>
     <div class="field"><span class="lbl">Reliable internet?</span>${radios("g-net", ["Yes", "Sometimes", "No"])}</div></div>
     <div class="field"><label for="g-mot">What would you like to be doing in 6 months? <span class="note" style="font-weight:400">A sentence or two. “Not sure yet” is a fine answer.</span></label><textarea id="g-mot" placeholder="e.g. Working as a junior data analyst in a fintech company" rows="3" maxlength="2000">${esc(zGoal)}</textarea></div>
