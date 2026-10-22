@@ -33,16 +33,16 @@ for t in tracks:
         matric = f"GEP/27A/{100 + n:03d}"
         plan = "two" if random.random() < 0.42 else "full"
         overdue = plan == "two" and random.random() < 0.25
-        paid = 85000 if plan == "full" else (45000 if overdue else 90000)
+        paid = 180000 if plan == "full" else (95000 if overdue else 190000)
         aid = sql(f"""insert into applications(ref, cohort_id, first_name, surname, email, phone, city, edu, nysc, situation, hours, laptop, internet, motivation, status,
             score, score_digital, score_comms, track_code, matric, plan, paid_total, admitted_at, created_at, dc1_at, dc1_note, account_set_at)
             values ('JNA-27-{random.randint(100000, 999999)}', {c}, {lit(fn)}, {lit(ln)}, '{fn.lower()}.{ln.lower()}{n}@example.com', '+23480{random.randint(10000000, 99999999)}', {lit(random.choice(CITIES))},
             'BSc', 'Completed', 'Graduate looking for work', 'Yes', 'Yes', 'Yes', 'I want a job in this field.', 'Admitted', {random.randint(62, 96)}, {random.randint(60, 100)}, {random.randint(60, 100)},
             '{t}', '{matric}', '{plan}', {paid}, now() - interval '{random.randint(60, 80)} days', now() - interval '{random.randint(80, 110)} days', now() - interval '70 days', 'Clear goals. Evenings are best.', now() - interval '40 days')
             returning id""").splitlines()[0]
-        sql(f"insert into payments(application_id, reference, part, amount, amount_paid, status, channel, created_at) values ('{aid}', 'PSK-{n:04d}A', '{'full' if plan == 'full' else 'part1'}', {85000 if plan == 'full' else 45000}, {85000 if plan == 'full' else 45000}, 'success', 'card', now() - interval '{random.randint(60, 80)} days')")
+        sql(f"insert into payments(application_id, reference, part, amount, amount_paid, status, channel, created_at) values ('{aid}', 'PSK-{n:04d}A', '{'full' if plan == 'full' else 'part1'}', {180000 if plan == 'full' else 95000}, {180000 if plan == 'full' else 95000}, 'success', 'card', now() - interval '{random.randint(60, 80)} days')")
         if plan == "two" and not overdue:
-            sql(f"insert into payments(application_id, reference, part, amount, amount_paid, status, channel, created_at) values ('{aid}', 'PSK-{n:04d}B', 'part2', 45000, 45000, 'success', 'card', now() - interval '{random.randint(0, 12)} days')")
+            sql(f"insert into payments(application_id, reference, part, amount, amount_paid, status, channel, created_at) values ('{aid}', 'PSK-{n:04d}B', 'part2', 95000, 95000, 'success', 'card', now() - interval '{random.randint(0, 12)} days')")
         # how far they got
         r = random.random()
         cur = cur_cal + (1 if r < .1 else 0) - (1 if r > .7 else 0) - (1 if r > .9 else 0)
