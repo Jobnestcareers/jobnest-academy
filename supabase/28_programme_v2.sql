@@ -1102,6 +1102,133 @@ begin
     'checks', coalesce((select jsonb_object_agg(item, jsonb_build_object('by', done_by, 'at', done_at)) from ops_checks where cohort_id = c.id and week = wk), '{}'::jsonb));
 end $function$;
 
+-- ---------- 10. Week 20: Discovery Call, Job Search & Pitching (the post-course call with a Career Coach) ----------
+create or replace function public.learn_done(p_key text, p_done boolean, p_data jsonb DEFAULT NULL::jsonb)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare a applications; it course_items; x learn_progress; d jsonb; n int;
+begin
+  a := private.require_student();
+  it := private.learn_item(a, p_key);
+  if it.staff then raise exception 'Staff complete this step.' using errcode = 'P0001'; end if;
+  if it.type = 'quiz' then raise exception 'Submit this one from its own page.' using errcode = 'P0001'; end if;
+  if it.title in ('Book your Discovery Call') then raise exception 'Book a time below. This ticks itself when you book.' using errcode = 'P0001'; end if;
+  if it.title in ('Have your Discovery Call') then raise exception 'Your coach marks this after your call.' using errcode = 'P0001'; end if;
+  if it.link and it.title not in ('ATS-compliant resume', 'Weekly job application tracker') then
+    raise exception 'Submit this one from its own page.' using errcode = 'P0001';
+  end if;
+  select * into x from learn_progress where application_id = a.id and key = p_key;
+  if p_done then
+    perform private.seq_check(a, it);
+    if it.type = 'oath' and coalesce(trim(p_data ->> 'sig'), '') = '' then raise exception 'Sign with your full name.' using errcode = 'P0001'; end if;
+    if it.title = 'Confirm your placement' and not exists (select 1 from placements where application_id = a.id) then
+      raise exception 'Your placement hasn''t been assigned yet. Student Success will add it here.' using errcode = 'P0001';
+    end if;
+    if it.title = 'Collect your internship certificate' and not exists (select 1 from learn_evals where application_id = a.id) then
+      raise exception 'Your internship certificate is issued after your supervisor submits your final evaluation.' using errcode = 'P0001';
+    end if;
+    if it.title = 'ATS-compliant resume' then
+      select data into d from learn_drafts where application_id = a.id and key = 'cv';
+      if d is null or coalesce(trim(d ->> 'name'), '') = '' or length(coalesce(d ->> 'summary', '')) < 40 then
+        raise exception 'Fill in your CV first: at least your name and a short summary.' using errcode = 'P0001';
+      end if;
+      p_data := jsonb_build_object('cv', d);
+    end if;
+    if it.title = 'Send 10 cold outreach messages' then
+      select jsonb_array_length(coalesce(data, '[]'::jsonb)) into n from learn_drafts where application_id = a.id and key = 'outreach';
+      if coalesce(n, 0) < 10 then raise exception 'Log 10 messages first. You have %.', coalesce(n, 0) using errcode = 'P0001'; end if;
+    end if;
+    if it.title = 'Weekly job application tracker' then
+      select jsonb_array_length(coalesce(data, '[]'::jsonb)) into n from learn_drafts where application_id = a.id and key = 'apps';
+      if coalesce(n, 0) < 3 then raise exception 'Add at least 3 applications first.' using errcode = 'P0001'; end if;
+      p_data := jsonb_build_object('count', n);
+    end if;
+    if it.title = 'Report your first interview invite' and not exists (
+      select 1 from learn_drafts d2, jsonb_array_elements(d2.data) e where d2.application_id = a.id and d2.key = 'apps' and e ->> 'st' in ('Interviewing','Offer')) then
+      raise exception 'Move an application to Interviewing first.' using errcode = 'P0001';
+    end if;
+    if it.type = 'logweek' and x.key is not null and x.status = 'done' and coalesce((x.data ->> 'signed')::boolean, false) then
+      raise exception 'Your supervisor has already signed this entry.' using errcode = 'P0001';
+    end if;
+    insert into learn_progress(application_id, key, week, status, data) values (a.id, p_key, it.week, 'done', p_data)
+    on conflict (application_id, key) do update set status = 'done', data = coalesce(excluded.data, learn_progress.data), done_at = now(), feedback = null;
+    insert into learn_history(application_id, key, action) values (a.id, p_key,
+      case when it.type = 'oath' then 'Signed' when it.type = 'logweek' then case when x.status = 'revise' then 'Resubmitted' else 'Submitted' end else 'Completed' end);
+  else
+    if it.type = 'oath' then raise exception 'A signed oath can''t be undone.' using errcode = 'P0001'; end if;
+    if it.type = 'logweek' then raise exception 'A submitted logbook entry can''t be withdrawn.' using errcode = 'P0001'; end if;
+    delete from learn_progress where application_id = a.id and key = p_key and status = 'done';
+  end if;
+  return public.learn_state();
+end $function$;
+create or replace function public.dc2_book(p_slot bigint, p_note text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare a applications; s coach_slots; co staff;
+begin
+  a := private.require_student();
+  if exists (select 1 from coach_slots where application_id = a.id) then raise exception 'You already have a call booked. Cancel it first to pick another time.' using errcode = 'P0001'; end if;
+  update coach_slots set application_id = a.id, note = nullif(left(trim(coalesce(p_note, '')), 300), ''), booked_at = now()
+  where id = p_slot and application_id is null and starts_at > now() + interval '2 hours' returning * into s;
+  if s.id is null then raise exception 'Sorry, that time was just taken. Please pick another.' using errcode = 'P0001'; end if;
+  select * into co from staff where email = s.coach_email;
+  perform private.learn_mark(a, 'Book your Discovery Call', true, null);
+  insert into learn_history(application_id, key, action) values (a.id, coalesce(private.key_of(a, 'Book your Discovery Call'), 'dc2'), 'Booked Discovery Call');
+  perform private.queue_mail(a, 'dc2_booked', jsonb_build_object(
+    'longdate', private.wat(s.starts_at, 'FMDay, FMDD FMMonth'), 'time', private.wat(s.starts_at, 'HH24:MI'), 'coach', co.full_name,
+    'meet', private.setting('call_link', ''),
+    'gcal', private.gcal_url(s.starts_at, 40, 'Jobnest Discovery Call', 'Your 40-minute call with ' || co.full_name || ', Career Coach.', private.setting('call_link', ''))),
+    private.site() || '/#/learn/learning/15');
+  return public.learn_extra();
+end $function$;
+create or replace function public.dc2_cancel()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare a applications; s coach_slots;
+begin
+  a := private.require_student();
+  select * into s from coach_slots where application_id = a.id;
+  if s.id is null then return public.learn_extra(); end if;
+  if s.starts_at < now() + interval '2 hours' then raise exception 'It''s less than 2 hours to your call. Message Student Success to change it.' using errcode = 'P0001'; end if;
+  if exists (select 1 from call_results where application_id = a.id) then raise exception 'Your call has already happened.' using errcode = 'P0001'; end if;
+  update coach_slots set application_id = null, note = null, booked_at = null where id = s.id;
+  perform private.learn_mark(a, 'Book your Discovery Call', false, null);
+  insert into learn_history(application_id, key, action) values (a.id, coalesce(private.key_of(a, 'Book your Discovery Call'), 'dc2'), 'Cancelled Discovery Call');
+  return public.learn_extra();
+end $function$;
+create or replace function public.coach_result(p_app uuid, p_score integer, p_note text, p_next text)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare s staff; a applications; nx text[];
+begin
+  s := private.require_role(array['coach','director','cohort_manager']);
+  select * into a from applications where id = p_app;
+  if a.id is null or not exists (select 1 from coach_slots where application_id = a.id) then raise exception 'That student hasn''t booked a call.' using errcode = 'P0001'; end if;
+  if p_score is null or p_score < 1 or p_score > 10 then raise exception 'Give a confidence score from 1 to 10.' using errcode = 'P0001'; end if;
+  select array_agg(trim(l)) into nx from unnest(string_to_array(coalesce(p_next, ''), E'\n')) l where trim(l) <> '';
+  insert into call_results(application_id, score, note, next, by_name) values (a.id, p_score, nullif(trim(coalesce(p_note, '')), ''), nx, s.full_name)
+  on conflict (application_id) do update set score = excluded.score, note = excluded.note, next = excluded.next, by_name = excluded.by_name, at = now();
+  perform private.learn_mark(a, 'Have your Discovery Call', true, s.full_name);
+  insert into learn_history(application_id, key, action, by_name) values (a.id, coalesce(private.key_of(a, 'Have your Discovery Call'), 'dc2'), format('Call result: %s/10', p_score), s.full_name);
+  perform private.queue_mail(a, 'dc2_result', jsonb_build_object('score', p_score, 'coach', s.full_name), private.site() || '/#/learn/learning/15');
+  return jsonb_build_object('ok', true);
+end $function$;
+update email_templates set subject = replace(subject, 'Discovery Call 2', 'Discovery Call'), body = replace(body, 'Discovery Call 2', 'Discovery Call'),
+  cta = replace(cta, 'Discovery Call 2', 'Discovery Call') where key in ('dc2_booked', 'dc2_result');
+update email_templates set body = replace(body, 'It lasts 40 minutes.', 'It lasts 40 minutes. Now that the course is done, your coach reviews where you are, runs a short mock interview and agrees your next steps.') where key = 'dc2_booked' and body not like '%where you are%';
+
 -- ---------- 8. Permissions ----------
 revoke execute on function public.learn_exam_start(text), public.learn_exam_save(text, jsonb), public.learn_exam_submit(text, jsonb), public.learn_results(),
   public.acad_results(bigint), public.acad_result_detail(uuid), public.acad_score_correct(uuid, text, numeric, text), public.acad_exam_resit(uuid, text, date, text),

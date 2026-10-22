@@ -24,7 +24,7 @@ const MY_APP = "jn.myapp";
 
 const LOGO = `<svg width="30" height="30" viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" rx="10" fill="#0F7B6C"/><path d="M8 20c1.5 6 18.5 6 20 0" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="18" cy="14" r="4.2" fill="#F4B740"/></svg>`;
 const ROUTE_STOPS = [["Week 1", "Orientation"], ["Weeks 2–3", "Fundamental Learning"], ["Weeks 4–11", "Core Skill Learning"], ["Week 12", "Examinations"],
-  ["Weeks 13–14", "Practical Project"], ["Weeks 15–18", "Internship"], ["Week 19", "CV & Portfolio"], ["Week 20", "Job Search & Pitching"]];
+  ["Weeks 13–14", "Practical Project"], ["Weeks 15–18", "Internship"], ["Week 19", "CV & Portfolio"], ["Week 20", "Discovery Call, Job Search & Pitching"]];
 const STAGES_APP = ["Submitted", "Assessment", "Discovery Call", "Offer", "Payment", "Admitted"];
 const APP_STAGE = { "Assessment pending": 1, "Assessment failed": 1, "Call to book": 2, "Call booked": 2, "Closed: no matching track": 2, "Under review": 3,
   "Offer sent": 3, "Waitlisted": 3, "Not selected": 3, "Offer expired": 3, "Offer declined": 3, "Deferred": 3, "Admitted": 5 };
@@ -585,7 +585,7 @@ const pwOk = (a, b, err) => {
 /* ---------- staff: portal shell ---------- */
 const SUPER_NAV = [{ g: "Overview" }, { k: "command", l: "Command centre" }, { k: "attention", l: "Needs attention" },
   { g: "Admissions" }, { k: "apps", l: "Applications" }, { k: "calls", l: "Calls" }, { k: "times", l: "Call times" }, { k: "decide", l: "Decisions" }, { k: "pay", l: "Payments" },
-  { g: "Academy" }, { k: "students", l: "Students" }, { k: "grading", l: "Grading" }, { k: "results", l: "Results" }, { k: "exams", l: "Examinations" }, { k: "intern", l: "Internships" }, { k: "dc2", l: "Discovery Call 2" }, { k: "pods", l: "Pods" },
+  { g: "Academy" }, { k: "students", l: "Students" }, { k: "grading", l: "Grading" }, { k: "results", l: "Results" }, { k: "exams", l: "Examinations" }, { k: "intern", l: "Internships" }, { k: "dc2", l: "Week 20 Discovery Call" }, { k: "pods", l: "Pods" },
   { k: "sessions", l: "Live sessions" }, { k: "news", l: "Announcements" }, { k: "support", l: "Help requests" }, { k: "discussion", l: "Discussion" }, { k: "content", l: "Content" },
   { g: "Careers" }, { k: "jobs", l: "Job search" }, { k: "opps", l: "Opportunities" }, { k: "outcomes", l: "Outcomes & alumni" },
   { g: "Role pages" }, { k: "health", l: "Programme Director" }, { k: "today", l: "Cohort Manager" }, { k: "desk", l: "Facilitator" }, { k: "career", l: "Career Coach" }, { k: "ops", l: "Academy Admin" }, { k: "pipeline", l: "Admissions Admin" }, { k: "home", l: "Admissions Officer" },
@@ -593,12 +593,12 @@ const SUPER_NAV = [{ g: "Overview" }, { k: "command", l: "Command centre" }, { k
 const N = (k, l) => ({ k, l }), G = (g) => ({ g });
 const ROLE_NAV = {
   director: [G("Overview"), N("health", "Programme health"), G("Learning"), N("students", "Students"), N("grading", "Grading"), N("results", "Results"), N("exams", "Examinations"), N("sessions", "Live sessions"), N("news", "Announcements"), N("pods", "Pods"), N("content", "Content"),
-    G("Work experience"), N("intern", "Internships"), N("dc2", "Discovery Call 2"), N("jobs", "Job search"), N("opps", "Opportunities"), N("outcomes", "Outcomes & alumni"), G("Support"), N("support", "Help requests"), N("discussion", "Discussion")],
+    G("Work experience"), N("intern", "Internships"), N("dc2", "Week 20 Discovery Call"), N("jobs", "Job search"), N("opps", "Opportunities"), N("outcomes", "Outcomes & alumni"), G("Support"), N("support", "Help requests"), N("discussion", "Discussion")],
   cohort_manager: [G("Today"), N("today", "Today"), G("Cohort"), N("students", "Students"), N("grading", "Grading"), N("results", "Results"), N("exams", "Examinations"), N("sessions", "Live sessions"), N("news", "Announcements"), N("pods", "Pods"), N("content", "Content"),
-    G("Support"), N("support", "Help requests"), N("discussion", "Discussion"), G("Work experience"), N("intern", "Internships"), N("dc2", "Discovery Call 2"), N("jobs", "Job search"), N("opps", "Opportunities"), N("outcomes", "Outcomes & alumni")],
+    G("Support"), N("support", "Help requests"), N("discussion", "Discussion"), G("Work experience"), N("intern", "Internships"), N("dc2", "Week 20 Discovery Call"), N("jobs", "Job search"), N("opps", "Opportunities"), N("outcomes", "Outcomes & alumni")],
   facilitator: [G("My work"), N("desk", "Grading desk"), N("grading", "All submissions"), N("results", "Results"), G("My track"), N("students", "Students"), N("sessions", "Live sessions"), N("news", "Announcements"), N("content", "Content"), N("pods", "Pods"),
     G("Supervision"), N("intern", "Internships"), G("Support"), N("support", "Help requests"), N("discussion", "Discussion")],
-  coach: [G("Today"), N("career", "Career desk"), G("Calls"), N("dc2", "Discovery Call 2"), G("Job search"), N("jobs", "Job search"), N("opps", "Opportunities"), N("outcomes", "Outcomes & alumni"),
+  coach: [G("Today"), N("career", "Career desk"), G("Calls"), N("dc2", "Week 20 Discovery Call"), G("Job search"), N("jobs", "Job search"), N("opps", "Opportunities"), N("outcomes", "Outcomes & alumni"),
     G("Students"), N("students", "Students"), N("intern", "Internships"), N("pods", "Pods"), N("sessions", "Live sessions"), N("news", "Announcements"), N("support", "Help requests"), N("discussion", "Discussion")],
   academy_admin: [G("Today"), N("ops", "Operations"), G("Work experience"), N("intern", "Internships"), N("opps", "Opportunities"), N("jobs", "Job search"), N("outcomes", "Outcomes & alumni"),
     G("Cohort"), N("students", "Students"), N("results", "Results"), N("exams", "Examinations"), N("sessions", "Live sessions"), N("news", "Announcements"), N("pods", "Pods"), N("content", "Content"), G("Support"), N("support", "Help requests"), N("discussion", "Discussion")],
@@ -814,7 +814,7 @@ async function tabStudent360(id) {
     career: `<section class="sc-2"><div class="card"><span class="eyebrow">Internship · Weeks 15–18</span>${s.placement ? `<h2 class="sc-h2">${esc(s.placement.role)} at ${esc(s.placement.org)}</h2><dl class="s3-kv"><dt>Supervisor</dt><dd>${esc(s.placement.sup_name || "—")}${s.placement.sup_email ? ` · <a href="mailto:${esc(s.placement.sup_email)}">${esc(s.placement.sup_email)}</a>` : ""}</dd><dt>Evaluation</dt><dd>${s.eval ? `Received${s.eval.overall ? ` · ${esc(String(s.eval.overall))}` : ""}` : "Not yet"}</dd></dl>`
         : `<h2 class="sc-h2">Not placed yet</h2><p class="note">Placements are matched before Week 15.</p><a class="btn sm" href="#/portal/intern">Assign a placement</a>`}</div>
       <div class="card"><span class="eyebrow">Career</span><h2 class="sc-h2">${s.outcome ? `Now: ${esc({ hired: "Employed", internship: "Internship", freelance: "Freelancing", study: "Studying", searching: "Still searching" }[s.outcome.status] || s.outcome.status)}` : "Career goals"}</h2>
-        <dl class="s3-kv"><dt>Aiming for</dt><dd>${esc(s.career?.role || "—")}</dd><dt>Industries</dt><dd>${esc(s.career?.interests || "—")}</dd><dt>Discovery Call 2</dt><dd>${s.call2 ? `Scored ${s.call2.score}/10` : "Not yet"}</dd><dt>Applications</dt><dd>${s.apps_n || 0} tracked</dd>
+        <dl class="s3-kv"><dt>Aiming for</dt><dd>${esc(s.career?.role || "—")}</dd><dt>Industries</dt><dd>${esc(s.career?.interests || "—")}</dd><dt>Discovery Call</dt><dd>${s.call2 ? `Scored ${s.call2.score}/10` : "Not yet"}</dd><dt>Applications</dt><dd>${s.apps_n || 0} tracked</dd>
           ${s.outcome?.company ? `<dt>Company</dt><dd>${esc(s.outcome.company)}${s.outcome.role ? ` · ${esc(s.outcome.role)}` : ""}</dd>` : ""}<dt>Certificate</dt><dd>${s.cert_id ? `<a class="link" href="#/certificate/${esc(s.cert_id)}" target="_blank" rel="noopener">${esc(s.cert_id)}</a>` : "Not issued"}</dd></dl></div></section>`,
     docs: D ? `<section class="sc-2"><div class="card"><span class="eyebrow">Documents</span><h2 class="sc-h2">${esc(s.first_name)}'s documents</h2>
         <ul class="sc-act">${[
@@ -1067,10 +1067,10 @@ async function tabCareer() {
   const days = [...Array(10)].map((_, k) => new Date(Date.now() + (k + 1) * 864e5)).filter((d) => d.getDay() && d.getDay() < 6).slice(0, 5), TT = ["09:00", "10:00", "11:30", "14:00", "15:30"];
   const slotAt = (d, t) => mine.find((x) => fmt(x.at, { year: "numeric", month: "2-digit", day: "2-digit" }) === fmt(d, { year: "numeric", month: "2-digit", day: "2-digit" }) && fmt(x.at, { hour: "2-digit", minute: "2-digit", hour12: false }) === t);
   const iso = (d, t) => `${fmt(d, { year: "numeric", month: "2-digit", day: "2-digit" }).split("/").reverse().join("-")}T${t}:00+01:00`;
-  shell("career", todays.length ? `${todays.length} mock interview${todays.length === 1 ? "" : "s"} today` : "Career desk", `${h.to_book.length ? `${h.to_book.length} student${h.to_book.length === 1 ? " still needs" : "s still need"} to book Discovery Call 2. ` : ""}${h.chat.length ? `${h.chat.length} question${h.chat.length === 1 ? " is" : "s are"} waiting in the career chat.` : "The career chat is all answered."}`,
+  shell("career", todays.length ? `${todays.length} mock interview${todays.length === 1 ? "" : "s"} today` : "Career desk", `${h.to_book.length ? `${h.to_book.length} student${h.to_book.length === 1 ? " still needs" : "s still need"} to book their Discovery Call. ` : ""}${h.chat.length ? `${h.chat.length} question${h.chat.length === 1 ? " is" : "s are"} waiting in the career chat.` : "The career chat is all answered."}`,
     `<section class="rh-desk"><div class="card rh-queue"><div class="sc-h"><b>${todays.length ? "Today's calls" : "Next calls"}</b><a class="link sm" href="#/portal/dc2">All</a></div>
         ${list.length ? list.map((x) => `<button class="rh-qi ${x.id === ui.ccSel ? "on" : ""}" data-act="cc-pick" data-k="${x.id}" aria-pressed="${x.id === ui.ccSel}"><b class="mono" style="width:52px;flex:none">${fmt(x.at, { hour: "2-digit", minute: "2-digit", hour12: false })}</b><span class="sc-p-t"><b>${esc(x.name)}</b><span class="note">${esc(x.track || "")}${new Date(x.at).toDateString() === today ? "" : ` · ${fmtDay(x.at)}`}</span></span><span class="pill ${x.result ? "ok" : new Date(x.at) < new Date() ? "now" : ""}">${x.result ? "Done" : new Date(x.at) < new Date() ? "To score" : "Booked"}</span></button>`).join("") : `<p class="empty">No calls booked yet. Open some times below.</p>`}</div>
-      <div class="card rh-grade">${cur ? `<div class="sc-h"><div><span class="eyebrow">Discovery Call 2 · ${fmtAt(cur.at)}</span><h2>${esc(cur.name)} · ${esc(cur.track || "")}</h2></div><div class="actions"><a class="btn sm ghost" href="#/portal/student/${cur.app}">Student record</a></div></div>
+      <div class="card rh-grade">${cur ? `<div class="sc-h"><div><span class="eyebrow">Discovery Call · ${fmtAt(cur.at)}</span><h2>${esc(cur.name)} · ${esc(cur.track || "")}</h2></div><div class="actions"><a class="btn sm ghost" href="#/portal/student/${cur.app}">Student record</a></div></div>
           <div class="rh-minis">${miniStat("CV ATS check", ch ? `${ch.filter((x) => x[1]).length}/5` : "—")}${miniStat("Their note", cur.note ? "Yes" : "None")}${miniStat("Result", cur.result ? `${cur.result.score}/10` : "Not yet")}</div>
           ${cur.note ? `<p><b>Their note:</b> “${esc(cur.note)}”</p>` : ""}${ch ? `<ul class="mini">${atsList(ch)}</ul>` : `<p class="note">No CV saved yet.</p>`}
           <form class="form dc2-form" data-i="${i}" novalidate><div class="field"><span class="lbl">Interview Confidence Score (1–10)</span><div class="rh-sc">${[...Array(10)].map((_, k) => `<button type="button" class="rh-s ${(ui.ccScore?.[cur.id] ?? cur.result?.score) === k + 1 ? "on" : ""}" data-act="cc-score" data-k="${k + 1}">${k + 1}</button>`).join("")}</div><input type="hidden" id="dsc-${i}" value="${ui.ccScore?.[cur.id] ?? cur.result?.score ?? ""}"></div>
@@ -1088,7 +1088,7 @@ async function tabCareer() {
       <div class="card"><div class="sc-h"><div><span class="eyebrow">Career chat</span><h2>${h.chat.length} question${h.chat.length === 1 ? "" : "s"} waiting</h2></div><button class="btn sm ghost" data-act="go-disc" data-k="career">Answer</button></div>
         ${h.chat.length ? `<ul class="sc-act">${h.chat.slice(0, 5).map((c) => `<li><span class="st-av">${ini(c.author)}</span><span><b>“${esc(c.body.slice(0, 140))}”</b><small class="note" style="display:block">${esc(c.author)} · ${agoS(c.at)}</small></span></li>`).join("")}</ul>` : `<p class="note">Nothing waiting.</p>`}
         <div class="rh-minis" style="margin-top:.8rem">${miniStat("In work", h.working)}${miniStat("Interviewing", P.interviewing || 0)}${miniStat("Opportunities live", h.opps_live)}</div>
-        ${h.to_book.length ? `<p class="note" style="margin-top:.8rem"><b>Still to book Discovery Call 2:</b> ${h.to_book.slice(0, 6).map((x) => esc(x.name)).join(", ")}${h.to_book.length > 6 ? ` and ${h.to_book.length - 6} more` : ""}.</p>` : ""}</div></section>`,
+        ${h.to_book.length ? `<p class="note" style="margin-top:.8rem"><b>Still to book their Discovery Call:</b> ${h.to_book.slice(0, 6).map((x) => esc(x.name)).join(", ")}${h.to_book.length > 6 ? ` and ${h.to_book.length - 6} more` : ""}.</p>` : ""}</div></section>`,
     { eyebrow: todayEyebrow("Career desk"), actions: `<a class="btn" href="#/portal/opps">Post an opportunity</a>` });
 }
 
@@ -1392,7 +1392,7 @@ async function tabSettings() {
 }
 
 const PERM_AREAS = [["Applications & calls", ["apps", "calls"]], ["Decisions & offers", ["decide"]], ["Payments", ["pay"]], ["Students", ["students"]], ["Grading", ["grading"]], ["Results & examinations", ["results", "exams"]],
-  ["Internships", ["intern"]], ["Career, DC2 & jobs", ["dc2", "jobs"]], ["Pods, help & discussion", ["pods", "support"]], ["Content", ["content"]], ["Settings & emails", ["settings"]], ["Staff & access", ["staff"]]];
+  ["Internships", ["intern"]], ["Career, Discovery Call & jobs", ["dc2", "jobs"]], ["Pods, help & discussion", ["pods", "support"]], ["Content", ["content"]], ["Settings & emails", ["settings"]], ["Staff & access", ["staff"]]];
 const TRACKED = ["facilitator", "coach"];
 const ROLE_SHORT = { super: "SA", adm_admin: "AD", adm_officer: "AO", director: "PD", cohort_manager: "CM", facilitator: "FA", coach: "CC", academy_admin: "AC" };
 async function tabStaff() {
@@ -1977,7 +1977,7 @@ function lsItemView(wi, ii) {
   if (!un) return `<div class="view">${head}<div class="gate">${LICON.lock}<span><b>Locked.</b> This opens when Week ${wi + 1} unlocks.</span></div></div>`;
   const blk = !dn && !r ? seqBlock(wi, it) : null;
   if (blk) return `<div class="view">${head}<div class="gate">${LICON.lock}<span><b>Do the steps in order.</b> Finish “${esc(blk.title)}” first, then this opens.</span></div><div><a class="btn" href="#/learn/learning/${wi + 1}/${blk.key}">Go to “${esc(blk.title)}”</a></div>${nav}</div>`;
-  if (ON_WEEK_PAGE.includes(it.title)) return `<div class="view">${head}<p style="max-width:62ch">${esc(it.detail || "")}</p><div class="signoff ${dn ? "signed" : ""}"><b>${dn ? "Done ✓" : "Do this on the Week " + (wi + 1) + " page"}</b><p class="note">${it.title === "Mock interview simulation" ? "Your coach marks this after your call." : it.title === "Book your 1-on-1 session" ? "Pick a time on the Week 15 page. This ticks itself when you book." : "The tools for this step are on the week page."}</p></div><div><a class="btn" href="#/learn/learning/${wi + 1}">Open Week ${wi + 1}</a></div>${nav}</div>`;
+  if (ON_WEEK_PAGE.includes(it.title)) return `<div class="view">${head}<p style="max-width:62ch">${esc(it.detail || "")}</p><div class="signoff ${dn ? "signed" : ""}"><b>${dn ? "Done ✓" : "Do this on the Week " + (wi + 1) + " page"}</b><p class="note">${it.title === "Have your Discovery Call" ? "Your coach marks this after your call." : it.title === "Book your Discovery Call" ? "Pick a time on the Week 15 page. This ticks itself when you book." : "The tools for this step are on the week page."}</p></div><div><a class="btn" href="#/learn/learning/${wi + 1}">Open Week ${wi + 1}</a></div>${nav}</div>`;
   if (it.title === "Collect your internship certificate") return `<div class="view">${head}${LS.X.eval ? `<div class="signoff signed"><b>Your internship is complete 🎉</b><p class="note">${LS.X.placement ? `${esc(LS.X.placement.sup_name)} at ${esc(LS.X.placement.org)} submitted your final evaluation.` : "Your supervisor submitted your final evaluation."} Here is your internship certificate. Download it and add it to your CV in Week 14.</p></div>${LS.icert && LS.icert.cert_id ? certBlock(LS.icert) : `<p class="note">Your certificate is being prepared. Refresh in a moment.</p>`}${btn("Mark as collected", "Collected ✓ · Undo")}`
     : `<div class="gate">${LICON.lock}<span><b>Not yet.</b> This opens after your supervisor signs all four logbook weeks and submits your final evaluation.</span></div>`}${nav}</div>`;
   if (it.title === "Confirm your placement") return `<div class="view">${head}${placementCard()}${LS.X.placement ? btn("I confirm my placement", "Confirmed ✓ · Undo") : ""}${nav}</div>`;
@@ -2163,7 +2163,7 @@ function cvView(wi, items) {
   <div class="items">${wk.items.filter((it) => it.opt).map((it) => itemRow(wi, it, true)).join("")}</div>`;
 }
 
-/* Discovery Call 2 */
+/* Discovery Call (Week 20, after the course) */
 function bookingUI() {
   const b = LS.X.booking;
   if (b) { const at = new Date(b.at), end = new Date(at.getTime() + 40 * 6e4);
@@ -2187,9 +2187,9 @@ function bookingUI() {
 }
 function dcView(wi) {
   const prep = [["cv", "Your updated CV from Week 19"], ["port", "Your portfolio link"], ["roles", "3 roles you're targeting"], ["pitch", "Your 60-second introduction"]], pd = draft("prep", {});
-  const apI = byTitle(wi, "Finalise your Job Search Action Plan"), callDone = doneT("Mock interview simulation"), r = LS.X.result;
-  return `<p style="max-width:64ch">A 40-minute, 1-on-1 video call with a Career Coach. You'll do a short <b>mock interview</b>, sharpen your pitch and leave with a <b>Job Search Action Plan</b>.</p>
-    ${stepsOl([["Book your call", doneT("Book your 1-on-1 session")], ["Have your call", callDone], ["Submit your action plan", apI && isDoneIt(apI)]])}
+  const apI = byTitle(wi, "Finalise your Job Search Action Plan"), callDone = doneT("Have your Discovery Call"), r = LS.X.result;
+  return `<p style="max-width:64ch">Now that the course is done, your <b>Discovery Call</b> shows you where you stand. It's a 40-minute, 1-on-1 video call with a Career Coach: you go through your results, CV and portfolio, do a short <b>mock interview</b>, and leave with an <b>Interview Confidence Score</b> and a <b>Job Search Action Plan</b>.</p>
+    ${stepsOl([["Book your call", doneT("Book your Discovery Call")], ["Have your call", callDone], ["Submit your action plan", apI && isDoneIt(apI)]])}
     <div class="prep"><span class="eyebrow">Have these ready</span><div class="prep-l">${prep.map(([k, t]) => `<label class="check"><input type="checkbox" data-prep="${k}" ${pd[k] ? "checked" : ""}> ${t}</label>`).join("")}</div></div>
     <div class="dc-col">${bookingUI()}
     ${r ? `<div class="card result-card"><div class="ch"><h3>Your call results</h3><span class="pill ok">From ${esc(r.by || "your coach")}</span></div>
@@ -2230,9 +2230,9 @@ function jobView(wi) {
     <div class="card"><div class="ch"><h3>Got an interview?</h3>${rI && isDoneIt(rI) ? `<span class="pill ok">Reported</span>` : ""}</div><p class="note">Move an application to Interviewing, then tell your coach so they can help you prepare.</p>
       ${rI ? `<div><button class="btn sm gold" data-act="ls-done" data-k="${rI.key}" data-v="1" ${!hasInt || isDoneIt(rI) ? "disabled" : ""}>${isDoneIt(rI) ? "Coach notified ✓" : "Report interview to my coach"}</button></div>` : ""}</div></div>`;
 }
-const SPECIAL = { 3: examView, 4: projectView, 5: internView, 6: cvView, 7: (wi) => `<h3 class="sp-h">1-on-1 coaching call</h3>${dcView(wi)}<h3 class="sp-h">Pitch, outreach and applications</h3>${jobView(wi)}` };
+const SPECIAL = { 3: examView, 4: projectView, 5: internView, 6: cvView, 7: (wi) => `<h3 class="sp-h">Your Discovery Call</h3>${dcView(wi)}<h3 class="sp-h">Pitch, outreach and applications</h3>${jobView(wi)}` };
 // Items that are done from their week page rather than their own page.
-const ON_WEEK_PAGE = ["Book your 1-on-1 session", "Mock interview simulation", "ATS-compliant resume", "Weekly job application tracker", "Send 10 cold outreach messages", "Report your first interview invite"];
+const ON_WEEK_PAGE = ["Book your Discovery Call", "Have your Discovery Call", "ATS-compliant resume", "Weekly job application tracker", "Send 10 cold outreach messages", "Report your first interview invite"];
 let draftT = {};
 function saveDraft(k, data, now) { LS.X.drafts = { ...(LS.X.drafts || {}), [k]: data }; clearTimeout(draftT[k]); draftT[k] = setTimeout(() => rpc("learn_draft", { p_key: k, p_data: data }).then(() => { const s = $("#cv-saved"); if (s && k === "cv") s.textContent = "Saved"; }).catch((x) => toast(x.message)), now ? 0 : 600); }
 
@@ -2441,7 +2441,7 @@ function careerJourney() {
     ["Complete a practical project", "Final project submitted and graded out of 100 by your project supervisor", stageDone(4)],
     ["Gain verified work experience", "Internship logbook signed and evaluation received", !!LS.X.eval || stageDone(5)],
     ["Build a professional CV", "ATS-ready CV submitted in Week 19", stageDone(6)],
-    ["Complete interview preparation", "Mock interview done in your 1-on-1 coaching call", doneT("Mock interview simulation")],
+    ["Have your Discovery Call", "Post-course review and mock interview with your Career Coach", doneT("Have your Discovery Call")],
     ["Explore opportunities", "At least one application tracked as Applied or further", applied]];
 }
 function lsCareerPage() {
@@ -2708,7 +2708,7 @@ async function tabIntern() {
     `<div class="card">${L.length ? `<div class="arows">${L.map(row3).join("")}</div>` : empty("No admitted students yet.")}</div>`);
 }
 
-/* ---------- staff: Discovery Call 2 ---------- */
+/* ---------- staff: Discovery Call ---------- */
 async function tabDc2() {
   const L = await rpc("coach_calls"); ui.dc2 = L;
   const isCoach = ["coach", "super"].includes(ME.role), mine = L.filter((x) => x.mine || !isCoach);
@@ -2722,7 +2722,7 @@ async function tabDc2() {
         <div class="field"><label for="dno-${i}">Summary for the student</label><textarea id="dno-${i}" placeholder="e.g. Strong pitch. Slow down and use numbers." rows="2">${esc(x.result?.note || "")}</textarea></div>
         <div class="field"><label for="dnx-${i}">Next steps (one per line)</label><textarea id="dnx-${i}" placeholder="One step per line" rows="3">${esc((x.result?.next || []).join("\n"))}</textarea></div>
         <div class="actions"><button class="btn sm" type="submit">${x.result ? "Update result" : "Save result"}</button></div></form></div></details>`;
-  shell("dc2", "Discovery Call 2", "Week 20. Students book a 40-minute call with a career coach, then you record their Interview Confidence Score and next steps.",
+  shell("dc2", "Discovery Call", "Week 20, after the course. Students book a 40-minute call with a career coach to review where they are now, then you record their Interview Confidence Score and next steps.",
     `<div class="grid2">${isCoach ? `<form class="card form" id="dc2-times" novalidate><h3>Add times</h3><p class="note">Each call is 40 minutes. Times are in WAT.</p>
       <div class="field"><span class="lbl">Days</span><div class="chips-row">${days.map((d) => `<label class="chip-cb"><input type="checkbox" name="dday" value="${d}"><span>${fmt(d + "T12:00:00Z", { weekday: "short", day: "numeric", month: "short" })}</span></label>`).join("")}</div></div>
       <div class="field"><span class="lbl">Times</span><div class="chips-row">${CALL_TIMES.map((t) => `<label class="chip-cb"><input type="checkbox" name="dtime" value="${t}"><span>${t}</span></label>`).join("")}</div></div>
@@ -2742,7 +2742,7 @@ async function tabJobs() {
       <span class="anext">${x.outreach.length}/10 outreach · ${x.apps.length} applications · ${ints(x)} interview${ints(x) === 1 ? "" : "s"}</span>${x.apps.some((a) => a.st === "Offer") ? `<span class="pill ok">Offer</span>` : ints(x) ? `<span class="pill now">Interviewing</span>` : x.apps.length || x.outreach.length ? `<span class="pill info">Searching</span>` : `<span class="pill">Not started</span>`}</summary>
     <div class="abody">
       <div class="actions" style="flex-wrap:wrap">${lk(x, "LinkedIn profile makeover", "LinkedIn")}${lk(x, "Publish your portfolio", "Portfolio")}${lk(x, "Record your elevator pitch", "Pitch recording")}${lk(x, "Finalise your Job Search Action Plan", "Action plan")}${x.phone ? `<a class="link sm" href="https://wa.me/${esc(String(x.phone).replace(/\D/g, "").replace(/^0/, "234"))}" target="_blank" rel="noopener">WhatsApp ↗</a>` : ""}</div>
-      <p class="note">${[["ATS-compliant resume", "CV submitted"], ["Weekly job application tracker", "Tracker submitted"], ["Report your first interview invite", "Interview reported"]].map(([t, l]) => `${has(x, t) ? "✓" : "○"} ${l}`).join(" · ")}${x.score ? ` · Discovery Call 2 score ${x.score}/10` : ""}</p>
+      <p class="note">${[["ATS-compliant resume", "CV submitted"], ["Weekly job application tracker", "Tracker submitted"], ["Report your first interview invite", "Interview reported"]].map(([t, l]) => `${has(x, t) ? "✓" : "○"} ${l}`).join(" · ")}${x.score ? ` · Discovery Call score ${x.score}/10` : ""}</p>
       ${x.pitch && (x.pitch.a || x.pitch.b || x.pitch.c) ? `<h4 style="margin:.8rem 0 .3rem">Pitch</h4><p class="note">${esc([x.pitch.a, x.pitch.b, x.pitch.c].filter(Boolean).join(" "))}</p>` : ""}
       <h4 style="margin:.8rem 0 .3rem">Applications</h4>${x.apps.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Role</th><th>Company</th><th>Status</th><th>Added</th></tr></thead><tbody>${x.apps.map((a) => `<tr><td data-label="Role"><b>${esc(a.role)}</b></td><td data-label="Company">${esc(a.co)}</td><td data-label="Status"><span class="pill ${a.st === "Offer" ? "ok" : a.st === "Interviewing" ? "now" : a.st === "Not selected" ? "bad" : ""}">${esc(a.st)}</span></td><td data-label="Added" class="note">${esc(a.on || "")}</td></tr>`).join("")}</tbody></table></div>` : `<p class="note">None yet.</p>`}
       <h4 style="margin:.8rem 0 .3rem">Outreach</h4>${x.outreach.length ? `<ul class="roles">${x.outreach.map((o) => `<li><b>${esc(o.name)} · ${esc(o.co)}</b><span class="note">${esc(o.ch)} · ${esc(o.on || "")}</span><span class="pill ${o.st === "Sent" ? "" : "ok"}">${esc(o.st)}</span></li>`).join("")}</ul>` : `<p class="note">None yet.</p>`}

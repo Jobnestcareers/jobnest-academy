@@ -40,10 +40,10 @@ export const STAGES = [
     activities: "CV rebuild, LinkedIn makeover and portfolio curation on Canva or Notion.",
     outputs: "ATS-compliant CV, optimised LinkedIn profile, published portfolio.",
     facilitators: "Talent Acquisition Specialists, CV writers, portfolio templates." },
-  { title: "Job Search and Pitching",
-    objective: "Run a focused job search with a strong pitch and interview preparation.",
-    activities: "1-on-1 coaching call with a mock interview, role matching, elevator pitch, cold outreach, applications.",
-    outputs: "Job Search Action Plan, recorded pitch, outreach log and application tracker.",
+  { title: "Discovery Call, Job Search and Pitching",
+    objective: "Find out where you stand after the course in a Discovery Call with a Career Coach, then run a focused job search with a strong pitch.",
+    activities: "Discovery Call (a 40-minute 1-on-1 review of your progress, CV and portfolio, with a short mock interview), role matching, elevator pitch, cold outreach, applications.",
+    outputs: "Interview Confidence Score, Job Search Action Plan, recorded pitch, outreach log and application tracker.",
     facilitators: "Career Coaches, interviewers, outreach templates." },
 ];
 
@@ -199,15 +199,16 @@ export function buildWeeks(track) {
     T("Publish your portfolio", "Curate your project and internship work on Canva or Notion.", true),
     { ...T("CV swap with a pod member", "Swap CVs with someone in your pod and give feedback using the checklist."), opt: true }],
     ["Rebuild your CV so it passes ATS filters", "Rewrite your LinkedIn headline and About section", "Publish a portfolio of your best work"]));
-  // Steps open in order inside a week, so the learner's own steps come first and the coach-led ones after.
-  weeks.push(W(7, "Job Search & Pitching", [T("Record your elevator pitch", "A 60-second video introducing yourself. Share the link.", true),
+  // Steps open in order inside a week. Booking the Discovery Call comes first; the call itself (marked by the coach) comes after the
+  // learner's own job-search steps, so nobody waits on the coach's diary to keep going.
+  weeks.push(W(7, "Discovery Call, Job Search & Pitching", [T("Book your Discovery Call", "Your Discovery Call is a 40-minute 1-on-1 with a Career Coach after the course. Pick a time on this week's page."),
+    T("Record your elevator pitch", "A 60-second video introducing yourself. Share the link.", true),
     T("Send 10 cold outreach messages", "Use the templates and log each one."),
-    T("Book your 1-on-1 session", "Pick a slot with your Career Coach."),
     T("Weekly job application tracker", "Log your applications and submit your tracker on Friday.", true),
     { ...T("Report your first interview invite", "Tell your coach so they can help you prepare."), opt: true },
-    T("Mock interview simulation", "A 40-minute interview with feedback against the rubric."),
-    T("Finalise your Job Search Action Plan", "Target roles, companies and weekly application goals.", true)],
-    ["Complete a mock interview and leave with an action plan", "Deliver a confident 60-second pitch", "Apply consistently and track every application"]));
+    T("Have your Discovery Call", "Your coach reviews where you are now after the course: your results, CV and portfolio. You do a short mock interview and agree your next steps. Your coach marks this after the call."),
+    T("Finalise your Job Search Action Plan", "Write up what you agreed in your Discovery Call: target roles, companies and weekly application goals.", true)],
+    ["Know where you stand after the course, from your Discovery Call", "Deliver a confident 60-second pitch", "Apply consistently and track every application"]));
   const RES = { 1: ["Email templates pack", "DOC"], 2: ["Trello board template", "Template"], 11: ["Exam timetable and rules", "PDF"], 12: ["Project brief & rubric", "PDF"], 18: ["ATS CV template", "DOC"], 19: ["Interview question bank", "PDF"] };
   weeks.forEach((w, i) => {
     if (i === 0) return;
