@@ -24,7 +24,7 @@ SID=$(echo $V | python3 -c 'import json,sys;print(json.load(sys.stdin)["slots"][
 echo "book: $(anon "select book_call('$REF','$TOK',$SID)->>'status'" | tail -1)"
 AID=$($P -c "select id from applications where ref='$REF'")
 echo "wrong officer: $(as bayo@test.ng "select 1" | tail -1)"
-echo "complete: $(as kemi@test.ng "select officer_complete_call('$AID','Good call','DAT',null,'offer','Strong')->>'status'" | tail -1)"
+echo "complete: $(as kemi@test.ng "select officer_complete_call('$AID','Good call','BOP',null,'offer','Strong')->>'status'" | tail -1)"
 echo "officer cannot decide: $(as kemi@test.ng "select admin_decide('$AID','offer')" 2>&1 | tail -1)"
 echo "decide: $(as bayo@test.ng "select admin_decide('$AID','offer')->>'status'" | tail -1)"
 echo "applicant sees: $(anon "select applicant_view('$REF','$TOK')->>'status'" | tail -1)"
@@ -32,5 +32,5 @@ echo "wrong token: $(anon "select applicant_view('$REF','00000000-0000-0000-0000
 echo "outbox: $($P -c "select string_agg(template, ', ' order by id) from outbox")"
 echo "email sample: $($P -c "select subject || ' | ' || left(replace(body, E'\n', ' '), 140) || ' | ' || link from outbox where template='booked'")"
 echo "me: $(as kemi@test.ng "select me()" | tail -1)"
-echo "settings: $(as bayo@test.ng "select admin_save_settings('{\"cohort\":{\"pass_mark\":70},\"tracks\":[{\"code\":\"DAT\",\"seats\":1}]}')->'cohort'->>'pass_mark'" | tail -1)"
+echo "settings: $(as bayo@test.ng "select admin_save_settings('{\"cohort\":{\"pass_mark\":70},\"tracks\":[{\"code\":\"BOP\",\"seats\":1}]}')->'cohort'->>'pass_mark'" | tail -1)"
 echo "overview: $(as bayo@test.ng "select adm_overview()->'tracks'->2" | tail -1)"

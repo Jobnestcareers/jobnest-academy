@@ -5,20 +5,20 @@ anon() { $P -c "set role anon; select set_config('request.jwt.claims','{}',false
 srv() { $P -c "set role service_role;" -c "$1"; }
 as() { $P -c "set role authenticated; select set_config('request.jwt.claims','{\"email\":\"$1\",\"sub\":\"00000000-0000-0000-0000-000000000001\"}',false);" -c "$2"; }
 ADA=gep-27a-001@students.jobnestcareers.com; BEN=gep-27a-002@students.jobnestcareers.com
-$P -c "update applications set track_code='CSP' where email='ben@test.ng'"
+$P -c "update applications set track_code='CSG' where email='ben@test.ng'"
 $P -c "update cohorts set start_date = current_date - 10"   # we're in week 2
-as owner@test.ng "select super_save_staff('fola@test.ng','Fola Facil','facilitator',true,'DAT') is not null" >/dev/null
+as owner@test.ng "select super_save_staff('fola@test.ng','Fola Facil','facilitator',true,'BOP') is not null" >/dev/null
 as owner@test.ng "select super_save_staff('cm@test.ng','Chi Manager','cohort_manager',true,null) is not null" >/dev/null
-as owner@test.ng "select super_save_staff('tobi@test.ng','Tobi CSP','facilitator',true,'CSP') is not null" >/dev/null
+as owner@test.ng "select super_save_staff('tobi@test.ng','Tobi CSP','facilitator',true,'CSG') is not null" >/dev/null
 echo "student login reserved: $(as owner@test.ng "select super_save_staff('x@students.jobnestcareers.com','X','facilitator')" 2>&1 | grep -o 'reserved.*')"
 echo "anon campus: $(anon "select student_campus()" 2>&1 | grep -o 'permission denied.*')"
 echo "staff as student: $(as fola@test.ng "select student_campus()" 2>&1 | grep -o 'Please sign in.*')"
 echo "fola all-track lesson: $(as fola@test.ng "select acad_save_lesson('{\"week\":1,\"title\":\"Welcome\"}')" 2>&1 | grep -o 'only add.*')"
-as fola@test.ng "select acad_save_lesson('{\"week\":1,\"track_code\":\"DAT\",\"kind\":\"video\",\"title\":\"Intro to spreadsheets\",\"url\":\"https://youtu.be/x\"}')" >/dev/null
+as fola@test.ng "select acad_save_lesson('{\"week\":1,\"track_code\":\"BOP\",\"kind\":\"video\",\"title\":\"Intro to spreadsheets\",\"url\":\"https://youtu.be/x\"}')" >/dev/null
 as cm@test.ng "select acad_save_lesson('{\"week\":1,\"title\":\"Welcome to GEP\",\"body\":\"Read this first.\"}')" >/dev/null
 as cm@test.ng "select acad_save_lesson('{\"week\":5,\"title\":\"Future week\"}')" >/dev/null
 echo "bad url: $(as cm@test.ng "select acad_save_lesson('{\"week\":1,\"title\":\"x\",\"url\":\"javascript:alert(1)\"}')" 2>&1 | grep -o 'Links must.*')"
-TID=$(as fola@test.ng "select acad_save_task('{\"week\":2,\"track_code\":\"DAT\",\"title\":\"Clean a dataset\",\"brief\":\"Share a Google Sheet\",\"due_at\":\"$(date -u -d '+2 days' +%FT%TZ)\"}')->>'id'" | tail -1)
+TID=$(as fola@test.ng "select acad_save_task('{\"week\":2,\"track_code\":\"BOP\",\"title\":\"Clean a dataset\",\"brief\":\"Share a Google Sheet\",\"due_at\":\"$(date -u -d '+2 days' +%FT%TZ)\"}')->>'id'" | tail -1)
 as cm@test.ng "select acad_save_session('{\"title\":\"Week 2 live class\",\"starts_at\":\"$(date -u -d '+10 minutes' +%FT%TZ)\",\"minutes\":60,\"link\":\"https://meet.google.com/abc\"}')" >/dev/null
 SID=$($P -c "select id from sessions limit 1")
 C=$(as $ADA "select student_campus()" | tail -1)
@@ -41,7 +41,7 @@ echo "attendance list: $(as fola@test.ng "select jsonb_path_query_array(acad_att
 MARKS=$($P -c "select jsonb_agg(jsonb_build_object('id',id,'status','present')) from applications where status='Admitted'")
 echo "cm marks: $(as cm@test.ng "select acad_mark_attendance($SID, '$MARKS')" | tail -1)"
 echo "announce emailed: $(as cm@test.ng "select acad_announce('Welcome to Week 2','Live class today at 10.',null,true)" | tail -1)"
-echo "fola announce to CSP: $(as fola@test.ng "select acad_announce('x','y','CSP',false)" 2>&1 | grep -o 'only post.*')"
+echo "fola announce to CSP: $(as fola@test.ng "select acad_announce('x','y','CSG',false)" 2>&1 | grep -o 'only post.*')"
 echo "students page: $(as cm@test.ng "select jsonb_path_query_array(acad_students()->'students','\$[*].matric')" | tail -1)"
 echo "ada progress: $(as cm@test.ng "select jsonb_build_object('passed',s->'tasks_passed','attended',s->'sessions_attended','account',s->'account') from jsonb_array_elements(acad_students()->'students') s where s->>'matric'='GEP/27A/001'" | tail -1)"
 echo "invite: $(as cm@test.ng "select acad_invite()" | tail -1) then again: $(as cm@test.ng "select acad_invite()" | tail -1)"

@@ -23,8 +23,8 @@ const balanceOf = (a) => a.plan && a.fees ? Math.max(0, (a.fees.plan_total || 0)
 const MY_APP = "jn.myapp";
 
 const LOGO = `<svg width="30" height="30" viewBox="0 0 36 36" aria-hidden="true"><rect width="36" height="36" rx="10" fill="#0F7B6C"/><path d="M8 20c1.5 6 18.5 6 20 0" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/><circle cx="18" cy="14" r="4.2" fill="#F4B740"/></svg>`;
-const ROUTE_STOPS = [["Week 1", "Orientation"], ["Weeks 2–3", "The Fundamentals"], ["Weeks 4–7", "Core Skill Learning"], ["Weeks 8–9", "Client Project"],
-  ["Weeks 10–13", "Internship"], ["Week 14", "CV, LinkedIn & Portfolio"], ["Week 15", "Discovery Call 2"], ["Weeks 16–17", "Job Search & Personal Pitch"]];
+const ROUTE_STOPS = [["Week 1", "Orientation"], ["Weeks 2–3", "Fundamental Learning"], ["Weeks 4–11", "Core Skill Learning"], ["Week 12", "Examinations"],
+  ["Weeks 13–14", "Practical Project"], ["Weeks 15–18", "Internship"], ["Week 19", "CV & Portfolio"], ["Week 20", "Job Search & Pitching"]];
 const STAGES_APP = ["Submitted", "Assessment", "Discovery Call", "Offer", "Payment", "Admitted"];
 const APP_STAGE = { "Assessment pending": 1, "Assessment failed": 1, "Call to book": 2, "Call booked": 2, "Closed: no matching track": 2, "Under review": 3,
   "Offer sent": 3, "Waitlisted": 3, "Not selected": 3, "Offer expired": 3, "Offer declined": 3, "Deferred": 3, "Admitted": 5 };
@@ -115,16 +115,16 @@ const pubFoot = () => `<footer class="wrap lp-foot"><a class="link" href="#/chec
 const TEAM = [["Admissions", "Guides you from application to your first day."], ["Programme Director", "Leads the programme and its standards."],
   ["Cohort Manager", "Keeps you on track, week by week."], ["Facilitators", "Teach your track and mark your work."], ["Career Coach", "CV, LinkedIn and your job search."]];
 const TRACK_INFO = {
-  DAT: ["Turn messy numbers into clear answers.", ["Excel and Google Sheets", "Cleaning and organising data", "Charts and dashboards", "Presenting findings"], ["Junior Data Analyst", "Reporting Assistant"]],
-  DMK: ["Grow a brand online.", ["Social media content", "Basic copywriting", "Running small ad campaigns", "Reading the results"], ["Social Media Assistant", "Marketing Assistant"]],
-  CSP: ["Help customers and solve problems well.", ["Clear written and spoken replies", "Help-desk tools", "Handling difficult customers", "Tracking and closing issues"], ["Customer Support Associate", "Customer Success Assistant"]],
-  ADM: ["Keep a team organised and running.", ["Calendars, email and documents", "Google Workspace and Microsoft 365", "Meeting notes and follow-ups", "Basic records and reporting"], ["Administrative Assistant", "Operations Assistant"]],
+  BOP: ["Keep a business organised and running.", ["Calendars, inboxes and business documents", "Spreadsheets, budgets and vendors", "Project coordination and SOPs", "Executive support and office records"], ["Operations Assistant", "Project Coordinator", "Executive / Virtual Assistant", "Admin Officer"]],
+  PTA: ["Help companies find and look after great people.", ["The recruitment lifecycle", "Job descriptions, sourcing and screening", "Interviews, onboarding and HR admin", "HR policies, data privacy and reporting"], ["Recruitment Coordinator", "HR Assistant", "Talent Sourcer"]],
+  CSG: ["Keep customers happy and help the business grow.", ["Support tools, live chat and email", "Customer success and onboarding", "CRM and sales prospecting", "Retention, upsell and CX reporting"], ["Customer Success Associate", "Sales Development Rep", "CRM Assistant", "Customer Support"]],
 };
 const part1Of = (p) => Math.ceil((p.inst_total || 0) / 2 / 500) * 500;
 const feeBox = (p, c) => { const t = p.inst_total || 0, a = part1Of(p), b = t - a, extra = t - p.fee, wk = c.inst_due_week || 6;
   return `<span class="nl-fees"><span class="nl-fee"><span>Pay in full</span><b>${naira(p.fee)}</b></span>${t > 0 ? `<span class="nl-fee two"><span class="nl-fee-r"><span>Or two parts</span><b>${naira(t)}</b></span><small>${naira(a)} to accept your place, then ${naira(b)} before Week ${wk}.${extra > 0 ? ` That's ${naira(extra)} more than paying in full.` : ""}</small></span>` : ""}<a class="nl-help" href="#/" data-act="jump" data-k="faq-cost">Need help with fees?</a></span>`; };
 const teamOf = () => { try { return JSON.parse(INFO.team || "{}") || {}; } catch { return {}; } };
 const FAQ = [["Can I join during NYSC?", "Yes."], ["Do I need experience?", "No. Just basic digital skills and clear communication."],
+  ["How am I graded?", "Ten weekly assessments (40 marks), two examinations in Week 12 (60 marks) and a practical project (100 marks). Your final score is the total divided by 2: Distinction 80–100, Merit 60–79, Pass 50–59."],
   ["Will I get a job at the end?", "We can't promise one, but you'll finish with experience, a portfolio and coaching."]];
 const TICK = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12l5 5 9-9"/></svg>`;
 
@@ -156,22 +156,22 @@ function pageHome() {
       <div class="nl-hero-txt">
         <p class="nl-status ${open ? "on" : ""}"><span class="nl-dot"></span>${open ? `Applications open${start ? ` · ${esc(c.name || "Next cohort")} starts ${start}` : ""}` : "Applications are closed for now"}</p>
         <h1 class="nl-h1">From graduate to work-ready.</h1>
-        <p class="nl-lead">In ${weeks} weeks, learn a skill employers pay for, deliver a real client project, intern with a company, and get coached through your job search. All online.</p>
+        <p class="nl-lead">In ${weeks} weeks, build the skills employers hire for, prove them in examinations and a practical project, intern with a company, and get coached through your job search. All online.</p>
         ${open ? `<div class="actions"><a class="btn gold lg" href="#/apply">Apply now →</a>${INFO.zuri_url ? `<a class="btn ghost lg nl-ghost" href="${esc(INFO.zuri_url)}" target="_blank" rel="noopener">Not sure which path fits? Ask Zuri</a>` : ""}</div>${INFO.zuri_url ? `<p class="nl-zsub">Zuri is our career assistant. Chat now, no booking needed.</p>` : ""}`
           : `<p class="note">Applications for the next cohort will open soon. Check back here.</p>`}
       </div>
       <div class="nl-art" aria-hidden="true">
-        <div class="nl-card nl-c1"><span class="nl-eyebrow">Your route · Week 8 of ${weeks}</span><div class="nl-bars"><i class="d"></i><i class="d"></i><i class="n"></i><i></i></div><div class="nl-bl"><span>Learn</span><span>Skills</span><span class="b">Project</span><span>Intern</span></div></div>
+        <div class="nl-card nl-c1"><span class="nl-eyebrow">Your route · Week 13 of ${weeks}</span><div class="nl-bars"><i class="d"></i><i class="d"></i><i class="n"></i><i></i></div><div class="nl-bl"><span>Skills</span><span>Exams</span><span class="b">Project</span><span>Intern</span></div></div>
         <div class="nl-card nl-c2"><span class="nl-time">10:00</span><span class="nl-c2t"><b>Live class</b><small>With your facilitator</small></span><span class="nl-join">Join</span></div>
-        <div class="nl-card nl-c3"><span class="nl-c3h"><b>Client project</b><span class="pill ok">Passed</span></span><small>Feedback from your facilitator, then it goes in your portfolio.</small></div>
+        <div class="nl-card nl-c3"><span class="nl-c3h"><b>Practical project</b><span class="pill ok">82/100</span></span><small>Graded against the rubric, then it goes in your portfolio.</small></div>
       </div></div></section>
     <section class="nl-finish"><div class="wrap"><h2 class="nl-h2">You'll finish with.</h2>
       <div class="nl-finrow"><ul class="nl-fin">
-        <li><b>A certificate</b><span>Signed by the Programme Director, and easy for employers to verify.</span></li>
-        <li><b>A real client project</b><span>In your portfolio, with feedback you can show employers.</span></li>
+        <li><b>A graded certificate</b><span>Distinction, Merit or Pass, signed by the Programme Director and easy for employers to verify.</span></li>
+        <li><b>A practical project</b><span>In your portfolio, graded with feedback you can show employers.</span></li>
         <li><b>Internship experience</b><span>Four weeks with a partner company.</span></li>
         <li><b>A job-ready CV and LinkedIn</b><span>Reviewed with your Career Coach.</span></li></ul>
-        <div class="nl-certwrap"><div class="cert-box nl-cert" aria-label="Example certificate">${certHTML({ name: "Aiden Ivwurie", programme: p.name || "Graduate Employability Programme", weeks, track: "", completed_on: null, cert_id: "JNA-GEP27A-001", signer_name: INFO.signer_name || "Shekemi Odeyemi", signer_title: INFO.signer_title || "Programme Director", year: String(new Date().getFullYear() + 1) })}</div></div>
+        <div class="nl-certwrap"><div class="cert-box nl-cert" aria-label="Example certificate">${certHTML({ name: "Aiden Ivwurie", programme: p.name || "Graduate Employability Programme", weeks, track: "", class: "Merit", completed_on: null, cert_id: "JNA-GEP27A-001", signer_name: INFO.signer_name || "Shekemi Odeyemi", signer_title: INFO.signer_title || "Programme Director", year: String(new Date().getFullYear() + 1) })}</div></div>
       </div></div></section>
     <section class="nl-route"><div class="wrap"><div class="nl-route-h"><h2 class="nl-h2">The ${weeks} weeks.</h2><a class="nl-more" href="#/tracks">See what you can learn →</a></div>
       <ol class="nl-weeks">${ROUTE_STOPS.map(([w, t], i) => `<li class="${i === ROUTE_STOPS.length - 1 ? "end" : ""}"><span>${w}</span><b>${t}</b></li>`).join("")}</ol></div></section>
@@ -418,7 +418,7 @@ function pageLetter(a, base) {
         <div><dt>Cohort</dt><dd>${esc(a.cohort)}</dd></div><div><dt>Matric number</dt><dd class="mono">${esc(a.matric)}</dd></div>
         <div><dt>Start date</dt><dd>${fmtDateD(a.start_date)} (Week 1: Orientation)</dd></div><div><dt>Duration</dt><dd>${a.weeks} weeks online, about 15 hours a week</dd></div>
         <div class="wide"><dt>Fees</dt><dd>${fees}</dd></div></dl>
-      <p>Over the ${a.weeks} weeks you will build the core skills for your track, deliver a client project, complete an internship, and be coached through your job search.</p>
+      <p>Over the ${a.weeks} weeks you will build the core skills for your track, sit two examinations, deliver a practical project, complete an internship, and be coached through your job search.</p>
       <h2>Before you start</h2>
       <ul><li>We'll email your student portal sign-in before the start date. You'll sign in with your matric number.</li>
         <li>Make sure you have a laptop and reliable internet for about 15 hours a week.</li>
@@ -585,23 +585,23 @@ const pwOk = (a, b, err) => {
 /* ---------- staff: portal shell ---------- */
 const SUPER_NAV = [{ g: "Overview" }, { k: "command", l: "Command centre" }, { k: "attention", l: "Needs attention" },
   { g: "Admissions" }, { k: "apps", l: "Applications" }, { k: "calls", l: "Calls" }, { k: "times", l: "Call times" }, { k: "decide", l: "Decisions" }, { k: "pay", l: "Payments" },
-  { g: "Academy" }, { k: "students", l: "Students" }, { k: "grading", l: "Grading" }, { k: "intern", l: "Internships" }, { k: "dc2", l: "Discovery Call 2" }, { k: "pods", l: "Pods" },
+  { g: "Academy" }, { k: "students", l: "Students" }, { k: "grading", l: "Grading" }, { k: "results", l: "Results" }, { k: "exams", l: "Examinations" }, { k: "intern", l: "Internships" }, { k: "dc2", l: "Discovery Call 2" }, { k: "pods", l: "Pods" },
   { k: "sessions", l: "Live sessions" }, { k: "news", l: "Announcements" }, { k: "support", l: "Help requests" }, { k: "discussion", l: "Discussion" }, { k: "content", l: "Content" },
   { g: "Careers" }, { k: "jobs", l: "Job search" }, { k: "opps", l: "Opportunities" }, { k: "outcomes", l: "Outcomes & alumni" },
   { g: "Role pages" }, { k: "health", l: "Programme Director" }, { k: "today", l: "Cohort Manager" }, { k: "desk", l: "Facilitator" }, { k: "career", l: "Career Coach" }, { k: "ops", l: "Academy Admin" }, { k: "pipeline", l: "Admissions Admin" }, { k: "home", l: "Admissions Officer" },
   { g: "Organisation" }, { k: "staff", l: "Staff & access" }, { k: "emails", l: "Emails" }, { k: "settings", l: "Settings" }, { k: "audit", l: "Activity log" }];
 const N = (k, l) => ({ k, l }), G = (g) => ({ g });
 const ROLE_NAV = {
-  director: [G("Overview"), N("health", "Programme health"), G("Learning"), N("students", "Students"), N("grading", "Grading"), N("sessions", "Live sessions"), N("news", "Announcements"), N("pods", "Pods"), N("content", "Content"),
+  director: [G("Overview"), N("health", "Programme health"), G("Learning"), N("students", "Students"), N("grading", "Grading"), N("results", "Results"), N("exams", "Examinations"), N("sessions", "Live sessions"), N("news", "Announcements"), N("pods", "Pods"), N("content", "Content"),
     G("Work experience"), N("intern", "Internships"), N("dc2", "Discovery Call 2"), N("jobs", "Job search"), N("opps", "Opportunities"), N("outcomes", "Outcomes & alumni"), G("Support"), N("support", "Help requests"), N("discussion", "Discussion")],
-  cohort_manager: [G("Today"), N("today", "Today"), G("Cohort"), N("students", "Students"), N("grading", "Grading"), N("sessions", "Live sessions"), N("news", "Announcements"), N("pods", "Pods"), N("content", "Content"),
+  cohort_manager: [G("Today"), N("today", "Today"), G("Cohort"), N("students", "Students"), N("grading", "Grading"), N("results", "Results"), N("exams", "Examinations"), N("sessions", "Live sessions"), N("news", "Announcements"), N("pods", "Pods"), N("content", "Content"),
     G("Support"), N("support", "Help requests"), N("discussion", "Discussion"), G("Work experience"), N("intern", "Internships"), N("dc2", "Discovery Call 2"), N("jobs", "Job search"), N("opps", "Opportunities"), N("outcomes", "Outcomes & alumni")],
-  facilitator: [G("My work"), N("desk", "Grading desk"), N("grading", "All submissions"), G("My track"), N("students", "Students"), N("sessions", "Live sessions"), N("news", "Announcements"), N("content", "Content"), N("pods", "Pods"),
+  facilitator: [G("My work"), N("desk", "Grading desk"), N("grading", "All submissions"), N("results", "Results"), G("My track"), N("students", "Students"), N("sessions", "Live sessions"), N("news", "Announcements"), N("content", "Content"), N("pods", "Pods"),
     G("Supervision"), N("intern", "Internships"), G("Support"), N("support", "Help requests"), N("discussion", "Discussion")],
   coach: [G("Today"), N("career", "Career desk"), G("Calls"), N("dc2", "Discovery Call 2"), G("Job search"), N("jobs", "Job search"), N("opps", "Opportunities"), N("outcomes", "Outcomes & alumni"),
     G("Students"), N("students", "Students"), N("intern", "Internships"), N("pods", "Pods"), N("sessions", "Live sessions"), N("news", "Announcements"), N("support", "Help requests"), N("discussion", "Discussion")],
   academy_admin: [G("Today"), N("ops", "Operations"), G("Work experience"), N("intern", "Internships"), N("opps", "Opportunities"), N("jobs", "Job search"), N("outcomes", "Outcomes & alumni"),
-    G("Cohort"), N("students", "Students"), N("sessions", "Live sessions"), N("news", "Announcements"), N("pods", "Pods"), N("content", "Content"), G("Support"), N("support", "Help requests"), N("discussion", "Discussion")],
+    G("Cohort"), N("students", "Students"), N("results", "Results"), N("exams", "Examinations"), N("sessions", "Live sessions"), N("news", "Announcements"), N("pods", "Pods"), N("content", "Content"), G("Support"), N("support", "Help requests"), N("discussion", "Discussion")],
   adm_admin: [G("Today"), N("pipeline", "Pipeline"), G("Admissions"), N("decide", "Decisions"), N("apps", "Applications"), N("pay", "Payments"), G("Setup"), N("emails", "Emails"), N("settings", "Settings"), G("Academy"), N("students", "Students")],
   adm_officer: [G("Today"), N("home", "Today's calls"), G("Admissions"), N("calls", "Calls"), N("times", "Call times"), N("apps", "Applications")]
 };
@@ -654,7 +654,7 @@ async function pagePortal(tab, sub) {
   if (!(tab === "student" && sub && ["super", "director", "cohort_manager", "academy_admin", "facilitator", "coach"].includes(ME.role)) && !items.some((x) => x.k === tab)) tab = items[0].k;
   if (!ui.pinged) { ui.pinged = true; rpc("staff_ping").catch(() => {}); }
   if (ui.testMode === undefined && ["super", "adm_admin", "academy_admin"].includes(ME.role)) ui.testMode = await rpc("admin_test_mode", {}).catch(() => null);
-  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, intern: tabIntern, dc2: tabDc2, jobs: tabJobs, pods: tabPods, health: tabHealth, today: tabToday, desk: tabDesk, career: tabCareer, ops: tabOps, pipeline: tabPipeline, command: tabCommand, attention: tabAttention, student: () => tabStudent360(sub), support: tabSupport, discussion: tabDiscussion, opps: tabOpps, outcomes: tabOutcomes, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
+  const pages = { home: tabHome, calls: tabCalls, times: tabTimes, decide: tabDecide, pay: tabPay, apps: tabApps, students: tabStudents, content: tabContent, grading: tabGrading, results: () => (sub ? tabResultDetail(sub) : tabResults()), exams: tabExams, intern: tabIntern, dc2: tabDc2, jobs: tabJobs, pods: tabPods, health: tabHealth, today: tabToday, desk: tabDesk, career: tabCareer, ops: tabOps, pipeline: tabPipeline, command: tabCommand, attention: tabAttention, student: () => tabStudent360(sub), support: tabSupport, discussion: tabDiscussion, opps: tabOpps, outcomes: tabOutcomes, sessions: tabSessions, news: tabNews, emails: tabEmails, settings: tabSettings, staff: tabStaff, audit: tabAudit, soon: tabSoon };
   const counts = Promise.all([rpc("staff_counts").catch(() => ({})), rpc("staff_counts_extra").catch(() => ({}))]).then(([x, y]) => ({ ...(x || {}), ...(y || {}) }));
   try { await pages[tab](); }
   catch (e) { shell(tab, "Something went wrong", "", `<div class="notice">${esc(e.message)}</div>`); }
@@ -662,7 +662,7 @@ async function pagePortal(tab, sub) {
 }
 
 /* ---------- Super Admin: command centre ---------- */
-const STAGE_OF_WEEK = (w) => w <= 1 ? "Orientation" : w <= 3 ? "Fundamentals" : w <= 7 ? "Core skills" : w <= 9 ? "Client project" : w <= 13 ? "Internship" : w === 14 ? "CV & portfolio" : w === 15 ? "Discovery Call 2" : "Job search";
+const STAGE_OF_WEEK = (w) => w <= 1 ? "Orientation" : w <= 3 ? "Fundamentals" : w <= 11 ? "Core skills" : w === 12 ? "Examinations" : w <= 14 ? "Practical project" : w <= 18 ? "Internship" : w === 19 ? "CV & portfolio" : "Job search";
 const agoS = (t) => { if (!t) return "—"; const m = Math.round((Date.now() - new Date(t)) / 6e4); return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} day${Math.round(m / 1440) === 1 ? "" : "s"} ago`; };
 const waitS = (t) => { if (!t) return ""; const h = Math.max(0, (Date.now() - new Date(t)) / 36e5); return h < 1 ? "under an hour" : h < 48 ? `${Math.round(h)} hours` : `${Math.round(h / 24)} days`; };
 const nairaK = (n) => n >= 1e6 ? "₦" + (n / 1e6).toFixed(2).replace(/\.?0+$/, "") + "m" : n >= 1e4 ? "₦" + Math.round(n / 1e3) + "k" : naira(n);
@@ -801,7 +801,7 @@ async function tabStudent360(id) {
             <div class="field"><label for="s3e-t">In one line</label><input id="s3e-t" maxlength="200" placeholder="e.g. One more Week ${s.cur} retake for ${esc(s.first_name)}"></div></div>
           <div class="field"><label for="s3e-d">Why</label><textarea id="s3e-d" rows="2" placeholder="What happened and what you recommend"></textarea></div><div><button class="btn sm" type="submit">Send</button></div></form></details>` : ""}
         ${s.notes.length ? `<ul class="sc-act">${s.notes.map((n) => `<li><span class="mono note">${fmtDay(n.at)}</span><span>${lines(n.body)}<small class="note" style="display:block">${esc(n.by)} · ${agoS(n.at)} <button class="link sm" data-act="s3-note-del" data-k="${n.id}">Delete</button></small></span></li>`).join("")}</ul>` : `<p class="empty">No notes yet.</p>`}</div></section>`,
-    learning: `<section class="card"><div class="sc-h"><div><span class="eyebrow">Learning</span><h2>Every week, every score</h2></div><span class="note">Pass mark ${s.pass}%. One retake is allowed per week.</span></div>
+    learning: `<section class="card"><div class="sc-h"><div><span class="eyebrow">Learning</span><h2>Every week, every score</h2></div><span class="note">Assessments have one attempt, no resits. <a class="link" href="#/portal/results/${s.id}">Full result →</a></span></div>
       <div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Week</th><th>Assessment</th><th>Week project</th><th>Average</th><th>Attempts</th><th>Status</th><th></th></tr></thead><tbody>
       ${weeks.map((w) => `<tr><td data-label="Week"><b>Week ${w.week}</b><span class="note" style="display:block">${esc(w.title || STAGE_OF_WEEK(w.week))}</span></td><td data-label="Assessment" class="mono">${w.quiz != null ? w.quiz + "%" : "—"}</td><td data-label="Project" class="mono">${w.proj != null ? w.proj + "%" : "—"}</td>
         <td data-label="Average" class="mono"><b>${w.avg != null ? w.avg + "%" : "—"}</b></td><td data-label="Attempts" class="mono">${w.attempt || (w.quiz != null ? 1 : "—")}${w.repeats ? ` · repeated ${w.repeats - 1}×` : ""}</td>
@@ -811,8 +811,8 @@ async function tabStudent360(id) {
       ${F.plan === "two" && F.total > F.paid && s.can.money ? `<form class="card form" id="s3-extend" novalidate><span class="eyebrow">Second instalment</span><h2 class="sc-h2">Give more time to pay</h2><p class="note">Due ${fmtDateD(F.due_date)}${F.extended ? " (already extended)" : ""}. A new date opens their learning straight away and sends them an alert.</p>
         <div class="field"><label for="s3-date">New due date</label><input id="s3-date" type="date" min="${new Date().toISOString().slice(0, 10)}" value="${F.extended ? F.due_date : ""}"></div><p class="err" id="s3-ext-err" role="alert"></p>
         <div class="actions"><button class="btn sm" type="submit">Save new date</button>${F.extended ? `<button class="btn sm ghost" type="button" data-act="s3-unextend">Remove extension</button>` : ""}<button class="btn sm ghost" type="button" data-act="s3-remind">Send a reminder</button></div></form>` : ""}</section>`,
-    career: `<section class="sc-2"><div class="card"><span class="eyebrow">Internship · Weeks 10–13</span>${s.placement ? `<h2 class="sc-h2">${esc(s.placement.role)} at ${esc(s.placement.org)}</h2><dl class="s3-kv"><dt>Supervisor</dt><dd>${esc(s.placement.sup_name || "—")}${s.placement.sup_email ? ` · <a href="mailto:${esc(s.placement.sup_email)}">${esc(s.placement.sup_email)}</a>` : ""}</dd><dt>Evaluation</dt><dd>${s.eval ? `Received${s.eval.overall ? ` · ${esc(String(s.eval.overall))}` : ""}` : "Not yet"}</dd></dl>`
-        : `<h2 class="sc-h2">Not placed yet</h2><p class="note">Placements are matched before Week 10.</p><a class="btn sm" href="#/portal/intern">Assign a placement</a>`}</div>
+    career: `<section class="sc-2"><div class="card"><span class="eyebrow">Internship · Weeks 15–18</span>${s.placement ? `<h2 class="sc-h2">${esc(s.placement.role)} at ${esc(s.placement.org)}</h2><dl class="s3-kv"><dt>Supervisor</dt><dd>${esc(s.placement.sup_name || "—")}${s.placement.sup_email ? ` · <a href="mailto:${esc(s.placement.sup_email)}">${esc(s.placement.sup_email)}</a>` : ""}</dd><dt>Evaluation</dt><dd>${s.eval ? `Received${s.eval.overall ? ` · ${esc(String(s.eval.overall))}` : ""}` : "Not yet"}</dd></dl>`
+        : `<h2 class="sc-h2">Not placed yet</h2><p class="note">Placements are matched before Week 15.</p><a class="btn sm" href="#/portal/intern">Assign a placement</a>`}</div>
       <div class="card"><span class="eyebrow">Career</span><h2 class="sc-h2">${s.outcome ? `Now: ${esc({ hired: "Employed", internship: "Internship", freelance: "Freelancing", study: "Studying", searching: "Still searching" }[s.outcome.status] || s.outcome.status)}` : "Career goals"}</h2>
         <dl class="s3-kv"><dt>Aiming for</dt><dd>${esc(s.career?.role || "—")}</dd><dt>Industries</dt><dd>${esc(s.career?.interests || "—")}</dd><dt>Discovery Call 2</dt><dd>${s.call2 ? `Scored ${s.call2.score}/10` : "Not yet"}</dd><dt>Applications</dt><dd>${s.apps_n || 0} tracked</dd>
           ${s.outcome?.company ? `<dt>Company</dt><dd>${esc(s.outcome.company)}${s.outcome.role ? ` · ${esc(s.outcome.role)}` : ""}</dd>` : ""}<dt>Certificate</dt><dd>${s.cert_id ? `<a class="link" href="#/certificate/${esc(s.cert_id)}" target="_blank" rel="noopener">${esc(s.cert_id)}</a>` : "Not issued"}</dd></dl></div></section>`,
@@ -865,12 +865,12 @@ async function tabHealth() {
   const bars = (arr) => `<div class="rh-spark" aria-hidden="true">${(arr || []).map((v) => `<i style="height:${v == null ? 4 : Math.max(8, v)}%" class="${v == null ? "na" : v < 70 ? "bad" : v < 85 ? "warn" : ""}"></i>`).join("")}</div>`;
   const F = d.feel || {}, fmax = Math.max(1, F.c1 || 0, F.c2 || 0, F.c3 || 0, F.c4 || 0, F.c5 || 0);
   const behind = A.behind1 + A.behind2, fmaxN = Math.max(1, A.behind2, A.behind1, A.on, A.ahead);
-  shell("health", hello(d.me), `${esc(C.name)} · ${C.week < 1 ? `starts ${fmtDateD(C.start_date)}` : `Week ${C.week} of 17 (${STAGE_OF_WEEK(C.week)})`}. ${d.pass_rate != null ? `Pass rate is <b>${d.pass_rate}%</b>${d.pass_rate >= 80 ? ", above" : ", below"} the 80% target.` : ""} ${open.length ? `${open.length} decision${open.length === 1 ? " is" : "s are"} waiting for you.` : "Nothing is waiting for you."}`,
-    `<section class="sc-kpis">${target("Weekly pass rate", d.pass_rate != null ? d.pass_rate + "%" : "—", d.pass_rate, 80, `Target 80%${d.pass_last != null ? ` · last week ${d.pass_last}%` : ""}`)}
+  shell("health", hello(d.me), `${esc(C.name)} · ${C.week < 1 ? `starts ${fmtDateD(C.start_date)}` : `Week ${C.week} of ${C.weeks || 20} (${STAGE_OF_WEEK(C.week)})`}. ${d.pass_rate != null ? `<b>${d.pass_rate}%</b> of final results are Pass or better${d.pass_rate >= 80 ? ", above" : ", below"} the 80% target.` : ""} ${open.length ? `${open.length} decision${open.length === 1 ? " is" : "s are"} waiting for you.` : "Nothing is waiting for you."}`,
+    `<section class="sc-kpis">${target("Pass rate (final results)", d.pass_rate != null ? d.pass_rate + "%" : "—", d.pass_rate, 80, `Target 80% Pass or better${d.pass_last != null ? ` · average assessments ${d.pass_last}/40` : ""}`)}
       ${target("On course to graduate", d.students ? pct(onCourse, d.students) + "%" : "—", pct(onCourse, d.students), 85, `${onCourse} of ${d.students} students · target 85%`)}
       ${target("Live class attendance", d.attend != null ? d.attend + "%" : "—", d.attend, 85, "Target 85%")}
       ${target("Graded within 2 days", d.grading_fast != null ? d.grading_fast + "%" : "—", d.grading_fast, 90, "Target 90%")}
-      ${target("In work 90 days after", d.in_work != null ? d.in_work + "%" : "—", d.in_work, 70, "Target 70% · measured after Week 17")}</section>
+      ${target("In work 90 days after", d.in_work != null ? d.in_work + "%" : "—", d.in_work, 70, "Target 70% · measured after Week 20")}</section>
     <section class="sc-2">
       <div class="card"><div class="sc-h"><div><span class="eyebrow">Escalated to you</span><h2>${open.length} decision${open.length === 1 ? "" : "s"} waiting</h2></div><span class="note">Cohort Managers, facilitators and coaches send these up from a student's page.</span></div>
         ${d.escalations.length ? `<ul class="sc-ql">${d.escalations.map((e) => `<li class="sc-q"><span class="st-av">${ini(e.name || e.by)}</span><div class="sc-q-t"><div class="sc-q-h"><b>${esc(e.title)}</b><span class="pill info">${ESC_KIND[e.kind] || e.kind}</span></div>
@@ -934,27 +934,113 @@ async function tabToday() {
     { eyebrow: todayEyebrow("Today"), actions: `<a class="btn ghost" href="#/portal/discussion">Discussion</a><a class="btn" href="#cm-news">New announcement</a>` });
 }
 
+/* ---------- Results, examinations and grading (Programme & Grading Policy) ---------- */
+const RES_ST = (r) => r.status === "Complete" ? (r.class ? `<span class="pill ${r.grade === "F" ? "bad" : "ok"}">${esc(r.class)}</span>` : `<span class="pill ok">Complete</span>`) : `<span class="pill now" title="${esc((r.missing || []).join(" · "))}">Pending</span>`;
+const m1 = (n) => n == null ? "—" : String(Math.round(n * 10) / 10);
+function resultsCsv(d) {
+  const S = d.students, aT = (S[0]?.result.assessments || []).map((x, i) => `A${i + 1} (wk ${x.week}) /4`);
+  const head = ["Matric", "Name", "Track", ...aT, "Assessments /40", "Fundamental /30", "Core /40", "Examinations /60", "Project /100", "Final /100", "Grade", "Classification", "Status", "Missing"];
+  const q = (v) => { const t = v == null ? "" : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+  const rows = S.map((s) => { const r = s.result; return [s.matric, s.name, d.tracks[s.track] || s.track || "", ...r.assessments.map((x) => x.marks ?? (x.status === "Missed" ? 0 : "")),
+    r.assess_score, r.fund.score ?? "", r.core.score ?? "", r.exam_score ?? "", r.project.score ?? "", r.final ?? "", r.grade ?? "", r.class ?? "", r.status, (r.missing || []).join("; ")]; });
+  const csv = [head, ...rows].map((r) => r.map(q).join(",")).join("\r\n");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv" }));
+  a.download = `jobnest-results-${(d.cohort.name || "cohort").replace(/[^A-Za-z0-9]+/g, "-")}.csv`; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+async function tabResults() {
+  const d = await rpc("acad_results", { p_cohort: ui.resCohort || null }); ui.res = d;
+  const S = d.students, f = ui.resF || {}, q = (f.q || "").toLowerCase();
+  const L = S.filter((s) => (!f.track || s.track === f.track) && (!f.st || (f.st === "pending" ? s.result.status === "Pending" : f.st === "missed" ? [s.result.fund.status, s.result.core.status].includes("Missed") : f.st === "ungraded" ? s.result.project.status === "Submitted" : s.result.grade === f.st))
+    && (!q || (s.name + " " + s.matric).toLowerCase().includes(q)));
+  const done = S.filter((s) => s.result.status === "Complete"), cnt = (g) => done.filter((s) => s.result.grade === g).length;
+  const pub = d.published;
+  shell("results", "Results", `${esc(d.cohort.name)} · examination week starts ${fmtDateD(d.cohort.exam_monday)}. Final score = (assessments /40 + examinations /60 + project /100) ÷ 2.`,
+    `<section class="sc-kpis sc-kpis4">${kpiBox("Complete", `${done.length}<small>/${S.length}</small>`, "every score in")}${kpiBox("Pending", S.length - done.length, "missing or ungraded scores")}${kpiBox("Distinction · Merit", `${cnt("A")} · ${cnt("B")}`, "")}${kpiBox("Pass · Fail", `${cnt("C")} · ${cnt("F")}`, "")}</section>
+    <div class="card"><div class="sc-h"><div><span class="eyebrow">Publishing</span><h2>${pub ? `Published ${fmtDay(pub.at)} by ${esc(pub.by)}` : "Not published"}</h2><span class="note">${pub ? "Students see their final score and classification. Changes now need the Programme Director or Super Admin." : "Students see their component scores now. Their final score and classification appear when you publish. Pending results stay Pending."}</span></div>
+      <div class="actions">${d.can_publish ? `<button class="btn ${pub ? "ghost" : "gold"}" data-act="res-publish" data-v="${pub ? 0 : 1}">${pub ? "Unpublish" : "Publish results"}</button>` : ""}<button class="btn ghost" data-act="res-csv">Export CSV</button>${["super", "director", "cohort_manager", "academy_admin"].includes(ME.role) ? `<a class="btn ghost" href="#/portal/exams">Examination settings</a>` : ""}</div></div></div>
+    <div class="card"><div class="filters">
+      ${d.cohorts.length > 1 ? `<select data-change="res-cohort" aria-label="Cohort">${d.cohorts.map((c) => `<option value="${c.id}" ${c.id === d.cohort.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select>` : ""}
+      <select data-change="res-track" aria-label="Track"><option value="">All tracks</option>${Object.entries(d.tracks).map(([k, v]) => `<option value="${k}" ${f.track === k ? "selected" : ""}>${esc(v)}</option>`).join("")}</select>
+      <select data-change="res-st" aria-label="Show"><option value="">Everyone</option>${[["pending", "Pending"], ["missed", "Missed an examination"], ["ungraded", "Project waiting for grading"], ["A", "Distinction"], ["B", "Merit"], ["C", "Pass"], ["F", "Fail"]].map(([k, v]) => `<option value="${k}" ${f.st === k ? "selected" : ""}>${v}</option>`).join("")}</select>
+      <input type="search" data-change="res-q" placeholder="Search name or matric" value="${esc(f.q || "")}" aria-label="Search"></div>
+      <div class="tbl-wrap"><table class="tbl res-tbl cards"><thead><tr><th>Student</th><th>Track</th><th class="mono">Assess. /40</th><th class="mono">Exams /60</th><th class="mono">Project /100</th><th class="mono">Final</th><th>Result</th></tr></thead><tbody>
+      ${L.map((s) => { const r = s.result; return `<tr><td data-label="Student"><a class="link" href="#/portal/results/${s.id}"><b>${esc(s.name)}</b></a><span class="note mono" style="display:block">${esc(s.matric)}</span></td><td data-label="Track">${esc(d.tracks[s.track] || "No track")}</td>
+        <td data-label="Assessments" class="mono">${m1(r.assess_score)}${r.assess_pending ? `<span class="note" style="display:block">${r.assess_pending} to take</span>` : r.assess_missed ? `<span class="note" style="display:block">${r.assess_missed} missed</span>` : ""}</td>
+        <td data-label="Examinations" class="mono">${r.exam_score ?? "—"}<span class="note" style="display:block">${r.fund.status === "Graded" ? r.fund.score : r.fund.status} · ${r.core.status === "Graded" ? r.core.score : r.core.status}</span></td>
+        <td data-label="Project" class="mono">${r.project.score ?? "—"}${r.project.score == null ? `<span class="note" style="display:block">${esc(r.project.status)}</span>` : ""}</td>
+        <td data-label="Final" class="mono"><b>${r.final ?? "—"}</b></td><td data-label="Result">${RES_ST(r)}</td></tr>`; }).join("") || `<tr><td colspan="7">${empty("No students match.")}</td></tr>`}</tbody></table></div></div>
+    <div class="card"><h3>Grading scale</h3>${scaleTable()}<p class="note">Scores are truncated, never rounded up: 79.5 is a Merit. A result stays Pending while any assessment, examination or the project has no score, unless the Programme Director approves an exception.</p></div>`);
+}
+async function tabResultDetail(id) {
+  const d = await rpc("acad_result_detail", { p_app: id }); ui.resD = d;
+  const r = d.result, edit = d.can_correct && (!d.locked || d.can_publish);
+  const fix = (comp, cur, mx, unit) => edit ? `<button class="btn sm ghost" data-act="res-fix" data-k="${comp}" data-v="${cur ?? ""}" data-mx="${mx}" data-u="${unit}">Correct</button>` : "";
+  const sitting = (k) => d.sittings.filter((x) => x.paper === k).map((x) => `<li>Attempt ${x.attempt}: started ${fmtAt(x.started_at)}${x.correct != null ? ` · <b>${x.correct}</b> correct` : " · in progress"}${x.late ? " · time ran out" : ""}</li>`).join("");
+  const exCard = (k) => { const e = r[k]; return `<div class="card"><div class="ch"><h3>${paperName(k)}</h3>${resPill(e.status)}</div>
+      <dl class="kv"><div><dt>Day</dt><dd>${fmtDateD(e.date)}</dd></div><div><dt>Score</dt><dd class="mono">${e.score != null ? `${e.score}/${e.questions}` : "—"}${e.corrected ? " (corrected)" : ""}</dd></div></dl>
+      ${sitting(k) ? `<ul class="note">${sitting(k)}</ul>` : ""}${e.resit ? `<div class="notice">Resit authorised for <b>${fmtDateD(e.resit.date)}</b>: ${esc(e.resit.reason)} ${edit ? `<button class="btn sm ghost" data-act="res-resit-x" data-k="${k}">Cancel resit</button>` : ""}</div>` : ""}
+      <div class="actions">${fix("exam-" + k, e.score, e.questions, "correct answers")}${edit ? `<button class="btn sm ghost" data-act="res-resit" data-k="${k}">Authorise a resit</button>` : ""}</div></div>`; };
+  shell("results", esc(d.name), `${esc(d.matric)} · ${esc(d.track || "No track")} · ${d.locked ? "results published" : "results not published yet"}`,
+    `<p><a class="link" href="#/portal/results">← All results</a> · <a class="link" href="#/portal/student/${d.id}">Student record</a></p>
+    <section class="sc-kpis sc-kpis4">${kpiBox("Assessments", `${m1(r.assess_score)}<small>/40</small>`, `${r.assess_taken} taken · ${r.assess_missed} missed · ${r.assess_pending} to take`)}${kpiBox("Examinations", `${r.exam_score ?? "—"}<small>/60</small>`, "(Fund + Core) ÷ 70 × 60")}${kpiBox("Project", `${r.project.score ?? "—"}<small>/100</small>`, esc(r.project.status))}${kpiBox("Final", `${r.final ?? "—"}<small>/100</small>`, r.class ? `${esc(r.class)} (${esc(r.grade)})` : "Pending")}</section>
+    ${r.status === "Pending" ? `<div class="notice"><b>Pending:</b> ${(r.missing || []).map(esc).join(" · ")}</div>` : ""}
+    <div class="card"><div class="ch"><h3>Exception</h3>${r.exception ? `<span class="pill now">Approved</span>` : ""}</div>
+      <p class="note">${r.exception ? `Approved by ${esc(r.exception.by)} on ${fmtDay(r.exception.at)}: ${esc(r.exception.reason)}. Missing scores count as zero.` : "With an approved exception, the final result is calculated with any missing score counted as zero. Only the Programme Director or Super Admin can approve one."}</p>
+      ${d.can_publish ? `<div class="actions"><button class="btn sm ${r.exception ? "ghost" : ""}" data-act="res-exc" data-v="${r.exception ? 0 : 1}">${r.exception ? "Remove the exception" : "Approve an exception"}</button></div>` : ""}</div>
+    <div class="card"><div class="ch"><h3>Weekly assessments</h3><b class="mono">${m1(r.assess_score)}/40</b></div>
+      <div class="tbl-wrap"><table class="tbl res-tbl cards"><thead><tr><th>Assessment</th><th>Status</th><th class="mono">Correct</th><th class="mono">Marks</th><th></th></tr></thead><tbody>
+      ${r.assessments.map((x) => `<tr><td data-label="Assessment">${esc(x.title)}<span class="note" style="display:block">Week ${x.week}${x.taken_at ? ` · ${fmtAt(x.taken_at)}` : ""}</span></td><td data-label="Status">${resPill(x.status)}${x.corrected ? ' <span class="pill">Corrected</span>' : ""}</td><td data-label="Correct" class="mono">${x.correct ?? "—"}/5</td><td data-label="Marks" class="mono">${x.marks ?? "—"}</td><td>${fix(x.key, x.correct, 5, "correct answers")}</td></tr>`).join("")}</tbody></table></div></div>
+    <div class="cols">${exCard("fund")}${exCard("core")}</div>
+    <div class="card"><div class="ch"><h3>Practical project</h3>${resPill(r.project.status)}</div>
+      <dl class="kv"><div><dt>Score</dt><dd class="mono">${r.project.score ?? "—"}/100${r.project.corrected ? " (corrected)" : ""}</dd></div><div><dt>Graded by</dt><dd>${esc(r.project.graded_by || "—")}</dd></div></dl>
+      ${r.project.rubric ? `<table class="tbl rub"><tbody>${Object.entries(r.project.rubric).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="mono">${v}</td></tr>`).join("")}</tbody></table>` : ""}
+      ${r.project.feedback ? `<p class="note">“${esc(r.project.feedback)}”</p>` : ""}<div class="actions">${fix("project", r.project.score, 100, "marks")}</div></div>
+    <div class="card"><h3>Score changes</h3>${d.changes.length ? `<ul class="roles">${d.changes.map((c) => `<li><b>${esc(c.component)}: ${c.old ?? "calculated"} → ${c.new ?? "calculated"}</b><span class="note">${esc(c.reason)} · ${esc(c.by)} · ${fmtAt(c.at)}</span></li>`).join("")}</ul>` : empty("No changes. Every score is calculated.")}</div>`);
+}
+const DAYN = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+async function tabExams() {
+  const d = await rpc("acad_exam_settings", {}); ui.exS = d;
+  const mon = d.exam_monday, dayD = (n) => { const x = new Date(mon + "T12:00:00Z"); x.setUTCDate(x.getUTCDate() + n - 1); return x.toISOString().slice(0, 10); };
+  shell("exams", "Examinations", `${esc(d.cohort)} · Week 12. Fundamental Examination: 30 questions on Monday or Tuesday. Core Skill Learning Examination: 40 questions by track on Wednesday, Thursday or Friday.`,
+    `<form class="card form" id="ex-set" novalidate><div class="sc-h"><div><span class="eyebrow">Timetable</span><h2>${d.published ? "Published to students" : "Not published yet"}</h2><span class="note">Students see their own dates once you publish. Publish before Week 12.</span></div></div>
+      <div class="grid2"><div class="field"><label for="ex-week">Examination week starts (Monday)</label><input id="ex-week" type="date" value="${esc(d.exam_week_start || "")}"><span class="note">Leave empty for Week 12: ${fmtDateD(d.week12_monday)}.</span></div>
+        <div class="field"><label>Start window each day</label><div class="grid2"><input id="ex-open" type="time" value="${esc(d.open)}" aria-label="Opens"><input id="ex-close" type="time" value="${esc(d.close)}" aria-label="Last start"></div><span class="note">Students can start any time in this window. Their timer runs from when they start.</span></div></div>
+      <div class="grid2"><div class="field"><label for="ex-fm">Fundamental time limit (minutes)</label><input id="ex-fm" type="number" min="10" max="240" value="${d.fund_minutes}"></div><div class="field"><label for="ex-cm">Core Skill Learning time limit (minutes)</label><input id="ex-cm" type="number" min="10" max="240" value="${d.core_minutes}"></div></div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Track</th><th>Fundamental day</th><th>Core Skill Learning day</th><th>Question pools</th></tr></thead><tbody>
+      ${d.schedule.map((t) => `<tr data-track="${t.track}"><td data-label="Track"><b>${esc(t.name)}</b></td>
+        <td data-label="Fundamental"><select class="ex-fd" aria-label="${esc(t.name)} Fundamental day">${[1, 2].map((n) => `<option value="${n}" ${t.fund_day === n ? "selected" : ""}>${DAYN[n]} · ${fmtDay(dayD(n))}</option>`).join("")}</select></td>
+        <td data-label="Core"><select class="ex-cd" aria-label="${esc(t.name)} Core day" ${t.track === "BOP" ? "disabled" : ""}>${[3, 4, 5].map((n) => `<option value="${n}" ${t.core_day === n ? "selected" : ""}>${DAYN[n]} · ${fmtDay(dayD(n))}</option>`).join("")}</select>${t.track === "BOP" ? `<span class="note" style="display:block">Always Wednesday (policy)</span>` : ""}</td>
+        <td data-label="Pools"><span class="pill ${t.fund_bank >= 30 ? "ok" : "bad"}">Fund ${t.fund_bank}</span> <span class="pill ${t.core_bank >= 40 ? "ok" : "bad"}">Core ${t.core_bank}</span></td></tr>`).join("")}</tbody></table></div>
+      <p class="note">Each candidate gets 30 (Fundamental) or 40 (Core) questions drawn at random from their track's pool, so papers differ. All questions carry equal weight: examination score = (correct ÷ 70) × 60.</p>
+      <label class="consent"><input type="checkbox" id="ex-pub" ${d.published ? "checked" : ""}> <span><b>Publish the timetable to students</b></span></label>
+      <p class="err" id="ex-err" role="alert"></p><div class="actions"><button class="btn" type="submit">Save examination settings</button><a class="btn ghost" href="#/portal/results">Results</a></div></form>`);
+}
+
 /* ---------- Facilitator: grading desk ---------- */
 const RUBRIC4 = [["Meets the brief", 40, "Answers every part of the task", [0, 10, 20, 30, 40]], ["Quality of work", 30, "Correct, clean and well reasoned", [0, 10, 20, 25, 30]],
   ["Clear communication", 20, "A manager could act on it without asking", [0, 5, 10, 15, 20]], ["Professional delivery", 10, "Tidy, well named, shared with the right access", [0, 4, 6, 8, 10]]];
+let PROJ_RUB4 = null; // built on first use: PROJECT_RUBRIC is defined further down
+const rubFor = (x) => x && x.title === "Submit your final project" ? (PROJ_RUB4 ||= PROJECT_RUBRIC.map(([n, mx, h]) => [n, mx, h, RUB_LEVELS.map(([, f]) => Math.round(mx * f))])) : RUBRIC4;
 const FB_SNIPS = ["Clear structure. Well done.", "Clean the data before you analyse it.", "Label every chart and axis.", "Add one line on what the manager should do next.", "Check spelling and names before you send."];
 async function tabDesk() {
   const [h, q, M] = await Promise.all([rpc("fac_home"), rpc("acad_learn_queue"), rpc("acad_messages").catch(() => [])]); ui.lq = q; ui.msgs = M;
   const wait = q.work.filter((x) => x.status === "submitted").sort((a, b) => new Date(a.at) - new Date(b.at));
   if (!wait.some((x) => x.key + x.app === ui.deskSel)) ui.deskSel = wait[0] ? wait[0].key + wait[0].app : null;
   const cur = wait.find((x) => x.key + x.app === ui.deskSel), R = (ui.rub || {})[ui.deskSel] || {}, picked = Object.keys(R).length;
-  const raw = Object.values(R).reduce((a, b) => a + b, 0), capped = cur && cur.cap != null && cur.cap < 1 ? Math.round(raw * cur.cap) : raw;
+  const RB = rubFor(cur), isFinal = RB !== RUBRIC4, nRB = RB.length;
+  const raw = Object.values(R).reduce((a, b) => a + b, 0), capped = !isFinal && cur && cur.cap != null && cur.cap < 1 ? Math.round(raw * cur.cap) : raw;
   const msgs = (M || []).filter((m) => m.waiting).slice(0, 4);
   const days = (t) => Math.max(0, Math.floor((Date.now() - new Date(t)) / 864e5));
-  shell("desk", `${wait.length} project${wait.length === 1 ? "" : "s"} to grade`, `${esc(h.track || "All tracks")} · ${h.students} students · Week ${Math.max(h.cohort.week, 1)}. Oldest first: week results stay open until these are graded.`,
+  shell("desk", `${wait.length} project${wait.length === 1 ? "" : "s"} to grade`, `${esc(h.track || "All tracks")} · ${h.students} students · Week ${Math.max(h.cohort.week, 1)}. Oldest first. Final projects count in the final result.`,
     `<section class="sc-kpis sc-kpis4">${kpiBox("Graded this week", h.graded_week, "by you")}${kpiBox("Average turnaround", h.turn != null ? h.turn + "d" : "—", "target 2 days", "")}${kpiBox("Waiting", wait.length, wait[0] ? `oldest ${days(wait[0].at)} day${days(wait[0].at) === 1 ? "" : "s"}` : "nothing waiting")}${kpiBox("Low confidence", h.low_conf, "in your track this week", "", "#/portal/students")}</section>
     <section class="rh-desk"><div class="card rh-queue"><div class="sc-h"><b>Queue</b><span class="note">oldest first</span></div>
         ${wait.length ? wait.map((x) => { const dd = days(x.at), on = x.key + x.app === ui.deskSel; return `<button class="rh-qi ${on ? "on" : ""}" data-act="desk-pick" data-k="${esc(x.key + x.app)}" aria-pressed="${on}"><span class="st-av">${ini(x.name)}</span><span class="sc-p-t"><b>${esc(x.name)}</b><span class="note">Week ${x.week} · ${esc(x.title)}</span></span><span class="pill ${dd > 2 ? "bad" : dd > 1 ? "now" : "ok"}">${dd ? dd + "d" : "today"}</span></button>`; }).join("") : `<p class="empty">All graded. Nice work. 🎉</p>`}
         <a class="link sm" href="#/portal/grading">All submissions and staff steps</a></div>
       <div class="card rh-grade">${cur ? `<div class="sc-h"><div><span class="eyebrow">Week ${cur.week} project · sent ${agoS(cur.at)}</span><h2>${esc(cur.name)} · ${esc(cur.title)}</h2><span class="note">${esc(cur.matric)} · ${esc(cur.track)}${cur.cap != null && cur.cap < 1 ? ` · <b>late, score capped at ${Math.round(cur.cap * 100)}%</b>` : " · on time"}</span></div>
           <div class="actions"><a class="btn sm ghost" href="${esc(cur.link)}" target="_blank" rel="noopener">Open their work ↗</a><a class="btn sm ghost" href="#/portal/student/${cur.app}">Student record</a></div></div>
-        <div class="rh-rub">${RUBRIC4.map(([n, mx, hint, vals], k) => `<div class="rh-rr"><div><b>${n} <span class="mono note">/ ${mx}</span></b><span class="note">${hint}</span></div><div class="rh-sc" role="group" aria-label="${n}">${vals.map((v) => `<button class="rh-s ${R[k] === v ? "on" : ""}" data-act="rub" data-k="${k}" data-v="${v}" aria-pressed="${R[k] === v}">${v}</button>`).join("")}</div></div>`).join("")}</div>
-        <div class="rh-total ${picked < 4 ? "" : capped >= 70 ? "ok" : "bad"}"><div><span class="eyebrow">Project score</span><b class="mono">${picked < 4 ? "—" : capped + "%"}</b></div><span>${picked < 4 ? `Score all four parts. ${4 - picked} left.` : capped >= 70 ? "Passes the week project. With the assessment score, this decides the week result." : "Below 70%. If they can fix it this week, ask for changes instead."}</span></div>
+        ${isFinal ? `<div class="notice">Final practical project: this score out of 100 goes straight into the final result. It isn't capped for lateness (timeliness is part of the rubric).</div>` : ""}
+        <div class="rh-rub">${RB.map(([n, mx, hint, vals], k) => `<div class="rh-rr"><div><b>${n} <span class="mono note">/ ${mx}</span></b><span class="note">${hint}</span></div><div class="rh-sc" role="group" aria-label="${n}">${vals.map((v) => `<button class="rh-s ${R[k] === v ? "on" : ""}" data-act="rub" data-k="${k}" data-v="${v}" aria-pressed="${R[k] === v}">${v}</button>`).join("")}</div></div>`).join("")}</div>
+        <div class="rh-total ${picked < nRB ? "" : capped >= 50 ? "ok" : "bad"}"><div><span class="eyebrow">${isFinal ? "Project score" : "Task score"}</span><b class="mono">${picked < nRB ? "—" : capped + "/100"}</b></div><span>${picked < nRB ? `Score all ${nRB} parts. ${nRB - picked} left.` : isFinal ? "Counts directly in the final result: (assessments + examinations + project) ÷ 2." : "Week tasks get feedback but don't count towards the final result."}</span></div>
         <div class="field"><label for="desk-fb">Feedback for ${esc(cur.name.split(" ")[0])}</label><textarea id="desk-fb" rows="3" placeholder="What worked, what to fix, and one thing to try next week. Students see this with the grade.">${esc((ui.fb || {})[ui.deskSel] || "")}</textarea>
           <div class="actions">${FB_SNIPS.map((t, i) => `<button class="btn sm ghost" type="button" data-act="fb-add" data-k="${i}">+ ${esc(t.split(".")[0])}</button>`).join("")}</div></div>
         <div class="actions" style="justify-content:flex-end"><button class="btn ghost" data-act="desk-revise">Ask for changes</button><button class="btn" data-act="desk-save">Save grade and next →</button></div>`
@@ -963,7 +1049,7 @@ async function tabDesk() {
       <div class="card"><span class="eyebrow">My track this week</span><h2 class="sc-h2">Week ${Math.max(h.cohort.week, 1)}${h.week_title ? ` · ${esc(h.week_title)}` : ""}</h2>
         <div class="rh-minis">${miniStat("Lessons done", h.lessons_pct != null ? h.lessons_pct + "%" : "—")}${miniStat("Assessment taken", `${h.quiz_taken}/${h.students}`)}${miniStat("Projects in", `${h.proj_in}/${h.students}`)}${miniStat("Low confidence", h.low_conf, h.low_conf ? "rh-bad" : "")}</div></div>
       <div class="card"><div class="sc-h"><div><span class="eyebrow">Project supervision</span><h2>${msgs.length ? `${msgs.length} waiting for a reply` : "No new messages"}</h2></div><a class="btn sm ghost" href="#/portal/grading">Open</a></div>
-        ${msgs.length ? `<ul class="sc-act">${msgs.map((m) => `<li><span class="st-av">${ini(m.name)}</span><span><b>${esc(m.name)}</b><small class="note" style="display:block">“${esc(((m.messages || []).at(-1)?.body || "").slice(0, 120))}” · ${agoS(m.last_at)}</small></span></li>`).join("")}</ul>` : `<p class="note">Students in the client project (Weeks 8–9) can message you from their project page.</p>`}</div>
+        ${msgs.length ? `<ul class="sc-act">${msgs.map((m) => `<li><span class="st-av">${ini(m.name)}</span><span><b>${esc(m.name)}</b><small class="note" style="display:block">“${esc(((m.messages || []).at(-1)?.body || "").slice(0, 120))}” · ${agoS(m.last_at)}</small></span></li>`).join("")}</ul>` : `<p class="note">Students in the practical project (Weeks 13–14) can message you from their project page.</p>`}</div>
       <div class="card"><span class="eyebrow">Next live class</span>${h.next ? `<h2 class="sc-h2">${esc(h.next.title)}</h2><p class="note">${fmtAt(h.next.at)} · ${h.next.minutes} min</p>
         <div class="actions">${h.next.link ? `<a class="btn" href="${esc(h.next.link)}" target="_blank" rel="noopener">Start class</a>` : ""}<a class="btn ghost" href="#/portal/sessions">Take attendance</a></div><p class="note">Students join from their portal, which marks them present.</p>` : `<h2 class="sc-h2">None scheduled</h2><a class="btn ghost" href="#/portal/sessions">Schedule one</a>`}</div></section>`,
     { eyebrow: todayEyebrow("Grading desk") });
@@ -1008,9 +1094,11 @@ async function tabCareer() {
 
 /* ---------- Academy Admin: operations ---------- */
 const OPS_ITEMS = (wk) => wk <= 1 ? [["Every student has a portal account", "Send set-up links to anyone missing"], ["Orientation class has a link", "Live sessions page"], ["Pods assigned", "Everyone in a pod before Week 2"]]
-  : wk <= 9 ? [["Confirm host spots", "Every host says how many interns they can take"], ["Match students to hosts", "By track, city and what they asked for"], ["Send supervisor links", "Each supervisor gets the logbook and evaluation link"], ["Brief students on the internship", "Announcement plus a live session"], ["Next week's classes have links", "Live sessions page"]]
-  : wk <= 13 ? [["Supervisors are signing logbooks", "Chase any supervisor more than a week behind"], ["Mid-internship check-in", "One message to each host"], ["Evaluations requested", "In Week 13, remind supervisors to evaluate"]]
-  : [["Certificates checked", "Names and tracks are right before issuing"], ["Graduation announcement", "Tell students what happens after Week 17"], ["Alumni check-ins planned", "30, 60 and 90 days after"]];
+  : wk <= 11 ? [["Exam timetable published", "Settings → Examinations, before Week 12"], ["Confirm host spots", "Every host says how many interns they can take"], ["Match students to hosts", "By track, city and what they asked for"], ["Send supervisor links", "Each supervisor gets the logbook and evaluation link"], ["Brief students on the internship", "Announcement plus a live session"], ["Next week's classes have links", "Live sessions page"]]
+  : wk <= 12 ? [["Examinations running", "Check the Results page each day for missed papers and resits"], ["Projects briefed", "Project supervisors ready for Week 13"]]
+  : wk <= 14 ? [["Projects graded", "Every final project graded against the rubric by the end of Week 14"], ["Placements confirmed", "Every student matched before Week 15"]]
+  : wk <= 18 ? [["Supervisors are signing logbooks", "Chase any supervisor more than a week behind"], ["Mid-internship check-in", "One message to each host"], ["Evaluations requested", "In Week 18, remind supervisors to evaluate"]]
+  : [["Certificates checked", "Names and tracks are right before issuing"], ["Graduation announcement", "Tell students what happens after Week 20"], ["Results published", "Programme Director approves and publishes on the Results page"], ["Alumni check-ins planned", "30, 60 and 90 days after"]];
 async function tabOps() {
   const [h, L] = await Promise.all([rpc("aa_home"), rpc("acad_placements")]); ui.places = L; ui.aa = h;
   const tf = ui.opsT || "", tracks = [...new Set(L.map((x) => x.track).filter(Boolean))];
@@ -1020,7 +1108,7 @@ async function tabOps() {
   const days = Math.ceil((new Date(h.intern_start + "T09:00:00+01:00") - Date.now()) / 864e5), used = h.hosts.reduce((t, x) => t + x.used, 0), spots = h.hosts.filter((x) => x.active).reduce((t, x) => t + x.spots, 0);
   shell("ops", need.length && wk < 14 ? `${need.length} student${need.length === 1 ? " needs" : "s need"} a placement` : "Operations", `${days > 0 ? `Internships start ${fmtDateD(h.intern_start)}, in ${days} day${days === 1 ? "" : "s"}.` : "Internships are under way."} ${h.hosts.length ? `${h.hosts.filter((x) => x.active).length} host organisations have ${Math.max(0, spots - used)} open spot${spots - used === 1 ? "" : "s"}.` : "Add your host organisations to track their spots."}`,
     `<section class="sc-kpis">${kpiBox("Need a placement", need.length, `of ${L.length} students`, "", "#/portal/intern")}${kpiBox("Placed", F.length - need.length, "supervisor link sent")}${kpiBox("Evaluated", evald.length, "internship certificates issued automatically")}${kpiBox("Not set up the portal", h.no_account, h.no_account ? "students" : "everyone is in")}${kpiBox("Classes without a link", h.sessions_nolink, "in the next 8 days", "", "#/portal/sessions")}</section>
-    <section class="card"><div class="sc-h"><div><span class="eyebrow">Placement board</span><h2>Internships, Weeks 10–13</h2></div>
+    <section class="card"><div class="sc-h"><div><span class="eyebrow">Placement board</span><h2>Internships, Weeks 15–18</h2></div>
         <div class="sc-tabs" role="group" aria-label="Track"><button class="sc-tab" data-act="ops-t" data-k="" aria-pressed="${!tf}">All</button>${tracks.map((t) => `<button class="sc-tab" data-act="ops-t" data-k="${esc(t)}" aria-pressed="${tf === t}">${esc(t)}</button>`).join("")}</div></div>
       <div class="hm-wrap"><div class="rh-pipe rh-pipe4">${col("Need a placement", "bad", "No host yet", need, "Add placement")}${col("Placed", "w", "Supervisor hasn't signed anything yet", placed, "Share the link again")}${col("Logbooks going", "a", "Supervisor is signing weekly logbooks", active, "View")}${col("Evaluated", "n", "Final evaluation in", evald, "View")}</div></div></section>
     <section class="sc-2">
@@ -1303,7 +1391,7 @@ async function tabSettings() {
     </div><p class="err" id="st-err" role="alert"></p><div class="actions" style="margin-top:1rem"><button class="btn" type="submit">Save settings</button></div></form>`);
 }
 
-const PERM_AREAS = [["Applications & calls", ["apps", "calls"]], ["Decisions & offers", ["decide"]], ["Payments", ["pay"]], ["Students", ["students"]], ["Grading", ["grading"]],
+const PERM_AREAS = [["Applications & calls", ["apps", "calls"]], ["Decisions & offers", ["decide"]], ["Payments", ["pay"]], ["Students", ["students"]], ["Grading", ["grading"]], ["Results & examinations", ["results", "exams"]],
   ["Internships", ["intern"]], ["Career, DC2 & jobs", ["dc2", "jobs"]], ["Pods, help & discussion", ["pods", "support"]], ["Content", ["content"]], ["Settings & emails", ["settings"]], ["Staff & access", ["staff"]]];
 const TRACKED = ["facilitator", "coach"];
 const ROLE_SHORT = { super: "SA", adm_admin: "AD", adm_officer: "AO", director: "PD", cohort_manager: "CM", facilitator: "FA", coach: "CC", academy_admin: "AC" };
@@ -1364,7 +1452,7 @@ const loginOf = (m) => m.trim().toLowerCase().replace(/\//g, "-") + STUDENT_DOMA
 const isStudent = () => !!auth.session?.email?.endsWith(STUDENT_DOMAIN);
 const KIND_I = { lesson: "📘", video: "▶️", reading: "📄", file: "📎", link: "🔗" };
 const KIND_L = { lesson: "Lesson", video: "Video", reading: "Reading", file: "File", link: "Link" };
-const stageOf = (w) => { const s = [[1, 1, 0], [2, 3, 1], [4, 7, 2], [8, 9, 3], [10, 13, 4], [14, 14, 5], [15, 15, 6], [16, 17, 7]].find(([a, b]) => w >= a && w <= b); return s ? ROUTE_STOPS[s[2]][1] : ""; };
+const stageOf = (w) => { const s = [[1, 1, 0], [2, 3, 1], [4, 11, 2], [12, 12, 3], [13, 14, 4], [15, 18, 5], [19, 19, 6], [20, 20, 7]].find(([a, b]) => w >= a && w <= b); return s ? ROUTE_STOPS[s[2]][1] : ""; };
 const watParts = (d) => { const p = fmt(d, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).split(", "); return { date: p[0].split("/").reverse().join("-"), time: p[1] }; };
 const lines = (t) => esc(t || "").replace(/\n/g, "<br>");
 const ago = (d) => { const m = (Date.now() - new Date(d)) / 6e4; return m < 60 ? `${Math.max(1, Math.round(m))} min ago` : m < 1440 ? `${Math.round(m / 60)} h ago` : fmtDay(d); };
@@ -1429,9 +1517,9 @@ function progressCard(C, cert) {
   const wd = LS.W.filter((_, i) => weekDone(i)).length, avg = avgScore();
   const past = (C.sessions || []).filter((x) => new Date(x.starts_at).getTime() + x.minutes * 6e4 < Date.now());
   const came = past.filter((x) => ["present", "late", "joined"].includes(x.att)).length;
-  const projWk = LS.W.findIndex((w) => w.stage === 3), internEnd = LS.W.map((w, i) => (w.stage === 4 ? i : -1)).filter((i) => i >= 0).at(-1);
+  const projWk = LS.W.findIndex((w) => w.stage === 4), internEnd = LS.W.map((w, i) => (w.stage === 5 ? i : -1)).filter((i) => i >= 0).at(-1);
   const B = [["✍️", "Oath signed", oathSigned()], ["✅", "First week passed", wd >= 2], ["🔥", "5 weeks done", wd >= 5],
-    ["💼", "Client project", projWk >= 0 && weekDone(projWk + 1)], ["🏢", "Internship", internEnd != null && weekDone(internEnd)], ["🎓", "Graduate", !!cert]];
+    ["💼", "Practical project", projWk >= 0 && weekDone(projWk + 1)], ["🏢", "Internship", internEnd != null && weekDone(internEnd)], ["🎓", "Graduate", !!cert]];
   return `<div class="card prog-card"><h3>Your progress</h3>
     <div class="prog-stats"><div><b class="mono">${wd}/${LS.W.length}</b><span>weeks done</span></div><div><b class="mono">${avg != null ? avg + "%" : "–"}</b><span>average</span></div><div><b class="mono">${past.length ? Math.round((came / past.length) * 100) + "%" : "–"}</b><span>attendance</span></div></div>
     <div class="badges" aria-label="Badges">${B.map(([e, t, on]) => `<span class="badge ${on ? "on" : ""}" title="${t}${on ? "" : " (not yet)"}"><i aria-hidden="true">${e}</i>${t}</span>`).join("")}</div></div>`;
@@ -1453,8 +1541,9 @@ const LICON = {
   lock: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`,
   file: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>`,
   done: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12l5 5 9-10"/></svg>`,
+  exam: `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4h6l1 2h3v15H5V6h3z"/><path d="M9 12l2 2 4-4M9 18h6"/></svg>`,
 };
-const LKIND = { lesson: "Video lesson", quiz: "Assessment", task: "Activity", logweek: "Internship logbook", oath: "Student Oath", guide: "Getting started" };
+const LKIND = { lesson: "Video lesson", quiz: "Weekly assessment", task: "Activity", logweek: "Internship logbook", oath: "Student Oath", guide: "Getting started", exam: "Examination" };
 const STAFF_STEPS = ["Supervisor grading", "Supervisor performance evaluation"];
 const PLEDGES = [
   "I will attend my live sessions and complete every week of the programme on time.",
@@ -1486,8 +1575,8 @@ const LB_FIELDS = [
     { k: "next", l: "What are your goals for next week?", t: "area", req: 1 }] },
 ];
 const LB_FINAL = { k: "achievement", l: "What was your biggest achievement during this internship?", t: "area", req: 1 };
-const MORE_PAGES = [["assignments", "Assignments & Projects", "Submissions, grades and feedback"], ["cohort", "My Cohort", "Pod, live sessions, announcements, discussion"],
-  ["career", "My Career", "Goals, skills, readiness, interview prep", 13], ["opps", "Opportunities", "Jobs, internships and applications", 15],
+const MORE_PAGES = [["results", "Results", "Assessments, examinations, project and final grade"], ["assignments", "Assignments & Projects", "Submissions, grades and feedback"], ["cohort", "My Cohort", "Pod, live sessions, announcements, discussion"],
+  ["career", "My Career", "Goals, skills, readiness, interview prep", 18], ["opps", "Opportunities", "Jobs, internships and applications", 19],
   ["profile", "Profile & Achievements", "Student ID, certificate, badges"], ["graduate", "Graduation & next steps", "Certificate, your job news, alumni check-ins"], ["help", "Help & Support", "FAQs and how to get help"]];
 
 /* ---------- derived state ---------- */
@@ -1498,11 +1587,16 @@ const graceDue = (wi) => new Date(weekStartAt(wi).getTime() + 6 * DAY + (23 * 60
 const fmtD = (d) => fmt(d, { weekday: "short", day: "numeric", month: "short" });
 const PASS = () => LS.L.pass_mark || 70;
 const row = (it) => LS.L.progress[it.key];
-const isDoneIt = (it) => { const r = row(it); return !!r && r.status !== "revise"; };
+const examOf = (it) => (LS.L.results || {})[it.paper] || null;
+const isDoneIt = (it) => { if (it.type === "exam") { const e = examOf(it); return !!e && ["Graded", "Missed"].includes(e.status); } const r = row(it); return !!r && r.status !== "revise"; };
+const quizCorrect = (r) => r ? (r.data?.correct ?? Math.round((r.score || 0) * 5 / 100)) : null;
+const marks1 = (n) => n == null ? "—" : (Math.round(n * 10) / 10).toFixed(1).replace(/\.0$/, "");
 function itemScoreIt(it) { const r = row(it); if (!r) return null; if (it.type === "quiz") return r.score ?? null; if (it.proj) return r.status === "graded" ? r.score : null; return null; }
 function weekProgress(wi) { let d = 0, n = 0; LS.W[wi].items.forEach((it) => { if (it.opt) return; n++; if (isDoneIt(it)) d++; }); return { d, n, pct: n ? Math.round((d / n) * 100) : 100 }; }
 const weekItemsDone = (wi) => { const p = weekProgress(wi); return p.d === p.n; };
+// Weeks no longer have a pass mark: a week is finished when its required steps are done (Programme & Grading Policy).
 function weekGate(wi) {
+  return null;
   const wk = LS.W[wi]; if (!wk || wk.stage < 1 || wk.stage > 3) return null;
   const qi = wk.items.findIndex((x) => x.type === "quiz"), pi = wk.items.findIndex((x) => x.proj);
   const q = qi >= 0 ? itemScoreIt(wk.items[qi]) : null, pr = pi >= 0 ? row(wk.items[pi]) : null, p = pr && pr.status === "graded" ? pr.score : null;
@@ -1526,7 +1620,8 @@ function dueLabel(d) { const days = Math.ceil((d - Date.now()) / DAY); return da
 const greeting = () => { const h = Number(fmt(new Date(), { hour: "numeric", hour12: false })); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
 function itemSub(it) {
   const r = row(it);
-  return it.type === "lesson" ? `${LKIND.lesson}${it.mins ? ` · ${it.mins} min` : ""}` : it.type === "quiz" ? `${LKIND.quiz} · ${QUIZ_N} questions · ${QUIZ_MIN} min`
+  return it.type === "lesson" ? `${LKIND.lesson}${it.mins ? ` · ${it.mins} min` : ""}` : it.type === "quiz" ? `${LKIND.quiz} · ${QUIZ_N} questions · ${QUIZ_MIN} min · one attempt`
+    : it.type === "exam" ? (() => { const e = examOf(it); return `${LKIND.exam} · ${it.paper === "fund" ? 30 : 40} questions · ${e?.minutes || (it.paper === "fund" ? 30 : 45)} min${e && LS.L.exam_published ? ` · ${fmtDateD(e.date)}` : ""}`; })()
     : it.type === "logweek" ? `${LKIND.logweek} · ${r ? "submitted" : "fill at the end of the week"}` : it.type === "oath" ? (r ? "Signed" : "Required to unlock Week 2 · about 3 min")
     : it.type === "guide" ? "Platform guide · about 4 min" : STAFF_STEPS.includes(it.title) ? "Completed by staff" : LKIND.task + (it.link ? " · submit a link" : "");
 }
@@ -1584,7 +1679,7 @@ function lsHome(cert) {
   const bal = LS.fee ? `<div class="notice bal bad"><span><b>Your learning is paused.</b> Your second instalment of <b>${naira(LS.fee.balance)}</b> was due on ${fmtDateD(LS.fee.due_date)}. Pay the balance to open your lessons again.</span><a class="btn sm gold" href="#/a/${esc(LS.fee.ref)}/${esc(LS.fee.token)}/pay">Pay now</a></div>`
     : C.me.balance > 0 ? `<div class="notice bal"><span>Your second instalment of <b>${naira(C.me.balance)}</b> is due by ${fmtDateD(C.me.due_date)}.</span><a class="btn sm gold" href="#/a/${esc(C.me.ref)}/${esc(C.me.token)}/pay">Pay now</a></div>` : "";
   const certCard = cert ? `<div class="card cert-card"><span class="eyebrow">Certificate of completion</span><h2>Your certificate is ready 🎓</h2><div class="actions"><a class="btn gold" href="#/learn/certificate">View and download</a></div></div>` : "";
-  lsShell("home", pageHead(`Week ${cur + 1} of ${LS.W.length} · ${esc(C.me.track || "")}`, `${greeting()}, ${esc(C.me.first_name)}`, esc(before && !weekDone(0) && !LS.cert && !Object.keys(LS.L.progress || {}).some((k) => (findItem(k)?.wi || 0) > 0) ? `The programme starts on ${fmtDateD(LS.L.start_date)}. You can start Week 1 now.` : encouragement(cur))) +
+  lsShell("home", pageHead(`Week ${cur + 1} of ${LS.W.length} · Stage ${wk.stage + 1}: ${esc(COURSE_STAGES[wk.stage]?.title || "")} · ${esc(C.me.track || "")}`, `${greeting()}, ${esc(C.me.first_name)}`, esc(before && !weekDone(0) && !LS.cert && !Object.keys(LS.L.progress || {}).some((k) => (findItem(k)?.wi || 0) > 0) ? `The programme starts on ${fmtDateD(LS.L.start_date)}. You can start Week 1 now.` : encouragement(cur))) +
   `<section class="wrap home">${installCard()}${bal}${certCard}
     ${allWeeksDone() ? gradHero() : `<div class="card today" id="t-today"><div class="today-l">
         ${cur === 0 ? "" : `<p class="cd-inline ${dl.c}">⏳ <b>${daysLeft} day${daysLeft === 1 ? "" : "s"} left</b> · due ${fmtD(weekDue(cur))}, 17:00</p>`}
@@ -1596,8 +1691,8 @@ function lsHome(cert) {
     <div class="strip" id="t-strip">
       <a class="sti" href="#/learn/learning"><span class="eyebrow">This week</span><b class="mono">${p.d}/${p.n}</b><span class="note">required done</span></a>
       <a class="sti" href="#/learn/assignments"><span class="eyebrow">Due this week</span><b class="mono">${due.length}</b><span class="note">assignment${due.length === 1 ? "" : "s"}</span></a>
-      <div class="sti"><span class="eyebrow">Week score</span><b class="mono">${sc != null ? sc + "%" : "—"}</b><span class="note">${sc != null ? "so far" : "no grades yet"}</span></div>
-      <div class="sti"><span class="eyebrow">Average</span><b class="mono">${avg != null ? avg + "%" : "—"}</b><span class="note">all graded work</span></div></div>
+      <a class="sti" href="#/learn/results"><span class="eyebrow">Assessments</span><b class="mono">${marks1(LS.L.results?.assess_score ?? 0)}<small>/40</small></b><span class="note">${LS.L.results?.assess_taken || 0} of 10 taken</span></a>
+      <a class="sti" href="#/learn/results"><span class="eyebrow">Final result</span><b class="mono">${LS.L.results?.class ? esc(LS.L.results.class) : "—"}</b><span class="note">${LS.L.results?.class ? `${LS.L.results.final}/100` : LS.L.results?.status === "Complete" ? "waiting to be published" : "pending"}</span></a></div>
     <div class="cols">
       <div class="card"><div class="ch"><h3>This week's checklist</h3><span class="note">${p.d} of ${p.n} required</span></div><div class="bar"><i style="width:${p.pct}%"></i></div>
         <ul class="checklist">${wk.items.map((it) => { const dn = isDoneIt(it); return `<li><a class="cl ${dn ? "done" : ""}" href="#/learn/learning/${cur + 1}/${it.key}"><span class="box">${dn ? LICON.done.replace(/20/g, "14") : ""}</span><span class="t">${esc(it.title)}</span>${it.opt ? `<span class="req opt">Optional</span>` : ""}</a></li>`; }).join("")}</ul></div>
@@ -1629,7 +1724,7 @@ function lsLearning(wi, key) {
   const f = key ? findItem(key) : null;
   const main = f && f.wi === wi ? lsItemView(wi, f.ii) : key === "brief" ? lsBrief(wi) : key === "logguide" ? lsLogGuide(wi) : lsWeekView(wi);
   lsShell("learning", `<div class="wrap lhead"><div><p class="eyebrow">${esc(LS.C.me.track || "")} · ${esc(LS.C.cohort.name)}</p><h1>My Learning</h1></div>
-    <div class="lh-prog" id="tour-progress"><div class="lh-bar"><i style="width:${pct}%"></i></div><span><b class="mono">${pct}%</b> complete · Week ${current + 1} of ${LS.W.length}${avg != null ? ` · avg <b class="mono">${avg}%</b>` : ""}</span></div></div>
+    <div class="lh-prog" id="tour-progress"><div class="lh-bar"><i style="width:${pct}%"></i></div><span><b class="mono">${pct}%</b> complete · Week ${current + 1} of ${LS.W.length} · assessments <b class="mono">${marks1(LS.L.results?.assess_score ?? 0)}/40</b></span></div></div>
     <section class="wrap campus"><aside>${weekSelect(wi)}<nav class="rail" id="tour-rail" aria-label="Programme stages and weeks">${groups}${allWeeksDone() ? `<a class="sg-grad" href="#/learn/graduate"><span class="sg-n">🎓</span><span class="sg-t"><small>Finish</small><b>Graduation</b></span><span class="sg-s">Open →</span></a>` : `<div class="sg-grad locked" title="Opens when you finish every week"><span class="sg-n">🎓</span><span class="sg-t"><small>Finish</small><b>Graduation</b></span><span class="sg-s">🔒</span></div>`}</nav></aside><div>${main}</div></section>`);
 }
 function gateCard(wi) {
@@ -1655,7 +1750,10 @@ function itemRow(wi, it, un) {
   if (!un) return `<div class="item locked"><span class="ic">${LICON.lock}</span><div><b>${esc(it.title)}</b><small>${itemSub(it)}</small></div>${it.opt ? `<span class="req opt">Optional</span>` : ""}</div>`;
   const blk = !dn && !r ? seqBlock(wi, it) : null;
   if (blk) return `<div class="item seq-locked" aria-disabled="true"><span class="ic">${LICON.lock}</span><div><b>${esc(it.title)}</b><small>Opens after “${esc(blk.title)}”</small></div>${it.opt ? `<span class="req opt">Optional</span>` : ""}</div>`;
-  const pill = r?.status === "revise" ? `<span class="pill bad">Revise</span>` : r?.status === "submitted" ? `<span class="pill info">Grading</span>` : it.type === "logweek" && r ? (r.data?.signed ? `<span class="pill ok">Signed</span>` : `<span class="pill info">To sign</span>`) : dn ? `<span class="pill ok">${sc != null ? sc + "%" : "Done"}</span>` : `<span class="pill">Start</span>`;
+  const ex = it.type === "exam" ? examOf(it) : null;
+  const pill = ex ? `<span class="pill ${ex.status === "Graded" ? "ok" : ex.status === "Missed" ? "bad" : ex.status === "Open" || ex.status === "In progress" ? "now" : ""}">${ex.status === "Graded" ? `${ex.correct}/${ex.questions}` : ex.status}</span>`
+    : it.type === "quiz" && r ? `<span class="pill ok">${quizCorrect(r)}/5 · ${marks1(quizCorrect(r) * 0.8)} marks</span>`
+    : r?.status === "revise" ? `<span class="pill bad">Revise</span>` : r?.status === "submitted" ? `<span class="pill info">Grading</span>` : it.type === "logweek" && r ? (r.data?.signed ? `<span class="pill ok">Signed</span>` : `<span class="pill info">To sign</span>`) : dn ? `<span class="pill ok">${sc != null ? sc + "%" : "Done"}</span>` : `<span class="pill">Start</span>`;
   return `<a class="item ${dn ? "done" : ""}" href="#/learn/learning/${wi + 1}/${it.key}"><span class="ic">${dn ? LICON.done : LICON[it.type] || LICON.task}</span><div><b>${esc(it.title)}</b><small>${itemSub(it)}</small></div><span class="item-r">${it.opt ? `<span class="req opt">Optional</span>` : ""}${pill}</span></a>`;
 }
 function lsWeekView(wi) {
@@ -1666,19 +1764,19 @@ function lsWeekView(wi) {
   if (isLast && un && weekItemsDone(wi) && !allWeeksDone()) LS.W.forEach((w, i) => { if (i === wi) return; const L = w.items.filter((it) => !it.opt && !isDoneIt(it)); L.forEach((it) => openLeft.push({ it, i })); if (!L.length && !weekDone(i)) openLeft.push({ it: null, i }); });
   const endCard = !isLast || !un ? "" : allWeeksDone() ? `<div class="card grad-hero end-card"><p class="eyebrow">Programme complete</p><h2>You've completed Jobnest Academy 🎓</h2><p>That's all ${LS.W.length} weeks done. Your next steps are waiting: your certificate, telling us where you land, and keeping your job search going.</p><div class="actions"><a class="btn gold" href="#/learn/graduate">See your next steps →</a></div></div>`
     : weekItemsDone(wi) ? `<div class="card almost"><div class="ch"><h3>You're almost there</h3><span class="pill now">${openLeft.length} left</span></div><p class="note">You've finished Week ${wi + 1}. Complete these to finish the programme and unlock Graduation:</p>
-      <ul class="almost-l">${openLeft.slice(0, 10).map(({ it, i }) => it ? `<li><a class="link" href="#/learn/learning/${i + 1}/${it.key}">Week ${i + 1}: ${esc(it.title)}</a>${row(it)?.status === "submitted" ? ` <span class="pill info">Waiting for grading</span>` : row(it)?.status === "revise" ? ` <span class="pill bad">Revise</span>` : ""}</li>` : `<li><a class="link" href="#/learn/learning/${i + 1}">Week ${i + 1}: pass the week result</a></li>`).join("")}</ul></div>` : "";
+      <ul class="almost-l">${openLeft.slice(0, 10).map(({ it, i }) => it ? `<li><a class="link" href="#/learn/learning/${i + 1}/${it.key}">Week ${i + 1}: ${esc(it.title)}</a>${row(it)?.status === "submitted" ? ` <span class="pill info">Waiting for grading</span>` : row(it)?.status === "revise" ? ` <span class="pill bad">Revise</span>` : ""}</li>` : `<li><a class="link" href="#/learn/learning/${i + 1}">Week ${i + 1}: finish this week</a></li>`).join("")}</ul></div>` : "";
   const next = (un && weekDone(wi) && wi < LS.W.length - 1 ? `<div class="celebrate"><div><b>Week ${wi + 1} complete.</b> <span class="note">${unlockedW(wi + 1) ? `Week ${wi + 2}: ${esc(LS.W[wi + 1].title)} is now unlocked.` : `Week ${wi + 2} opens on ${fmtD(new Date(weekStartAt(wi + 1).getTime() - 2 * DAY))}.`}</span></div>${unlockedW(wi + 1) ? `<a class="btn sm" href="#/learn/learning/${wi + 2}">Start Week ${wi + 2} →</a>` : ""}</div>` : "");
   const head = (extra) => `<div class="stage-head wk-head" id="tour-head"><div class="row"><div><p class="eyebrow">Week ${wi + 1} of ${LS.W.length} · Stage ${wk.stage + 1}: ${esc(st.title)}</p><h2 style="margin-top:.45rem">${esc(wk.title)}</h2></div>${weekPill(wi, un)}</div>${extra}</div>`;
   if (st.welcome) return head(`<div class="welcome"><p class="big">Congratulations, ${esc(me.first_name)}. You took a bold step.</p>
       <p>Choosing to invest in yourself and your future takes courage, and you've already done the hardest part: you started. We're proud to have you in ${esc(LS.C.cohort.name)}.</p>
-      <p>Over the next ${LS.W.length} weeks you'll learn skills employers are hiring for, solve a real business problem in your own client project, and gain real work experience in your internship. Some weeks will stretch you. That is where the growth happens, and we'll be beside you every week.</p>
+      <p>Over the next ${LS.W.length} weeks you'll learn skills employers are hiring for, prove them in assessments and examinations, solve a real business problem in your practical project, and gain real work experience in your internship. Some weeks will stretch you. That is where the growth happens, and we'll be beside you every week.</p>
       <p>Show up, ask questions and keep going. We can't wait to see you build a career you are proud of.</p><div><span class="sig">The Jobnest Academy Team</span></div></div>
     <div class="bar" aria-hidden="true"><i style="width:${p.pct}%"></i></div>
     ${oathSigned() ? "" : `<div class="gate">${LICON.lock}<span>Complete the ${p.n} required tasks below. <b>Week 2 stays locked until you read and sign your Student Oath.</b></span></div>`}`) + `<div class="items" id="tour-items">${items}</div>${next}`;
   const tab = ui.wtab || "tasks", sess = un ? lsSessions().filter((s) => s.wi === wi)[0] : null;
   const stWeeks = LS.W.map((w, i) => (w.stage === wk.stage ? i + 1 : null)).filter(Boolean);
   const tabs = [["tasks", "Tasks", `${p.d}/${p.n}`], ["about", "About this week", ""], ["res", "Resources", String((wk.resources || []).length)]];
-  const lockMsg = !un ? `<div class="gate">${LICON.lock}<span><b>Preview.</b> ${wi === 1 && !oathSigned() ? "Opens when you sign your Student Oath in Week 1." : !weekDone(wi - 1) ? `Opens when you pass Week ${wi}: ${esc(LS.W[wi - 1].title)}.` : `Opens on ${fmtD(new Date(weekStartAt(wi).getTime() - 2 * DAY))}.`}</span></div>` : "";
+  const lockMsg = !un ? `<div class="gate">${LICON.lock}<span><b>Preview.</b> ${wi === 1 && !oathSigned() ? "Opens when you sign your Student Oath in Week 1." : !weekDone(wi - 1) ? `Opens when you finish Week ${wi}: ${esc(LS.W[wi - 1].title)}.` : `Opens on ${fmtD(new Date(weekStartAt(wi).getTime() - 2 * DAY))}.`}</span></div>` : "";
   const meta = `<div class="wk-meta-row"><span>Due ${fmtD(weekDue(wi))}, 17:00</span>${sess ? `<span>Live: ${fmtD(sess.at)}, ${fmtTime(sess.at)}</span>` : ""}</div>
     ${un ? `<div class="bar" aria-hidden="true"><i style="width:${p.pct}%"></i></div>` : ""}
     <div class="wtabs" role="tablist">${tabs.map(([k, l, c]) => `<button role="tab" data-act="ls-wtab" data-k="${k}" aria-selected="${tab === k}">${l}${c ? ` <span class="mono">${c}</span>` : ""}</button>`).join("")}</div>`;
@@ -1693,7 +1791,7 @@ function lsWeekView(wi) {
       <div><button class="btn sm" type="submit">${ck ? "Update check-in" : "Send check-in"}</button></div></form>` : ""}`; }
   if (tab === "about") body = `<div class="card about-card"><h3>By the end of this week you can</h3><ul class="obj">${(wk.objectives || []).map((o) => `<li>${esc(o)}</li>`).join("")}</ul>
       <h3>Deadlines</h3>${deadlineLine(wi)}
-      ${wk.stage >= 1 && wk.stage <= 3 ? `<h3>How this week is passed</h3><p class="note">Your assessment score and week project grade are averaged. You need ${PASS()}% or more to move on; below that, you repeat the week.</p>` : ""}
+      ${wk.stage >= 1 && wk.stage <= 2 ? `<h3>How this week counts</h3><p class="note">This week's assessment has 5 questions and <b>one attempt</b>. Each correct answer is worth 0.8 marks, so it adds up to 4 marks to your 40 assessment marks. Your week task gets feedback from your facilitator but doesn't count towards your final score.</p>` : wk.stage === 3 ? `<h3>How this week counts</h3><p class="note">The two examinations give up to 60 marks: (correct answers ÷ 70) × 60.</p>` : wk.stage === 4 ? `<h3>How this week counts</h3><p class="note">Your final project is graded out of 100 against the rubric. That score goes straight into your final result.</p>` : ""}
       ${sess ? `<h3>Live session</h3><ul class="sess-list">${sessionRow(sess)}</ul>` : ""}
       <h3>About Stage ${wk.stage + 1}: ${esc(st.title)}</h3><p>${esc(st.objective || "")}</p>
       <dl class="kv"><div><dt>Weeks</dt><dd>${stWeeks.length > 1 ? `Weeks ${stWeeks[0]}–${stWeeks.at(-1)}` : `Week ${stWeeks[0]}`}</dd></div>${st.facilitators ? `<div><dt>Facilitators</dt><dd>${esc(st.facilitators)}</dd></div>` : ""}</dl></div>`;
@@ -1727,20 +1825,20 @@ function quizReview(d) {
   return (d.review || []).map((q, qi) => `<fieldset class="q"><legend>${qi + 1}. ${esc(q.q)}</legend>${q.o.map((o, oi) => `<label class="opt ${oi === q.a ? "right" : oi === q.ans ? "wrong" : ""}"><input type="radio" disabled ${oi === q.ans ? "checked" : ""}> ${esc(o)}</label>`).join("")}${q.ans == null ? `<p class="note">Not answered</p>` : ""}</fieldset>`).join("");
 }
 function quizBody(wi, it, r) {
-  const d = r?.data || {}, retake = !!d.retake, att = d.attempt || 1, gate = LS.W[wi].stage >= 1;
+  const d = r?.data || {}, retake = false, att = 1, gate = LS.W[wi].stage >= 1;
   const Q = ui.quiz && ui.quiz.key === it.key ? ui.quiz : null;
   if (Q) return `<div class="qtimer" id="qtimer" aria-live="off"><span>⏱ <b class="mono" id="qt-left">--:--</b> left</span><span class="note">Question <b id="qt-done">0</b> of ${Q.d.qs.length} answered</span></div>
     <form id="ls-quiz" data-k="${it.key}" novalidate>${Q.d.qs.map((q, qi) => `<fieldset class="q"><legend>${qi + 1}. ${esc(q.q)}</legend>${q.o.map((o, oi) => `<label class="opt"><input type="radio" name="q${qi}" value="${oi}" ${Q.ans[qi] === oi ? "checked" : ""}> ${esc(o)}</label>`).join("")}</fieldset>`).join("")}
       <p class="err" id="quiz-err" role="alert"></p><div style="margin-top:1rem"><button class="btn" type="submit">Submit answers</button></div></form>`;
-  if (r && !retake) {
-    const pass = r.score >= PASS();
-    return `<div class="result ${pass ? "pass" : "fail"}">${att > 1 ? `Retake score: ${d.last}%. Your best score, <b>${r.score}%</b>, counts.` : `You scored <b>${r.score}%</b>.`} ${pass ? "Well done!" : ""}${d.late ? " Time ran out, so unanswered questions were marked wrong." : ""}</div>
-      ${!pass && att < 2 ? `<div class="card retake"><h3>Below ${PASS()}%: redo the lessons, then retake</h3><p class="note">Go back through this week's lessons. When you've marked them complete again, you get <b>one retake</b> with new questions. Your best score counts.</p><div><button class="btn" data-act="ls-retry" data-k="${it.key}">Redo this week's lessons</button></div></div>` : ""}
-      ${!pass && att >= 2 ? `<div class="card retake"><h3>You've used your retake</h3><p class="note">Your week result uses your best score. If the week isn't passed, you can repeat the week from the week page.</p></div>` : ""}
+  if (r) {
+    const c = quizCorrect(r), pass = c >= 3;
+    return `<div class="result ${pass ? "pass" : "fail"}">You got <b>${c} of 5</b> correct: <b>${marks1(c * 0.8)} of 4 marks</b> towards your 40 assessment marks. ${c === 5 ? "Full marks!" : pass ? "Well done!" : "Review this week's lessons before the examinations."}${d.late ? " Time ran out, so unanswered questions were marked wrong." : ""}</div>
+      ${false ? `<div class="card retake"><h3>Below ${PASS()}%: redo the lessons, then retake</h3><p class="note">Go back through this week's lessons. When you've marked them complete again, you get <b>one retake</b> with new questions. Your best score counts.</p><div><button class="btn" data-act="ls-retry" data-k="${it.key}">Redo this week's lessons</button></div></div>` : ""}
+      ${false ? `<div class="card retake"><h3>You've used your retake</h3><p class="note">Your week result uses your best score. If the week isn't passed, you can repeat the week from the week page.</p></div>` : ""}
       <h3 style="margin-top:1.2rem">Your answers</h3>${quizReview(d)}`;
   }
   return `<div class="card qstart"><h3>${retake ? "Your retake" : "Before you start"}</h3><ul class="reqs"><li>The assessment contains <b>${QUIZ_N} questions</b>.</li><li>You have <b>${QUIZ_MIN} minutes</b> to complete it once you start.</li><li>Answers are submitted automatically when the time runs out.</li>
-    <li>${retake ? "This is your only retake. Your best score counts." : `If you score below ${PASS()}%, review this week's lessons. You are allowed one retake.`}</li>${gate ? `<li>Your score contributes to the week's overall result.</li>` : ""}</ul>
+    <li><b>You have one attempt.</b> There are no resits, so finish this week's lessons first.</li><li>Each correct answer is worth 0.8 marks: up to 4 of your 40 assessment marks.</li><li>Assessments close when the examination week (Week 12) starts.</li></ul>
     <div><button class="btn gold" data-act="ls-qstart" data-k="${it.key}">${retake ? "Start retake" : "Start assessment"}</button></div></div>`;
 }
 let QTIMER = null;
@@ -1761,6 +1859,116 @@ async function quizSubmit(auto) {
   let r; try { r = await busy(btn, () => rpc("learn_quiz", { p_key: key, p_answers: ans })); } catch { Q.sent = false; QTIMER = setInterval(quizTick, 1000); return; }
   if (!r) return;
   ui.quiz = null; LS.L = r; toast("Answers submitted"); await lsRender(); window.scrollTo({ top: 0, behavior: "smooth" });
+}
+/* ---------- examinations (Week 12) and results ---------- */
+// Practical project rubric, out of 100 (draft for approval). [criterion, marks, what earns full marks]
+const PROJECT_RUBRIC = [["Understanding of the brief", 15, "Every requirement in the brief is understood and addressed."],
+  ["Quality and accuracy", 25, "Deliverables are correct, complete and free of errors."],
+  ["Track skills", 20, "Uses the tools and techniques taught in the track confidently and correctly."],
+  ["Problem-solving", 15, "Sensible decisions, clearly explained, with options considered."],
+  ["Presentation", 15, "Professional, well organised and easy for a client to use."],
+  ["Planning and self-review", 10, "Plan followed, submitted on time, honest self-review against the rubric."]];
+const RUB_LEVELS = [["Not shown", 0], ["Weak", 0.4], ["Fair", 0.6], ["Good", 0.8], ["Excellent", 1]];
+const projRubricTable = () => `<table class="tbl rub"><thead><tr><th>Criterion</th><th class="mono">Marks</th></tr></thead><tbody>${PROJECT_RUBRIC.map(([n, m, h]) => `<tr><td><b>${n}</b><span class="note">${h}</span></td><td class="mono">${m}</td></tr>`).join("")}<tr><td><b>Total</b></td><td class="mono">100</td></tr></tbody></table>
+  <p class="note">Each criterion is marked Not shown (0), Weak (40%), Fair (60%), Good (80%) or Excellent (full marks).</p>`;
+const GRADE_SCALE = [["A", "Distinction", "80–100"], ["B", "Merit", "60–79"], ["C", "Pass", "50–59"], ["F", "Fail", "0–49"]];
+const scaleTable = () => `<table class="tbl"><thead><tr><th>Grade</th><th>Classification</th><th>Final score</th></tr></thead><tbody>${GRADE_SCALE.map(([g, c, r]) => `<tr><td class="mono">${g}</td><td>${c}</td><td class="mono">${r}</td></tr>`).join("")}</tbody></table>`;
+const resPill = (st) => `<span class="pill ${["Graded", "Complete"].includes(st) ? "ok" : st === "Missed" ? "bad" : ["Open", "In progress", "Submitted", "Revision requested"].includes(st) ? "now" : ""}">${esc(st)}</span>`;
+const paperName = (p) => p === "fund" ? "Fundamental Examination" : "Core Skill Learning Examination";
+function examWhen(e) {
+  if (!LS.L.exam_published) return "Date and time to be published by Student Success";
+  return `${fmtDateD(e.date)} · start between ${fmtTime(new Date(e.opens))} and ${fmtTime(new Date(e.closes))}`;
+}
+function examRules() {
+  const R = LS.L.results || {}, f = R.fund || {}, c = R.core || {};
+  return `<div class="lesson-doc"><h3>When you sit each paper</h3><ul>
+      <li><b>Fundamental Examination</b>: 30 questions in ${f.minutes || 30} minutes. ${LS.L.exam_published && f.date ? `Your day: <b>${fmtDateD(f.date)}</b>.` : "Monday or Tuesday of Week 12, depending on your track."}</li>
+      <li><b>Core Skill Learning Examination</b>: 40 questions for your track in ${c.minutes || 45} minutes. ${LS.L.exam_published && c.date ? `Your day: <b>${fmtDateD(c.date)}</b>.` : "Wednesday, Thursday or Friday of Week 12, depending on your track."}</li>
+      <li>Start any time inside the window on your day${LS.L.exam_published && f.opens ? ` (${fmtTime(new Date(f.opens))} to ${fmtTime(new Date(f.closes))})` : ""}. Your timer starts when you press Start and can't be paused.</li></ul>
+    <h3>Rules</h3><ul>
+      <li>One sitting per paper. Your answers save as you go, so a dropped connection doesn't lose your work. Open the paper again to carry on.</li>
+      <li>When time runs out, your saved answers are submitted automatically.</li>
+      <li>Work on your own. Questions are drawn at random, so every candidate's paper is different.</li>
+      <li>You only see the examination for your own track.</li>
+      <li>If you miss a paper, speak to Student Success straight away. A resit is only possible when staff authorise it, and it replaces your earlier score.</li></ul>
+    <h3>How the examinations count</h3><p>(correct answers across both papers ÷ 70) × 60 gives up to 60 marks. Your final score is (assessments /40 + examinations /60 + project /100) ÷ 2.</p></div>`;
+}
+function examCard(it) {
+  const e = examOf(it); if (!e) return "";
+  const f = findItem(it.key), rules = f ? LS.W[f.wi].items.find((x) => x.title === "Read the examination rules") : null, rd = !rules || isDoneIt(rules);
+  const st = e.status;
+  let body = "";
+  if (st === "Graded") body = `<div class="result pass">You got <b>${e.correct} of ${e.questions}</b> correct.${e.late ? " Time ran out, so your saved answers were submitted." : ""}</div>`;
+  else if (st === "Missed") body = `<div class="result fail">You missed this examination. Speak to Student Success as soon as possible. A resit is only possible when staff authorise it.</div><div class="actions"><a class="btn sm ghost" href="#/learn/help">Contact Student Success</a></div>`;
+  else if (st === "In progress") body = `<div class="actions"><button class="btn gold" data-act="ex-start" data-k="${it.paper}">Continue the examination</button></div>`;
+  else if (st === "Open") body = !LS.L.exam_published ? "" : !rd ? `<p class="note">Read the examination rules first, then this opens.</p>` : `<div class="actions"><button class="btn gold" data-act="ex-start" data-k="${it.paper}">Start the examination</button></div>`;
+  else if (st === "Upcoming") body = `<p class="note">This opens on your examination day.</p>`;
+  return `<div class="card exam-card"><div class="ch"><h3>${esc(e.title)}</h3>${resPill(st)}</div>
+    ${e.resit ? `<div class="notice">Resit authorised for <b>${fmtDateD(e.resit.date)}</b>. It replaces your earlier score.</div>` : ""}
+    <dl class="kv"><div><dt>When</dt><dd>${examWhen(e)}</dd></div><div><dt>Questions</dt><dd>${e.questions}</dd></div><div><dt>Time limit</dt><dd>${e.minutes} minutes</dd></div></dl>${body}</div>`;
+}
+function examView(wi) {
+  if (ui.exam) return examPaper();
+  const W = LS.W[wi], rules = W.items.find((x) => x.title === "Read the examination rules"), R = LS.L.results || {};
+  return `<p style="max-width:64ch">Two timed examinations this week: the <b>Fundamental Examination</b> and the <b>Core Skill Learning Examination</b> for your track. Together they give up to 60 of your final marks.</p>
+    ${LS.L.exam_published ? "" : `<div class="notice">Student Success publishes your examination dates and times before Week 12.</div>`}
+    ${rules ? `<div class="items">${itemRow(wi, rules, true)}</div>` : ""}
+    <div class="cols">${W.items.filter((x) => x.type === "exam").map(examCard).join("")}</div>
+    ${R.exam_score != null ? `<div class="card"><div class="ch"><h3>Examination score</h3><b class="mono">${R.exam_score}/60</b></div><p class="note">(${R.fund.score} + ${R.core.score} correct) ÷ 70 × 60</p></div>` : ""}`;
+}
+function examPaper() {
+  const X = ui.exam;
+  return `<div class="card exam-head"><b>${paperName(X.paper)}</b><span class="note">${X.d.qs.length} questions · answers save as you go</span></div>
+    <div class="qtimer" id="ex-timer" aria-live="off"><span>⏱ <b class="mono" id="ex-left">--:--</b> left</span><span class="note"><b id="ex-done">${X.ans.filter((x) => x != null).length}</b> of ${X.d.qs.length} answered · <span id="ex-saved">Saved</span></span></div>
+    <form id="ls-exam" data-p="${X.paper}" novalidate>${X.d.qs.map((q, qi) => `<fieldset class="q"><legend>${qi + 1}. ${esc(q.q)}</legend>${q.o.map((o, oi) => `<label class="opt"><input type="radio" name="x${qi}" value="${oi}" ${X.ans[qi] === oi ? "checked" : ""}> ${esc(o)}</label>`).join("")}</fieldset>`).join("")}
+      <p class="err" id="ex-err" role="alert"></p><div style="margin-top:1rem"><button class="btn" type="submit">Submit examination</button></div></form>`;
+}
+let XTIMER = null, XSAVE = null;
+function examTick() {
+  const X = ui.exam, el = $("#ex-left"); if (!X || !el) { clearInterval(XTIMER); XTIMER = null; return; }
+  const left = Math.max(0, Math.round((X.deadline - (Date.now() + X.skew)) / 1000));
+  el.textContent = `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`;
+  $("#ex-timer").classList.toggle("warn", left <= 120);
+  $("#ex-done").textContent = X.ans.filter((x) => x != null).length;
+  if (left <= 0 && !X.sent) { X.sent = true; toast("Time's up. Submitting your answers."); examSubmit(true); }
+}
+function examSave() {
+  const X = ui.exam; if (!X) return; const s0 = $("#ex-saved"); if (s0) s0.textContent = "Saving…";
+  clearTimeout(XSAVE); XSAVE = setTimeout(() => rpc("learn_exam_save", { p_paper: X.paper, p_answers: X.ans })
+    .then(() => { const s = $("#ex-saved"); if (s) s.textContent = "Saved"; })
+    .catch(() => { const s = $("#ex-saved"); if (s) s.textContent = "Not saved yet. Check your connection."; }), 700);
+}
+async function examSubmit(auto) {
+  const X = ui.exam; if (!X) return;
+  if (!auto) { const n = X.ans.filter((x) => x == null).length; if (!confirm(n ? `${n} question${n === 1 ? " is" : "s are"} unanswered. Submit the examination anyway? You can't change it afterwards.` : "Submit the examination? You can't change it afterwards.")) return; }
+  clearInterval(XTIMER); XTIMER = null; clearTimeout(XSAVE);
+  let r; try { r = await busy($("#ls-exam button[type=submit]"), () => rpc("learn_exam_submit", { p_paper: X.paper, p_answers: X.ans })); } catch { X.sent = false; XTIMER = setInterval(examTick, 1000); return; }
+  if (!r) return;
+  ui.exam = null; LS.L = r; toast("Examination submitted"); await lsRender(); window.scrollTo({ top: 0, behavior: "smooth" });
+}
+function lsResultsPage() {
+  const R = LS.L.results || {}, A = R.assessments || [], P = R.project || {}, done = R.status === "Complete";
+  const tile = (l, v, mx, note) => `<div class="sti"><span class="eyebrow">${l}</span><b class="mono">${v}<small>/${mx}</small></b><span class="note">${note}</span></div>`;
+  const fin = R.class ? `<div class="card res-final ok"><span class="eyebrow">Final result${R.published_at ? ` · published ${fmtDay(R.published_at)}` : ""}</span><div class="res-big"><b class="mono">${R.final}<small>/100</small></b><span><b>${esc(R.class)}</b><span class="note">Grade ${esc(R.grade)}</span></span></div></div>`
+    : done ? `<div class="card res-final"><span class="eyebrow">Final result</span><h3>Being checked</h3><p class="note">All your scores are in. Your final score and classification appear here when the Programme Director publishes results.</p></div>`
+    : `<div class="card res-final"><span class="eyebrow">Final result</span><h3>Pending</h3><p class="note">Your final result is worked out once every part below has a score:</p><ul class="reqs">${(R.missing || []).map((m) => `<li>${esc(m)}</li>`).join("")}</ul></div>`;
+  lsShell("results", pageHead("Results", "Your results", "Final score = (assessments /40 + examinations /60 + practical project /100) ÷ 2. Scores are never rounded up.") + `<section class="wrap pagebody">
+    <div class="strip res-strip">${tile("Assessments", marks1(R.assess_score ?? 0), 40, `${R.assess_taken || 0} of 10 taken${R.assess_missed ? ` · ${R.assess_missed} missed` : ""}`)}
+      ${tile("Examinations", R.exam_score ?? "—", 60, R.exam_score != null ? "both papers sat" : "after both papers")}
+      ${tile("Practical project", P.score ?? "—", 100, P.status || "")}</div>
+    ${fin}
+    <div class="card"><div class="ch"><h3>Weekly assessments</h3><b class="mono">${marks1(R.assess_score ?? 0)}/40</b></div><p class="note">Ten assessments, 5 questions each, one attempt. Each correct answer is 0.8 marks. They close when the examination week starts${R.assess_close ? ` (${fmtDay(R.assess_close)})` : ""}.</p>
+      <div class="tbl-wrap"><table class="tbl res-tbl cards"><thead><tr><th>Assessment</th><th>Week</th><th>Status</th><th class="mono">Correct</th><th class="mono">Marks</th></tr></thead><tbody>
+      ${A.map((x, i) => `<tr><td data-label="Assessment">${esc(x.title)}</td><td data-label="Week" class="mono">${x.week}</td><td data-label="Status">${resPill(x.status)}</td><td data-label="Correct" class="mono">${x.correct != null ? x.correct + "/5" : "—"}</td><td data-label="Marks" class="mono">${x.marks != null ? marks1(x.marks) + "/4" : "—"}</td></tr>`).join("")}</tbody></table></div></div>
+    <div class="card"><div class="ch"><h3>Examinations</h3><b class="mono">${R.exam_score ?? "—"}/60</b></div>
+      <div class="tbl-wrap"><table class="tbl res-tbl cards"><thead><tr><th>Paper</th><th>Date</th><th>Status</th><th class="mono">Correct</th></tr></thead><tbody>
+      ${["fund", "core"].map((k) => { const e = R[k] || {}; return `<tr><td data-label="Paper">${paperName(k)}</td><td data-label="Date">${LS.L.exam_published && e.date ? fmtDateD(e.date) : "To be published"}</td><td data-label="Status">${resPill(e.status || "Upcoming")}</td><td data-label="Correct" class="mono">${e.score != null ? `${e.score}/${e.questions}` : "—"}</td></tr>`; }).join("")}</tbody></table></div>
+      <p class="note">Examination score = (Fundamental + Core correct answers) ÷ 70 × 60.</p></div>
+    <div class="card"><div class="ch"><h3>Practical project</h3><b class="mono">${P.score ?? "—"}/100</b></div>
+      <p>${resPill(P.status || "Not submitted")} ${P.graded_by ? `<span class="note">Graded by ${esc(P.graded_by)}</span>` : ""}</p>
+      ${P.rubric ? `<table class="tbl rub"><tbody>${Object.entries(P.rubric).map(([k, v]) => `<tr><td>${esc(k)}</td><td class="mono">${v}/${(PROJECT_RUBRIC.find((r) => r[0] === k) || [0, "?"])[1]}</td></tr>`).join("")}</tbody></table>` : ""}
+      ${P.feedback ? `<div class="card fb ok"><h3>Assessor feedback</h3><p>${esc(P.feedback)}</p></div>` : ""}</div>
+    <div class="card"><h3>Grading scale</h3>${scaleTable()}</div></section>`);
 }
 function lsItemView(wi, ii) {
   const it = LS.W[wi].items[ii], r = row(it), dn = isDoneIt(it), un = unlockedW(wi), me = LS.C.me;
@@ -1783,6 +1991,8 @@ function lsItemView(wi, ii) {
   if (it.type === "lesson") return `<div class="view">${head}<div class="video"><span class="play" aria-hidden="true"><svg width="26" height="26" viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z" fill="currentColor"/></svg></span><span class="cap">${esc(it.title)} · video coming soon</span></div>
     <p class="note">Your facilitator adds the video here. Until then, the text version below covers the lesson.</p>${lessonBody(it)}${btn("Mark lesson complete", "Completed ✓ · Mark as not done")}${nav}</div>`;
   if (it.type === "quiz") return `<div class="view">${head}${quizBody(wi, it, r)}${nav}</div>`;
+  if (it.type === "exam") return `<div class="view">${head}${ui.exam && ui.exam.paper === it.paper ? examPaper() : examCard(it, true)}${ui.exam ? "" : nav}</div>`;
+  if (it.title === "Read the examination rules") return `<div class="view">${head}${examRules()}${btn("I've read the examination rules", "Read ✓ · Mark as not read")}${nav}</div>`;
   if (it.link) {
     const st = aStatus(it), canEdit = !r || r.status === "revise" || (r.status !== "graded" && !it.proj) || r.status === "submitted";
     return `<div class="view">${head}<p style="max-width:64ch">${esc(it.detail || "")}</p>${deadlineLine(wi)}
@@ -1812,7 +2022,7 @@ function guideView() {
     ["lesson", "My Learning", "Every week is listed in order, grouped by stage. A week unlocks once you finish the week before it."],
     ["task", "Inside each week", "Every week has lessons, assessments and tasks. Open an item, complete it and it gets a green tick."],
     ["quiz", "Assessments", `Each assessment counts toward your week result. You need ${PASS()}% to move on.`],
-    ["logweek", "Internship logbook", "In Weeks 10 to 13 you fill one logbook entry each week."],
+    ["logweek", "Internship logbook", "In Weeks 15 to 18 you fill one logbook entry each week."],
     ["oath", "The More menu", "Assignments, your cohort, your profile and Help & Support live here."]].map(([ic, t, b]) => `<div class="guide-row"><span class="ic">${LICON[ic]}</span><div><b>${t}</b><span class="note" style="font-size:.9rem">${b}</span></div></div>`).join("");
   return `<p style="max-width:64ch">Here's everything you need to find your way around the Jobnest student portal.</p><div class="guide">${rows}</div>`;
 }
@@ -1830,11 +2040,11 @@ Fun fact: [something about you].</pre></div></div>`;
 function lsBrief(wi) {
   const it = LS.W[wi].items.find((x) => x.title === "Read your project brief");
   return `<div class="view brief-doc"><a class="back" href="#/learn/learning/${wi + 1}">← Week ${wi + 1}: ${esc(LS.W[wi].title)}</a>
-    <div><p class="eyebrow">Client project brief</p><h2 style="margin-top:.4rem">Your client project</h2><p class="note" style="font-size:.95rem;margin-top:.3rem">${esc(LS.C.me.track || "")} track · individual project · Weeks 8–9</p></div>
+    <div><p class="eyebrow">Practical project brief</p><h2 style="margin-top:.4rem">Your practical project</h2><p class="note" style="font-size:.95rem;margin-top:.3rem">${esc(LS.C.me.track || "")} track · individual project · Weeks ${wi + 1}–${wi + 2} · graded out of 100</p></div>
     <h3>Your task</h3><p>${esc(it?.detail || "")}</p>
-    <h3>Timeline</h3><dl class="kv tl"><div><dt>Week 8</dt><dd>Project plan due ${fmtD(weekDue(7))}, 17:00. Check in with your supervisor.</dd></div><div><dt>Week 9</dt><dd>Final project due ${fmtD(weekDue(8))}, 17:00. Self-review, then supervisor grading.</dd></div></dl>
-    <h3>How you'll be graded</h3><table class="tbl rub"><tbody>${RUBRIC.map((x) => `<tr><td><b>${x[0]}</b><span class="note">${x[1]}</span></td><td class="mono">${x[2]}</td></tr>`).join("")}</tbody></table>
-    <h3>How to submit</h3><p>Put everything in one Google Drive or Notion folder, set sharing to “anyone with the link can view”, and paste the link into the Week 9 task “Submit your final project”.</p></div>`;
+    <h3>Timeline</h3><dl class="kv tl"><div><dt>Week ${wi + 1}</dt><dd>Project plan due ${fmtD(weekDue(wi))}, 17:00. Check in with your supervisor.</dd></div><div><dt>Week ${wi + 2}</dt><dd>Final project due ${fmtD(weekDue(wi + 1))}, 17:00. Self-review, then supervisor grading.</dd></div></dl>
+    <h3>How you'll be graded</h3><p class="note">Your supervisor scores your final project out of 100 with this rubric. The score goes straight into your final result: (assessments + examinations + project) ÷ 2.</p>${projRubricTable()}
+    <h3>How to submit</h3><p>Put everything in one Google Drive or Notion folder, set sharing to “anyone with the link can view”, and paste the link into the Week ${wi + 2} task “Submit your final project”.</p></div>`;
 }
 function logWeek(wi, it, r) {
   const w = it.wk || wi - 8, e = r?.data || {}, ro = !!r && r.status !== "revise", last = w === 4;
@@ -1857,16 +2067,16 @@ const draft = (k, d) => (LS.X.drafts && LS.X.drafts[k]) ?? d;
 const stepsOl = (L) => `<ol class="dc-steps">${L.map(([t, ok], i) => `<li class="${ok ? "done" : ""}"><span class="mono">${ok ? "✓" : i + 1}</span>${t}</li>`).join("")}</ol>`;
 const PROJ_PHASES = [["Plan & build", "Read the brief, plan your project and check in with your supervisor."], ["Deliver", "Finish and submit your project, review it yourself and get graded."]];
 function projectView(wi, items) {
-  const projW = LS.W.map((w, i) => (w.stage === 3 ? i : -1)).filter((i) => i >= 0), ph = projW.indexOf(wi), finalWi = projW.at(-1);
-  const finalIt = LS.W[finalWi].items.find((x) => x.proj), fr = finalIt ? row(finalIt) : null, daysToFinal = Math.max(0, Math.ceil((weekDue(finalWi) - Date.now()) / DAY));
+  const projW = LS.W.map((w, i) => (w.stage === 4 ? i : -1)).filter((i) => i >= 0), ph = projW.indexOf(wi), finalWi = projW.at(-1);
+  const finalIt = LS.W[finalWi].items.find((x) => x.final) || LS.W[finalWi].items.find((x) => x.proj), fr = finalIt ? row(finalIt) : null, daysToFinal = Math.max(0, Math.ceil((weekDue(finalWi) - Date.now()) / DAY));
   const brief = (byTitle(projW[0], "Read your project brief") || {}).detail || "";
   const ms = []; projW.forEach((w) => LS.W[w].items.forEach((it) => ms.push({ t: it.title, w, ok: isDoneIt(it) })));
   const firstOpen = ms.findIndex((m) => !m.ok), p = weekProgress(wi), msgs = LS.X.messages || [];
-  return `<div class="proj-hero"><p class="eyebrow">Client project · ${ph + 1} of ${projW.length}</p><h2>${esc(LS.W[wi].title.replace("Project: ", ""))}</h2>
+  return `<div class="proj-hero"><p class="eyebrow">Practical project · ${ph + 1} of ${projW.length}</p><h2>${esc(LS.W[wi].title.replace("Project: ", ""))}</h2>
     <p class="ph-brief">${esc(brief)}</p>
     <div class="ph-stats"><div><span>Final project due</span><b class="mono">${daysToFinal}<small> days</small></b><span>${fmtD(weekDue(finalWi))}, 17:00</span></div>
       <div><span>This week</span><b class="mono">${p.d}<small>/${p.n}</small></b><span>tasks done</span></div>
-      <div><span>Grade</span><b class="mono">${fr?.status === "graded" ? fr.score + "<small>%</small>" : "—"}</b><span>${fr?.status === "graded" ? "graded by your supervisor" : fr ? "waiting for grading" : "after you submit"}</span></div></div>
+      <div><span>Project score</span><b class="mono">${fr?.status === "graded" ? (fr.grade ?? fr.score) + "<small>/100</small>" : "—"}</b><span>${fr?.status === "graded" ? "graded by your supervisor" : fr ? "waiting for grading" : "after you submit"}</span></div></div>
     <ol class="ph-steps">${PROJ_PHASES.map((x, i) => `<li class="${weekDone(projW[i]) ? "done" : i === ph ? "cur" : ""}"><span class="mono">Week ${projW[i] + 1}</span><b>${x[0]}</b><span>${x[1]}</span></li>`).join("")}</ol>
     <div class="actions"><a class="btn gold sm" href="#/learn/learning/${projW[0] + 1}/brief">${LICON.file} Read the full brief & rubric</a><span class="ph-note">Individual project · you work on your own, with your supervisor's support</span></div></div>
   <div style="margin-top:1rem">${gateCard(wi)}</div>
@@ -1896,7 +2106,7 @@ function internView(wi, items) {
 function lsLogGuide(wi) {
   const pl = LS.X.placement;
   return `<div class="view guide-doc"><a class="back" href="#/learn/learning/${wi + 1}">← Week ${wi + 1}: ${esc(LS.W[wi].title)}</a>
-    <div><p class="eyebrow">Internship · Weeks 10–13</p><h2 style="margin-top:.4rem">Logbook guide</h2></div>
+    <div><p class="eyebrow">Internship · Weeks 15–18</p><h2 style="margin-top:.4rem">Logbook guide</h2></div>
     <p>Your logbook is the official record of your internship. Your supervisor signs every entry, and it becomes verified work experience for your CV and portfolio.</p>
     <h3>When to fill it</h3><ul><li>Once a week, at the end of each internship week: 4 entries in total.</li><li>Submit by <b>Friday, 17:00</b>. Write notes during the week so Friday is quick.</li></ul>
     <h3>What to write</h3><ul><li><b>Tasks:</b> list each task and what you delivered. Be specific.</li><li><b>Tools:</b> the software you used, e.g. Excel, Trello, Zendesk.</li><li><b>Skills:</b> what you learned or got better at.</li><li><b>Challenges:</b> one problem and how you solved it.</li><li><b>Next week:</b> two or three clear goals.</li></ul>
@@ -1907,8 +2117,9 @@ function lsLogGuide(wi) {
 }
 
 /* CV builder */
-const TRACK_SKILLS = { ADM: ["Calendar management", "Google Workspace", "Microsoft Office", "Meeting minutes", "Expense tracking"], CSP: ["Zendesk", "Live chat support", "Ticket triage", "CSAT", "De-escalation"],
-  DAT: ["Excel", "Google Sheets", "Pivot tables", "Data cleaning", "Looker Studio"], DMK: ["Canva", "Meta Ads Manager", "Content calendars", "Copywriting", "Social media analytics"] };
+const TRACK_SKILLS = { BOP: ["Calendar & inbox management", "Google Workspace", "Microsoft Office", "Project coordination", "SOPs & process mapping", "Expense tracking"],
+  PTA: ["Recruitment coordination", "Boolean sourcing", "CV screening", "Interview scheduling", "Onboarding", "HR reporting"],
+  CSG: ["Zendesk", "Live chat support", "CRM (HubSpot)", "Customer onboarding", "Sales prospecting", "CSAT & NPS"] };
 function cvData() {
   const me = LS.C.me, pl = LS.X.placement, d = draft("cv", null); if (d) return d;
   const brief = (LS.W.flatMap((w) => w.items).find((x) => x.title === "Read your project brief") || {}).detail || "";
@@ -1947,7 +2158,7 @@ function cvView(wi, items) {
       ${liI ? linkBox(liI, "li-url", "Your LinkedIn profile URL", "https://linkedin.com/in/...", "Submit LinkedIn") : ""}</div>
     <div class="card"><div class="ch"><h3>Portfolio</h3>${pfI && isDoneIt(pfI) ? `<span class="pill ok">Published</span>` : ""}</div>
       <p class="note">Include these, with a short description of the result for each:</p>
-      <ul class="reqs"><li>Your client project</li><li>Your internship${pl ? ` at ${esc(pl.org)}` : ""}</li><li>Your best practice exercise from Weeks 4–7</li><li>Your CV</li></ul>
+      <ul class="reqs"><li>Your practical project</li><li>Your internship${pl ? ` at ${esc(pl.org)}` : ""}</li><li>Your best week task from Weeks 4–11</li><li>Your CV</li></ul>
       ${pfI ? linkBox(pfI, "pf-url", "Portfolio link (Canva, Notion or Google Sites)", "https://", "Publish portfolio") : ""}</div></div>
   <div class="items">${wk.items.filter((it) => it.opt).map((it) => itemRow(wi, it, true)).join("")}</div>`;
 }
@@ -1975,7 +2186,7 @@ function bookingUI() {
       <div><button class="btn gold" data-act="dc-book" data-k="${pick.id}">Confirm booking</button></div></div>` : ""}</div>`;
 }
 function dcView(wi) {
-  const prep = [["cv", "Your updated CV from Week 14"], ["port", "Your portfolio link"], ["roles", "3 roles you're targeting"], ["pitch", "Your 60-second introduction"]], pd = draft("prep", {});
+  const prep = [["cv", "Your updated CV from Week 19"], ["port", "Your portfolio link"], ["roles", "3 roles you're targeting"], ["pitch", "Your 60-second introduction"]], pd = draft("prep", {});
   const apI = byTitle(wi, "Finalise your Job Search Action Plan"), callDone = doneT("Mock interview simulation"), r = LS.X.result;
   return `<p style="max-width:64ch">A 40-minute, 1-on-1 video call with a Career Coach. You'll do a short <b>mock interview</b>, sharpen your pitch and leave with a <b>Job Search Action Plan</b>.</p>
     ${stepsOl([["Book your call", doneT("Book your 1-on-1 session")], ["Have your call", callDone], ["Submit your action plan", apI && isDoneIt(apI)]])}
@@ -1992,12 +2203,12 @@ function dcView(wi) {
 /* Job search */
 const APP_ST = ["Applied", "Interviewing", "Offer", "Not selected"];
 function jobView(wi) {
-  const stW = LS.W.map((w, i) => (w.stage === 7 ? i : -1)).filter((i) => i >= 0), first = wi === stW[0];
+  const stW = LS.W.map((w, i) => (w.stage === 7 ? i : -1)).filter((i) => i >= 0), first = wi === stW[0]; let partA = "";
   const outs = draft("outreach", []), apps = draft("apps", []), pt = draft("pitch", {});
   const words = [pt.a, pt.b, pt.c].join(" ").trim().split(/\s+/).filter(Boolean).length;
   const stats = `<div class="ph-stats js-stats"><div><span>Outreach sent</span><b class="mono">${outs.length}<small>/10</small></b></div><div><span>Applications</span><b class="mono">${apps.length}</b></div><div><span>Interviews</span><b class="mono">${apps.filter((a) => a.st === "Interviewing" || a.st === "Offer").length}</b></div></div>`;
   if (first) { const pI = byTitle(wi, "Record your elevator pitch"), oI = byTitle(wi, "Send 10 cold outreach messages");
-    return stats + `<div class="cols"><div class="card"><div class="ch"><h3>Your 60-second pitch</h3>${pI && isDoneIt(pI) ? `<span class="pill ok">Recorded</span>` : ""}</div>
+    partA = `<div class="cols"><div class="card"><div class="ch"><h3>Your 60-second pitch</h3>${pI && isDoneIt(pI) ? `<span class="pill ok">Recorded</span>` : ""}</div>
       <form class="form" novalidate>
         <div class="field"><label for="pt-a">Who you are</label><textarea id="pt-a" data-pitch="a" rows="2" placeholder="I'm a ${esc(LS.C.me.track || "")} professional who…">${esc(pt.a || "")}</textarea></div>
         <div class="field"><label for="pt-b">What you've done (with a result)</label><textarea id="pt-b" data-pitch="b" rows="2" placeholder="At my internship I…">${esc(pt.b || "")}</textarea></div>
@@ -2011,7 +2222,7 @@ function jobView(wi) {
       ${outs.length ? `<ul class="roles">${outs.slice().reverse().map((o) => `<li><b>${esc(o.name)} · ${esc(o.co)}</b><span class="note">${esc(o.ch)} · ${esc(o.on)}</span><span class="pill ${o.st === "Sent" ? "" : "ok"}">${esc(o.st)}</span></li>`).join("")}</ul>` : `<p class="empty">No messages logged yet. Aim for 2 a day.</p>`}
       ${oI ? `<div class="actions" style="margin-top:.8rem"><button class="btn sm ${isDoneIt(oI) ? "ghost" : ""}" data-act="ls-done" data-k="${oI.key}" data-v="${isDoneIt(oI) ? 0 : 1}" ${outs.length < 10 && !isDoneIt(oI) ? "disabled" : ""}>${isDoneIt(oI) ? "Done ✓ · Undo" : `Mark outreach done (${outs.length}/10)`}</button></div>` : ""}</div></div>`; }
   const tI = byTitle(wi, "Weekly job application tracker"), rI = byTitle(wi, "Report your first interview invite"), hasInt = apps.some((a) => a.st === "Interviewing" || a.st === "Offer");
-  return stats + `<div class="card"><div class="ch"><h3>Add an application</h3></div>
+  return stats + partA + `<div class="card"><div class="ch"><h3>Add an application</h3></div>
     <form id="app-form" class="form" novalidate><div class="app-row"><div class="field"><label for="a-role">Role</label><input id="a-role" placeholder="e.g. Junior Data Analyst"></div><div class="field"><label for="a-co">Company</label><input id="a-co" placeholder="e.g. Flutterwave"></div><div class="field"><label for="a-st">Status</label><select id="a-st">${APP_ST.map((x) => `<option>${x}</option>`).join("")}</select></div><div class="field"><span class="lbl">&nbsp;</span><button class="btn sm" type="submit">Add</button></div></div></form></div>
   <div class="board">${APP_ST.map((st) => `<div class="col"><div class="col-h"><b>${st}</b><span class="mono">${apps.filter((a) => a.st === st).length}</span></div>${apps.map((a, i) => a.st !== st ? "" : `<div class="app-card"><b>${esc(a.role)}</b><span class="note">${esc(a.co)} · ${esc(a.on)}</span><label class="sr-only" for="as-${i}">Status</label><select id="as-${i}" data-app="${i}">${APP_ST.map((x) => `<option ${x === a.st ? "selected" : ""}>${x}</option>`).join("")}</select></div>`).join("") || `<p class="note">None yet</p>`}</div>`).join("")}</div>
   <div class="cols"><div class="card"><div class="ch"><h3>This week's tracker</h3>${tI && isDoneIt(tI) ? `<span class="pill ok">Submitted</span>` : ""}</div><p class="note">Submit your tracker every Friday. Aim for at least 5 targeted applications a week (minimum 3 to submit).</p>
@@ -2019,7 +2230,7 @@ function jobView(wi) {
     <div class="card"><div class="ch"><h3>Got an interview?</h3>${rI && isDoneIt(rI) ? `<span class="pill ok">Reported</span>` : ""}</div><p class="note">Move an application to Interviewing, then tell your coach so they can help you prepare.</p>
       ${rI ? `<div><button class="btn sm gold" data-act="ls-done" data-k="${rI.key}" data-v="1" ${!hasInt || isDoneIt(rI) ? "disabled" : ""}>${isDoneIt(rI) ? "Coach notified ✓" : "Report interview to my coach"}</button></div>` : ""}</div></div>`;
 }
-const SPECIAL = { 3: projectView, 4: internView, 5: cvView, 6: dcView, 7: jobView };
+const SPECIAL = { 3: examView, 4: projectView, 5: internView, 6: cvView, 7: (wi) => `<h3 class="sp-h">1-on-1 coaching call</h3>${dcView(wi)}<h3 class="sp-h">Pitch, outreach and applications</h3>${jobView(wi)}` };
 // Items that are done from their week page rather than their own page.
 const ON_WEEK_PAGE = ["Book your 1-on-1 session", "Mock interview simulation", "ATS-compliant resume", "Weekly job application tracker", "Send 10 cold outreach messages", "Report your first interview invite"];
 let draftT = {};
@@ -2075,7 +2286,7 @@ function lsGraduatePage() {
           : careersUrl() ? `<p class="note">You're a Jobnest graduate. Browse jobs, internships and graduate programmes on Jobnest Careers, and apply with your verified certificate.</p><div class="actions"><a class="btn gold" href="${esc(careersUrl())}" target="_blank" rel="noopener">Go to Jobnest Careers ↗</a></div>`
           : `<p class="note">Jobnest Careers, our jobs and opportunities platform, is launching soon. Your link will appear here, and we'll send you an alert when it opens. Until then, use the Opportunities page.</p><div class="actions"><a class="btn sm ghost" href="#/learn/opps">Opportunities</a></div>`}</div>
       <div class="card"><h3>Keep your job search going</h3><p class="note">Your portal stays open after the programme. Keep using your tools:</p>
-        <div class="actions"><a class="btn sm ghost" href="#/learn/learning/${LS.W.length}">Applications board</a><a class="btn sm ghost" href="#/learn/learning/${LS.W.findIndex((w) => w.stage === 5) + 1}">CV builder</a><a class="btn sm ghost" href="#/learn/help">Help & Support</a></div></div>
+        <div class="actions"><a class="btn sm ghost" href="#/learn/learning/${LS.W.length}">Applications board</a><a class="btn sm ghost" href="#/learn/learning/${LS.W.findIndex((w) => w.stage === 6) + 1}">CV builder</a><a class="btn sm ghost" href="#/learn/help">Help & Support</a></div></div>
     </div></div>
     <h2 style="margin:1.6rem 0 .8rem">Alumni check-ins</h2><p class="note" style="margin-bottom:1rem">We check in 30, 60 and 90 days after the programme. Tell us how you're doing, and ask for help if you need it.</p>
     <div class="grad-cks">${[30, 60, 90].map(ck).join("")}</div></section>`);
@@ -2107,7 +2318,7 @@ function lsAssignmentsPage(key) {
   const list = lsAssignments(), f = ui.asf || "All", groups = ["All", "Not Started", "Submitted", "Revision Required", "Graded"];
   const shown = list.filter((a) => f === "All" || aStatus(a.it) === f);
   const hist = (LS.L.history || []).slice().reverse().slice(0, 8).map((h) => ({ ...h, f: findItem(h.key) }));
-  lsShell("assignments", pageHead("Assignments & Projects", "Your submissions", "Everything you need to submit across the 17 weeks, with deadlines, rubrics and facilitator feedback.") +
+  lsShell("assignments", pageHead("Assignments & Projects", "Your submissions", `Everything you need to submit across the ${LS.W.length} weeks, with deadlines, rubrics and facilitator feedback.`) +
   `<section class="wrap pagebody"><div class="chips" role="group" aria-label="Filter by status">${groups.map((g) => `<button class="chipf" data-act="ls-asf" data-k="${g}" aria-pressed="${f === g}">${g}${g === "All" ? "" : ` <span class="mono">${list.filter((a) => aStatus(a.it) === g).length}</span>`}</button>`).join("")}</div>
     <div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Assignment</th><th>Week</th><th>Deadline</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody>
     ${shown.length ? shown.map((a) => { const un = unlockedW(a.wi), st = aStatus(a.it);
@@ -2128,7 +2339,7 @@ function lsAssignmentDetail(key) {
       : `<form id="ls-link" data-k="${it.key}" class="form" style="margin-top:.8rem" novalidate><div class="field"><label for="ls-url">Link to your work *</label><input id="ls-url" inputmode="url" placeholder="https://" value="${esc(r?.link || "")}"></div><p class="err" id="ls-err" role="alert"></p>
         <div class="actions"><button class="btn" type="submit">${st === "Revision Required" ? "Resubmit" : r ? "Update link" : "Submit assignment"}</button></div></form>${r?.status === "submitted" ? `<p class="note" style="margin-top:.6rem">Waiting for your facilitator to grade it. Feedback arrives within 5 working days.</p>` : ""}`}</div></div>
     <div class="stack"><div class="card"><h3>Details</h3><dl class="kv"><div><dt>Deadlines</dt><dd>Full marks: ${fmtD(weekDue(wi))}, 17:00<br>80% max: ${fmtD(graceDue(wi))}, 23:59</dd></div><div><dt>Stage</dt><dd>${esc(COURSE_STAGES[LS.W[wi].stage].title)}</dd></div><div><dt>In My Learning</dt><dd><a class="link" href="#/learn/learning/${wi + 1}/${it.key}">Week ${wi + 1} item</a></dd></div></dl></div>
-      ${it.proj ? `<div class="card"><h3>Assessment rubric</h3><table class="tbl rub"><tbody>${RUBRIC.map((x) => `<tr><td><b>${x[0]}</b><span class="note">${x[1]}</span></td><td class="mono">${x[2]}</td></tr>`).join("")}<tr><td><b>Total</b></td><td class="mono">${total}</td></tr></tbody></table></div>` : ""}
+      ${it.final ? `<div class="card"><h3>Project rubric</h3>${projRubricTable()}</div>` : it.proj ? `<div class="card"><h3>Feedback rubric</h3><p class="note">Week tasks get feedback but don't count towards your final score.</p><table class="tbl rub"><tbody>${RUBRIC.map((x) => `<tr><td><b>${x[0]}</b><span class="note">${x[1]}</span></td><td class="mono">${x[2]}</td></tr>`).join("")}<tr><td><b>Total</b></td><td class="mono">${total}</td></tr></tbody></table></div>` : ""}
       <div class="card"><h3>History</h3>${hist.length ? `<ul class="hist">${hist.map((h) => `<li><span class="mono note">${fmtAt(h.at)}</span><span>${esc(h.action)}${h.by ? ` · ${esc(h.by)}` : ""}</span></li>`).join("")}</ul>` : `<p class="empty">No activity yet.</p>`}</div></div></div></section>`);
 }
 function discussionCard(D, staff, ch = "cohort") {
@@ -2166,15 +2377,16 @@ function lsProfilePage(cert) {
     <div class="stack"><div class="card idcard"><div class="ch"><h3>Student ID</h3>${LOGO}</div><div class="id-row">${avatar("id-av")}<p style="margin:.4rem 0 0;font-size:1.3rem"><b>${esc(me.first_name)} ${esc(me.surname || "")}</b></p></div>
       <dl class="kv"><div><dt>Matric number</dt><dd class="mono">${esc(me.matric)}</dd></div><div><dt>Track</dt><dd>${esc(me.track || "")}</dd></div><div><dt>Cohort</dt><dd>${esc(LS.C.cohort.name)}</dd></div><div><dt>Email</dt><dd>${esc(me.email || "")}</dd></div></dl></div>
       ${cert ? `<div class="card cert-card"><span class="eyebrow">Certificate of completion</span><h2>Your certificate is ready 🎓</h2><div class="actions"><a class="btn gold" href="#/learn/certificate">View and download</a></div></div>` : `<div class="card"><h3>Certificate</h3><p class="note">Your certificate appears here once you complete the programme.</p></div>`}
-      ${LS.icert && LS.icert.cert_id ? `<div class="card cert-card"><span class="eyebrow">Certificate of internship</span><h2>${esc(LS.icert.role)} at ${esc(LS.icert.org)}</h2><div class="actions"><a class="btn gold" href="#/learn/learning/13/${(LS.W[12]?.items.find((x) => x.title === "Collect your internship certificate") || {}).key || ""}">View and download</a></div></div>` : ""}
+      ${LS.icert && LS.icert.cert_id ? `<div class="card cert-card"><span class="eyebrow">Certificate of internship</span><h2>${esc(LS.icert.role)} at ${esc(LS.icert.org)}</h2><div class="actions"><a class="btn gold" href="${(() => { const f = LS.W.map((w, i) => [i, w.items.find((x) => x.title === "Collect your internship certificate")]).find(([, x]) => x); return f ? `#/learn/learning/${f[0] + 1}/${f[1].key}` : "#/learn/learning"; })()}">View and download</a></div></div>` : ""}
       ${installCard()}</div>
     <div class="stack">${progressCard(LS.C, cert)}${profileForm()}<div class="card"><h3>Account</h3><div class="actions"><a class="btn ghost" href="#/learn/forgot">Change password</a><button class="btn ghost" data-act="signout-learn">Sign out</button></div></div></div></div></section>`);
 }
 const SUPPORT_CATS = ["Technical problem", "Course content", "Deadlines or extension", "Payment", "Internship", "Personal or wellbeing", "Other"];
 function lsHelpPage() {
-  const Q = [["I can't open the next week", "Each week opens when you pass the week before it, and not earlier than the Saturday before it starts. Check the week result on the previous week."],
+  const Q = [["I can't open the next week", "Each week opens when you finish the required steps of the week before it, and not earlier than the Saturday before it starts."],
     ["Why can't I open a lesson?", "Inside each week, items open in order. Finish the step before it first. Optional items never block you."],
-    ["How are weeks passed?", `In Stages 2–4, your assessment score and week project grade are averaged. You need ${PASS()}% or more. If your assessment is below ${PASS()}%, redo the week's lessons and retake it once.`],
+    ["How is my final result worked out?", "Ten weekly assessments (40 marks), the two examinations in Week 12 (60 marks) and your practical project (100 marks). Final score = (assessments + examinations + project) ÷ 2. Distinction 80–100, Merit 60–79, Pass 50–59, Fail below 50. Scores are never rounded up."],
+    ["Can I retake an assessment or examination?", "Weekly assessments have one attempt and no resits. If you miss an examination for a serious reason, speak to Student Success: a resit is only possible when staff authorise it, and it replaces your earlier score."],
     ["What if I submit late?", "Work is due Friday at 17:00 for full marks. Until Sunday 23:59 the maximum is 80%. After that, it's 50%."],
     ["How do I join a live session?", "Open My Cohort or Home and tap Join. Joining through the portal records your attendance."],
     ["I forgot my password", "Use Forgot password on the sign-in page. We'll email you a link."]];
@@ -2208,10 +2420,9 @@ function lockedPage(k) {
 }
 
 /* ---------- My Career ---------- */
-const CAREER_SKILLS = { DAT: ["Spreadsheet formulas & pivot tables", "Data cleaning", "Data visualisation", "Dashboards & reporting"],
-  CSP: ["Support fundamentals & tone", "Ticketing tools", "Live chat & email support", "CX metrics"],
-  DMK: ["Marketing strategy & funnels", "Content creation", "Social media management", "Paid ads & analytics"],
-  ADM: ["Calendar & inbox management", "Business documents", "Spreadsheets", "Travel, expenses & vendors"] };
+const CAREER_SKILLS = { BOP: ["Calendar & inbox management", "Business documents & spreadsheets", "Project coordination & SOPs", "Executive support & office records"],
+  PTA: ["Recruitment lifecycle & job descriptions", "Sourcing & screening", "Interviews & onboarding", "HR policies, data privacy & metrics"],
+  CSG: ["Support tools & etiquette", "Customer success & onboarding", "CRM & sales prospecting", "Retention & growth reporting"] };
 const INTERVIEW_QS = [["Tell me about yourself.", "Use present–past–future: what you do now, the experience that got you here (your Jobnest project and internship), and why this role is next."],
   ["Why do you want this role?", "Link the job description to one skill you've proved in your portfolio and one thing you want to learn."],
   ["Tell me about a challenge you solved.", "Use STAR. Your internship logbook challenges are great material."],
@@ -2225,16 +2436,17 @@ function careerJourney() {
   const o = draft("opps", {}), applied = Object.values(o.st || {}).some((x) => ["Applied", "Interviewing", "Offer received"].includes(x)) || draft("apps", []).length > 0;
   const tn = LS.C.me.track || "your track";
   return [["Complete the skills foundation", "Weeks 2–3 complete, including the Workplace Readiness assessment", stageDone(1)],
-    ["Build track skills", `The ${tn} core weeks complete, with each week passed`, stageDone(2)],
-    ["Complete a practical project", "Client project submitted and graded by your project supervisor", stageDone(3)],
-    ["Gain verified work experience", "Internship logbook signed and evaluation received", !!LS.X.eval || stageDone(4)],
-    ["Build a professional CV", "ATS-ready CV submitted in Week 14", stageDone(5)],
-    ["Complete interview preparation", "Mock interview done in Discovery Call 2", stageDone(6)],
+    ["Build track skills", `The ${tn} core weeks complete, with all ten weekly assessments taken`, stageDone(2)],
+    ["Sit the examinations", "Fundamental and Core Skill Learning Examinations in Week 12", stageDone(3)],
+    ["Complete a practical project", "Final project submitted and graded out of 100 by your project supervisor", stageDone(4)],
+    ["Gain verified work experience", "Internship logbook signed and evaluation received", !!LS.X.eval || stageDone(5)],
+    ["Build a professional CV", "ATS-ready CV submitted in Week 19", stageDone(6)],
+    ["Complete interview preparation", "Mock interview done in your 1-on-1 coaching call", doneT("Mock interview simulation")],
     ["Explore opportunities", "At least one application tracked as Applied or further", applied]];
 }
 function lsCareerPage() {
   const c = draft("career", {}), J = careerJourney(), ok = J.filter((x) => x[2]).length;
-  const core = stageWeeks(2), skills = [["Professional communication & workplace readiness", stageWeeks(1).at(-1)], ...(CAREER_SKILLS[LS.L.track] || CAREER_SKILLS.DAT).map((n, i) => [n, core[i]])];
+  const core = stageWeeks(2), skills = [["Professional communication & workplace readiness", stageWeeks(1).at(-1)], ...(CAREER_SKILLS[LS.L.track] || CAREER_SKILLS.BOP).map((n, i) => [n, core[i * 2 + 1] ?? core.at(-1)])];
   const ev = (wi) => { if (wi == null) return [""]; const sc = weekScore(wi), g = weekGate(wi);
     return weekDone(wi) ? ["assessed", `Week ${wi + 1} passed${sc != null ? ` · ${sc}%` : ""}`] : g && g.state === "grading" ? ["pending", `Week ${wi + 1} waiting for grading`] : ["", `Evidence comes from Week ${wi + 1}`]; };
   const port = lsAssignments().filter((a) => a.it.proj && aStatus(a.it) === "Graded" && LS.W[a.wi].stage >= 2);
@@ -2323,7 +2535,7 @@ async function tabOpps() {
       <div class="grid2"><div class="field"><label for="op-skills">Skills (comma-separated)</label><input id="op-skills" value="${esc(cur.skills || "")}" placeholder="Excel, Dashboards"></div><div class="field"><label for="op-link">Apply link</label><input id="op-link" inputmode="url" value="${esc(cur.link || "")}" placeholder="https://"></div></div>
       <label class="check"><input type="checkbox" id="op-active" ${cur.active === false ? "" : "checked"}> Show to students</label>
       <p class="err" id="op-err" role="alert"></p><div><button class="btn" type="submit">Save</button></div></form>` : "";
-  shell("opps", "Opportunities", "Jobs, internships and events students see on their Opportunities page (opens in Week 16). New listings send students an alert.",
+  shell("opps", "Opportunities", "Jobs, internships and events students see on their Opportunities page (opens in Week 20). New listings send students an alert.",
     `${e ? form : `<div class="actions" style="margin-bottom:1rem"><button class="btn" data-act="opp-edit" data-k="new">Add an opportunity</button></div>`}
     <div class="card" style="margin-top:1rem">${O.length ? `<div class="tbl-wrap"><table class="tbl cards"><thead><tr><th>Opportunity</th><th>Type</th><th>Track</th><th>Deadline</th><th>Status</th><th></th></tr></thead><tbody>
       ${O.map((o) => `<tr><td data-label="Opportunity"><b>${esc(o.title)}</b><span class="note">${esc(o.org)}${o.location ? " · " + esc(o.location) : ""}</span></td><td data-label="Type">${esc(o.kind)}</td><td data-label="Track">${esc(tName(d.tracks || [], o.track_code))}</td>
@@ -2367,20 +2579,21 @@ function gradCelebrate() {
 }
 async function lsRender(p1, p2, p3) {
   setTimeout(gradCelebrate, 300); setTimeout(() => { if ($(".cert-box")) fitCert(); }, 30);
-  setTimeout(() => { if (ui.quiz && $("#qt-left") && !QTIMER) { QTIMER = setInterval(quizTick, 1000); quizTick(); } }, 0);
+  setTimeout(() => { if (ui.quiz && $("#qt-left") && !QTIMER) { QTIMER = setInterval(quizTick, 1000); quizTick(); } if (ui.exam && $("#ex-left") && !XTIMER) { XTIMER = setInterval(examTick, 1000); examTick(); } }, 0);
   if (p1 === undefined) [p1, p2, p3] = lsParts();
   const page = p1 || "home", cert = LS.cert;
   if (LS.fee && !["home", "help", "profile"].includes(page)) return feeLockPage();
   if (MORE_PAGES.some((m) => m[0] === page && m[3] != null) && !pageOpen(page)) return lockedPage(page);
   if (page === "learning") { const wi = Math.min(Math.max((parseInt(p2, 10) || curWeek() + 1) - 1, 0), LS.W.length - 1);
-    if (LS.W[wi].stage === 6 && !LS.X.booking && !p3 && unlockedW(wi) && !LS.slots) { try { LS.slots = await rpc("dc2_slots"); } catch { LS.slots = []; } }
+    if (LS.W[wi].stage === 7 && !LS.X.booking && !p3 && unlockedW(wi) && !LS.slots) { try { LS.slots = await rpc("dc2_slots"); } catch { LS.slots = []; } }
     const f3 = p3 ? findItem(p3) : null;
     if (f3 && f3.it.title === "Collect your internship certificate" && LS.X.eval && LS.icert === undefined) LS.icert = await rpc("certificate_view", { p_cert: internCertId() }).catch(() => null);
-    if (LS.W[wi].stage === 3 && LS.sup === undefined) LS.sup = await rpc("learn_supervisor").catch(() => null);
+    if (LS.W[wi].stage === 4 && LS.sup === undefined) LS.sup = await rpc("learn_supervisor").catch(() => null);
     lsLearning(wi, p3 || null); }
   else if (page === "career") { LS.discCareer = await rpc("disc_list2", { p_channel: "career" }).catch(() => []); lsCareerPage(); }
   else if (page === "opps") { LS.opps = await rpc("opps_list").catch(() => LS.opps || []); lsOppsPage(); }
   else if (page === "assignments") lsAssignmentsPage(p2 || null);
+  else if (page === "results") lsResultsPage();
   else if (["cohort", "sessions", "news"].includes(page)) { LS.disc = await rpc("disc_list2", { p_channel: "cohort" }).catch(() => []); lsCohortPage(); }
   else if (page === "profile") { LS.profile = await rpc("profile_get").catch(() => ({})); if (LS.X.eval && LS.icert === undefined) LS.icert = await rpc("certificate_view", { p_cert: internCertId() }).catch(() => null); lsProfilePage(cert); }
   else if (page === "help") { LS.support = await rpc("support_list").catch(() => []); lsHelpPage(); }
@@ -2403,8 +2616,8 @@ async function lsCall(fn, args, btn, msg) {
 const TOUR = [
   { t: "Welcome to your student portal", b: "Here's a quick look around. It takes less than a minute." },
   { t: "Today", b: "Your next task and how many days are left this week. Tap Continue to pick up where you left off.", sel: "#t-today" },
-  { t: "Your week at a glance", b: "Required tasks done, assignments due and your scores.", sel: "#t-strip" },
-  { t: "My Learning", b: "All 17 weeks, grouped into stages. Each week opens when you pass the one before it.", sel: "#nav-learning" },
+  { t: "Your week at a glance", b: "Required tasks done, assignments due, your assessment marks and your final result.", sel: "#t-strip" },
+  { t: "My Learning", b: "All 20 weeks, grouped into eight stages. Each week opens when you finish the one before it.", sel: "#nav-learning" },
   { t: "More", b: "Assignments & Projects, My Cohort, your profile and Help & Support live here.", sel: "#more" },
   { t: "You're all set", b: "Start with Week 1: Orientation and sign your Student Oath. You can take this tour again from the More menu." },
 ];
@@ -2491,7 +2704,7 @@ async function tabIntern() {
           <div class="grid2"><div class="field"><label for="ps-${i}">Supervisor's name</label><input id="ps-${i}" placeholder="e.g. Funmi Bello" value="${esc(p?.sup_name || "")}"></div><div class="field"><label for="pp-${i}">Supervisor's WhatsApp</label><input id="pp-${i}" placeholder="e.g. 0803 000 0000" value="${esc(p?.sup_phone || "")}" inputmode="tel"></div></div>
           <div class="field"><label for="pe-${i}">Supervisor's email (optional)</label><input id="pe-${i}" placeholder="e.g. funmi@company.com" type="email" value="${esc(p?.sup_email || "")}"></div>
           <div class="actions"><button class="btn sm" type="submit">${p ? "Save changes" : "Save placement"}</button></div></form>` : ""}</div></details>`; };
-  shell("intern", "Internships", "Weeks 10–13. Add each student's placement, then share the supervisor's link so they can sign the weekly logbook and give the final evaluation.",
+  shell("intern", "Internships", "Weeks 15–18. Add each student's placement, then share the supervisor's link so they can sign the weekly logbook and give the final evaluation.",
     `<div class="card">${L.length ? `<div class="arows">${L.map(row3).join("")}</div>` : empty("No admitted students yet.")}</div>`);
 }
 
@@ -2509,7 +2722,7 @@ async function tabDc2() {
         <div class="field"><label for="dno-${i}">Summary for the student</label><textarea id="dno-${i}" placeholder="e.g. Strong pitch. Slow down and use numbers." rows="2">${esc(x.result?.note || "")}</textarea></div>
         <div class="field"><label for="dnx-${i}">Next steps (one per line)</label><textarea id="dnx-${i}" placeholder="One step per line" rows="3">${esc((x.result?.next || []).join("\n"))}</textarea></div>
         <div class="actions"><button class="btn sm" type="submit">${x.result ? "Update result" : "Save result"}</button></div></form></div></details>`;
-  shell("dc2", "Discovery Call 2", "Week 15. Students book a 40-minute call with a career coach, then you record their Interview Confidence Score and next steps.",
+  shell("dc2", "Discovery Call 2", "Week 20. Students book a 40-minute call with a career coach, then you record their Interview Confidence Score and next steps.",
     `<div class="grid2">${isCoach ? `<form class="card form" id="dc2-times" novalidate><h3>Add times</h3><p class="note">Each call is 40 minutes. Times are in WAT.</p>
       <div class="field"><span class="lbl">Days</span><div class="chips-row">${days.map((d) => `<label class="chip-cb"><input type="checkbox" name="dday" value="${d}"><span>${fmt(d + "T12:00:00Z", { weekday: "short", day: "numeric", month: "short" })}</span></label>`).join("")}</div></div>
       <div class="field"><span class="lbl">Times</span><div class="chips-row">${CALL_TIMES.map((t) => `<label class="chip-cb"><input type="checkbox" name="dtime" value="${t}"><span>${t}</span></label>`).join("")}</div></div>
@@ -2518,7 +2731,7 @@ async function tabDc2() {
     <div class="card" style="margin-top:1rem"><div class="ch"><h3>Booked calls</h3><span class="note">${booked.length}</span></div>${booked.length ? `<div class="arows">${booked.map((x) => call(x, L.indexOf(x))).join("")}</div>` : empty("No calls booked yet.")}</div>`);
 }
 
-/* ---------- staff: job search (Weeks 14–17) ---------- */
+/* ---------- staff: job search (Weeks 19–20) ---------- */
 async function tabJobs() {
   const L = await rpc("acad_jobsearch");
   const lk = (x, t, l) => x.links[t] ? `<a class="link sm" href="${esc(x.links[t])}" target="_blank" rel="noopener">${l} ↗</a>` : `<span class="note">${l}: not yet</span>`;
@@ -2535,7 +2748,7 @@ async function tabJobs() {
       <h4 style="margin:.8rem 0 .3rem">Outreach</h4>${x.outreach.length ? `<ul class="roles">${x.outreach.map((o) => `<li><b>${esc(o.name)} · ${esc(o.co)}</b><span class="note">${esc(o.ch)} · ${esc(o.on || "")}</span><span class="pill ${o.st === "Sent" ? "" : "ok"}">${esc(o.st)}</span></li>`).join("")}</ul>` : `<p class="note">None yet.</p>`}
       ${x.cv ? `<details style="margin-top:.8rem"><summary class="link sm">See their CV</summary><div style="margin-top:.6rem">${cvPreview(x.cv)}</div></details>` : ""}
     </div></details>`;
-  shell("jobs", "Job search", "Weeks 14–17. Each student's CV, LinkedIn, portfolio, pitch, outreach and job applications. It updates as students work.",
+  shell("jobs", "Job search", "Weeks 19–20. Each student's CV, LinkedIn, portfolio, pitch, outreach and job applications. It updates as students work.",
     `<div class="kpis">${[["Outreach sent", tot.out], ["Applications", tot.apps], ["Interviews", tot.ints], ["Offers", tot.offers]].map(([l, v]) => `<div class="kpi card"><span class="eyebrow">${l}</span><b class="mono">${v}</b></div>`).join("")}</div>
     <div class="card" style="margin-top:1rem">${L.length ? `<div class="arows">${L.map(row4).join("")}</div>` : empty("No admitted students yet.")}</div>`);
 }
@@ -2558,7 +2771,7 @@ async function tabPods() {
     ${d.unassigned.length ? `<div class="card" style="margin-top:1rem"><div class="ch"><h3>Not in a pod yet</h3><span class="pill now">${d.unassigned.length}</span></div><ul class="pod-m">${d.unassigned.map((m) => `<li><span><b>${esc(m.name)}</b> <span class="note">${esc(tn(m.track))}</span></span>${can && d.pods.length ? podSel(m.app, null) : ""}</li>`).join("")}</ul></div>` : ""}
     <div class="pod-grid">${d.pods.map(pod).join("") || `<div class="card">${empty("No pods yet.")}</div>`}</div>`);
 }
-const podFields = (p, tracks) => `<div class="field"><label>Pod name</label><input name="name" value="${esc(p?.name || "")}" placeholder="e.g. Data Analysis pod 1"></div>
+const podFields = (p, tracks) => `<div class="field"><label>Pod name</label><input name="name" value="${esc(p?.name || "")}" placeholder="e.g. Business Operations pod 1"></div>
   <div class="field"><label>Track</label><select name="track"><option value="">All tracks</option>${tracks.map((t) => `<option value="${t.code}" ${p?.track === t.code ? "selected" : ""}>${esc(t.name)}</option>`).join("")}</select></div>
   <div class="field"><label>Weekly check-in</label><input name="meet" value="${esc(p?.meet || "")}" placeholder="e.g. Thursdays, 19:00 WAT"></div>
   <div class="field"><label>Meeting link (optional)</label><input name="link" value="${esc(p?.link || "")}" placeholder="https://"></div>`;
@@ -2785,10 +2998,35 @@ document.addEventListener("click", async (e) => {
     return;
   }
   if (a === "copy-host") { try { await navigator.clipboard.writeText(k); } catch { const ta = document.createElement("textarea"); ta.value = k; document.body.append(ta); ta.select(); document.execCommand("copy"); ta.remove(); } return toast("Link copied"); }
+  if (a === "res-csv") { if (ui.res) resultsCsv(ui.res); return; }
+  if (a === "res-publish") { const on = t.dataset.v === "1";
+    if (!confirm(on ? "Publish results for this cohort? Students with a complete result will see their final score and classification, and get an alert. Pending results stay Pending." : "Unpublish results? Students stop seeing their final score and classification.")) return;
+    try { await busy(t, () => rpc("acad_results_publish", { p_cohort: ui.res.cohort.id, p_on: on })); toast(on ? "Results published" : "Results unpublished"); route(); } catch { /* shown */ } return; }
+  if (a === "res-fix") { const mx = +t.dataset.mx, cur = t.dataset.v;
+    const v = prompt(`New score (${t.dataset.u}, 0 to ${mx}). Leave empty to go back to the calculated score.${cur !== "" ? ` Current: ${cur}.` : ""}`, cur); if (v === null) return;
+    const reason = prompt("Reason for the change (kept in the record and the activity log):"); if (!reason || !reason.trim()) return toast("A reason is needed");
+    try { await busy(t, () => rpc("acad_score_correct", { p_app: ui.resD.id, p_component: k, p_value: v.trim() === "" ? null : +v, p_reason: reason })); toast("Score updated and result recalculated"); route(); } catch { /* shown */ } return; }
+  if (a === "res-resit") { const dt = prompt(`Resit date for the ${paperName(k)} (YYYY-MM-DD). They can start it in the usual daily window.`, new Date(Date.now() + 864e5).toISOString().slice(0, 10)); if (!dt) return;
+    const reason = prompt("Reason for the resit (e.g. illness with a doctor's note):"); if (!reason || !reason.trim()) return toast("A reason is needed");
+    try { await busy(t, () => rpc("acad_exam_resit", { p_app: ui.resD.id, p_paper: k, p_date: dt.trim(), p_reason: reason })); toast("Resit authorised. The student gets an alert."); route(); } catch { /* shown */ } return; }
+  if (a === "res-resit-x") { if (!confirm("Cancel this unused resit?")) return; try { await busy(t, () => rpc("acad_exam_resit_cancel", { p_app: ui.resD.id, p_paper: k })); toast("Resit cancelled"); route(); } catch { /* shown */ } return; }
+  if (a === "res-exc") { const on = t.dataset.v === "1"; const reason = on ? prompt("Reason for the exception (missing scores will count as zero):") : ""; if (on && (!reason || !reason.trim())) return;
+    if (!on && !confirm("Remove the exception? The result goes back to Pending while scores are missing.")) return;
+    try { await busy(t, () => rpc("acad_result_exception", { p_app: ui.resD.id, p_on: on, p_reason: reason || null })); toast(on ? "Exception approved" : "Exception removed"); route(); } catch { /* shown */ } return; }
   if (a === "pod-del") { if (!confirm("Delete this pod? Its members go back to 'Not in a pod yet'.")) return; try { await busy(t, () => rpc("acad_pod_delete", { p_id: +k })); toast("Pod deleted"); route(); } catch { /* shown */ } return; }
   if (a === "dc2-rm") { try { await busy(t, () => rpc("coach_remove_slot", { p_id: +k })); toast("Time removed"); route(); } catch { /* shown */ } return; }
   if (a === "msg-reply") { const tx = $("#mr-" + k).value.trim(); if (!tx) return toast("Write a reply first"); try { await busy(t, () => rpc("acad_message_reply", { p_app: ui.msgs[+k].app, p_body: tx })); toast("Reply sent"); route(); } catch { /* shown */ } return; }
   if (a === "grad-close" || a === "grad-go") { $("#grad-modal")?.remove(); if (a === "grad-go") go("#/learn/graduate"); return; }
+  if (a === "ex-start") {
+    const e = (LS.L.results || {})[k];
+    if (e && e.status !== "In progress" && !confirm(`Start the ${paperName(k)} now? You have ${e.minutes} minutes for ${e.questions} questions, and the timer can't be paused.`)) return;
+    let d; try { d = await busy(t, () => rpc("learn_exam_start", { p_paper: k })); } catch { return; }
+    if (!d) return;
+    ui.exam = { paper: k, d, ans: d.qs.map((_, i) => (Array.isArray(d.answers) && d.answers[i] != null ? +d.answers[i] : null)), deadline: Date.parse(d.deadline), skew: Date.parse(d.now) - Date.now() };
+    const f = LS.W.map((w, wi) => [wi, w.items.find((x) => x.type === "exam" && x.paper === k)]).find(([, it]) => it);
+    if (f) go(`#/learn/learning/${f[0] + 1}/${f[1].key}`); else await lsRender();
+    clearInterval(XTIMER); XTIMER = setInterval(examTick, 1000); setTimeout(examTick, 50); return;
+  }
   if (a === "ls-qstart") {
     let d; try { d = await busy(t, () => rpc("learn_quiz_start", { p_key: k })); } catch { return; }
     if (!d) return;
@@ -2820,9 +3058,10 @@ document.addEventListener("click", async (e) => {
   if (a === "fb-add") { const fb = $("#desk-fb"); if (fb) { fb.value = (fb.value.trim() ? fb.value.trim() + " " : "") + FB_SNIPS[+k]; fb.focus(); } return; }
   if (a === "desk-save" || a === "desk-revise") {
     const x = ui.lq.work.find((w) => w.key + w.app === ui.deskSel); if (!x) return; const R0 = (ui.rub || {})[ui.deskSel] || {}, fb = $("#desk-fb").value.trim();
-    if (a === "desk-save" && Object.keys(R0).length < 4) return toast("Score all four parts first");
+    const RB = rubFor(x);
+    if (a === "desk-save" && Object.keys(R0).length < RB.length) return toast(`Score all ${RB.length} parts first`);
     if (a === "desk-revise" && !fb) { toast("Say what to change in the feedback box"); $("#desk-fb").focus(); return; }
-    const parts = Object.fromEntries(RUBRIC4.map(([n], i) => [n, R0[i] ?? 0]));
+    const parts = Object.fromEntries(RB.map(([n], i) => [n, R0[i] ?? 0]));
     try { await busy(t, () => rpc("acad_learn_grade_parts", { p_app: x.app, p_key: x.key, p_status: a === "desk-save" ? "graded" : "revise", p_parts: parts, p_feedback: fb })); toast(a === "desk-save" ? "Grade sent" : "Changes requested"); ui.deskSel = null; route(); } catch { /* shown */ } return; }
   if (a === "cc-pick") { ui.ccSel = +k; return route(); }
   if (a === "cc-score") { ui.ccScore = { ...(ui.ccScore || {}), [ui.ccSel]: +k }; $$(".rh-sc .rh-s[data-act=cc-score]").forEach((b) => b.classList.toggle("on", b.dataset.k === k)); const hid = t.closest("form")?.querySelector("input[type=hidden]"); if (hid) hid.value = k; return; }
@@ -2947,6 +3186,9 @@ document.addEventListener("change", (e) => {
   const el = e.target, k = el.dataset.k;
   if (el.dataset.actChange === "track") { const none = el.value === "NONE"; $("#wi-" + k).hidden = !none; $("#ri-" + k).hidden = none; }
   if (el.dataset.actChange === "interest") { $("#wo-" + k).hidden = el.value !== "Other"; }
+  if (["res-cohort", "res-track", "res-st", "res-q"].includes(el.dataset.change)) {
+    if (el.dataset.change === "res-cohort") ui.resCohort = +el.value; else ui.resF = { ...(ui.resF || {}), [el.dataset.change.slice(4)]: el.value };
+    route(); return; }
   if (el.dataset.change === "pod-move") {
     const v = el.value; if (v === "") return; el.disabled = true;
     rpc("acad_pod_assign", { p_app: el.dataset.app, p_pod: v === "0" ? null : +v }).then(() => { toast(v === "0" ? "Removed from pod" : "Moved"); route(); }).catch((x) => { toast(x.message); el.disabled = false; });
@@ -2960,6 +3202,7 @@ document.addEventListener("change", (e) => {
     return;
   }
   if (ui.quiz && el.closest?.("#ls-quiz") && el.name?.startsWith("q")) { ui.quiz.ans[+el.name.slice(1)] = +el.value; quizTick(); return; }
+  if (ui.exam && el.closest?.("#ls-exam") && el.name?.startsWith("x")) { ui.exam.ans[+el.name.slice(1)] = +el.value; examSave(); examTick(); return; }
   if (el.dataset.li && LS) { const d = { ...draft("li", {}), [el.dataset.li]: el.checked }; saveDraft("li", d); return; }
   if (el.dataset.prep && LS) { const d = { ...draft("prep", {}), [el.dataset.prep]: el.checked }; saveDraft("prep", d); return; }
   if (el.dataset.app != null && el.tagName === "SELECT" && LS) { const apps = draft("apps", []).map((a, i) => (i === +el.dataset.app ? { ...a, st: el.value } : a)); saveDraft("apps", apps, true); lsRender(); return; }
@@ -2984,6 +3227,10 @@ document.addEventListener("change", (e) => {
 });
 
 document.addEventListener("submit", async (e) => {
+  if (e.target.id === "ex-set") { e.preventDefault(); const f = e.target, err = $("#ex-err"); err.textContent = "";
+    const sched = $$("#ex-set tr[data-track]").map((r) => ({ track: r.dataset.track, fund_day: +r.querySelector(".ex-fd").value, core_day: +r.querySelector(".ex-cd").value }));
+    const p = { schedule: sched, exam_open: $("#ex-open").value, exam_close: $("#ex-close").value, exam_fund_minutes: $("#ex-fm").value, exam_core_minutes: $("#ex-cm").value, exam_week_start: $("#ex-week").value || "", published: $("#ex-pub").checked };
+    try { await busy(f.querySelector("button[type=submit]"), () => rpc("acad_exam_settings", { p })); toast("Examination settings saved"); route(); } catch (x) { err.textContent = x.message; } return; }
   const f = e.target;
   e.preventDefault();
   if (f.id === "apply-form") return submitApply(f);
@@ -3178,6 +3425,7 @@ document.addEventListener("submit", async (e) => {
     saveDraft("apps", [...draft("apps", []), { role: r0, co, st: $("#a-st").value, on: fmtDay(new Date()) }], true); toast("Application added"); lsRender(); return;
   }
   if (f.id === "ls-quiz" && ui.quiz) { await quizSubmit(false); return; }
+  if (f.id === "ls-exam" && ui.exam) { await examSubmit(false); return; }
   if (f.id === "ls-quiz") {
     const it = findItem(f.dataset.k)?.it, n = (it?.qs || []).length, ans = [];
     for (let i = 0; i < n; i++) { const c = f.querySelector(`input[name="q${i}"]:checked`); if (!c) { $("#quiz-err").textContent = `Answer question ${i + 1} first.`; return; } ans.push(+c.value); }
@@ -3298,8 +3546,8 @@ function certHTML(c) {
       <span class="cert-date">${esc(done)}</span>
       <span class="cert-name">${esc(c.name)}</span>
       <span class="cert-sm">${c.kind === "internship" ? "has successfully completed an internship as" : "has successfully completed"}</span>
-      <span class="cert-prog">${esc(c.kind === "internship" ? c.role : c.programme)}</span>
-      <span class="cert-sm">${c.kind === "internship" ? `at ${esc(c.org)} · 4 weeks · supervised by ${esc(c.sup_name)}` : `${c.track ? `${esc(c.track)} track · ` : ""}a ${c.weeks || 17}-week online programme by Jobnest Academy`}</span>
+      <span class="cert-prog">${esc(c.kind === "internship" ? c.role : c.programme)}</span>${c.kind !== "internship" && c.class ? `<span class="cert-class">${esc(c.class)}</span>` : ""}
+      <span class="cert-sm">${c.kind === "internship" ? `at ${esc(c.org)} · 4 weeks · supervised by ${esc(c.sup_name)}` : `${c.track ? `${esc(c.track)} track · ` : ""}a ${c.weeks || 20}-week online programme by Jobnest Academy`}</span>
     </div>
     <div class="cert-sig"><img src="/assets/signature-pd.png" alt="Signature of ${esc(c.signer_name)}"><span class="cert-line"></span><b>${esc(c.signer_name)}</b><span>${esc(c.signer_title)}, Jobnest Academy</span></div>
     <div class="cert-ribbon"><span class="cert-title">CERTIFICATE<br>OF<br>${c.kind === "internship" ? "INTERNSHIP" : "COMPLETION"}</span><i></i><div class="cert-seal">${CERT_SEAL}<text x="105" y="140" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="12" font-weight="700" fill="#10263D">${esc(c.year || "")}</text></svg></div></div>
@@ -3371,7 +3619,7 @@ async function certCanvas(c, k = 2) {
   F('500 46px "Playfair Display", serif'); x.fillStyle = "#10263D"; let nf = 46; while (x.measureText(c.name).width > 600 && nf > 28) { nf -= 2; F(`500 ${nf}px "Playfair Display", serif`); } x.fillText(c.name, L, oy + 290);
   F('400 16px "DM Sans", sans-serif'); x.fillStyle = "#3E5266"; x.fillText(c.kind === "internship" ? "has successfully completed an internship as" : "has successfully completed", L, oy + 332);
   F('500 28px "Playfair Display", serif'); x.fillStyle = "#10263D"; x.fillText(c.kind === "internship" ? c.role : c.programme, L, oy + 374);
-  F('400 16px "DM Sans", sans-serif'); x.fillStyle = "#3E5266"; x.fillText(c.kind === "internship" ? `at ${c.org} · 4 weeks · supervised by ${c.sup_name}` : `${c.track ? `${c.track} track · ` : ""}a ${c.weeks || 17}-week online programme by Jobnest Academy`, L, oy + 408);
+  F('400 16px "DM Sans", sans-serif'); x.fillStyle = "#3E5266"; x.fillText(c.kind === "internship" ? `at ${c.org} · 4 weeks · supervised by ${c.sup_name}` : `${c.track ? `${c.track} track · ` : ""}a ${c.weeks || 20}-week online programme by Jobnest Academy`, L, oy + 408);
   // signature
   const sb = oy + ih - 80, lineY = sb - 46;
   x.strokeStyle = "#9AAAB9"; x.lineWidth = 1.5; x.beginPath(); x.moveTo(L, lineY); x.lineTo(L + 260, lineY); x.stroke();

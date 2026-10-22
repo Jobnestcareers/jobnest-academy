@@ -6757,3 +6757,2179 @@ language sql immutable as $$
   select (round(p.fee * (1 + p.inst_pct / 100.0) / 5000) * 5000)::int
 $$;
 notify pgrst, 'reload schema';
+
+
+-- Jobnest Academy update 28: Programme & Grading Policy (Oct 2026).
+-- 20 weeks in 8 stages, three tracks (Business Operations, People & Talent, Customer Success & Growth),
+-- 10 weekly assessments (5 questions, 4 marks each, no resits), two timed examinations (Fundamental 30 questions in 30 minutes,
+-- Core Skill Learning 40 questions in 45 minutes, by track and day), a practical project out of 100, and
+-- Final = (Assessments /40 + Exams /60 + Project /100) / 2, graded Distinction / Merit / Pass / Fail.
+-- Run 28_programme_v2.sql, then 28b_course_v2.sql, then 28c_question_banks.sql.
+
+-- ---------- 1. Tracks: Administrative Support -> Business Operations, Customer Support -> Customer Success & Growth,
+--               new People & Talent, Data Analysis and Digital Marketing close ----------
+alter table course_items add column if not exists paper text;
+alter table course_items add column if not exists final boolean not null default false;
+alter table applications add column if not exists cert_class text;
+alter table cohorts add column if not exists exam_week_start date;   -- set to move the examination week (a Monday). Empty = Week 12.
+
+insert into tracks(code, programme_code, name, seats, sort) values
+  ('BOP', 'GEP', 'Business Operations', 30, 1), ('PTA', 'GEP', 'People & Talent', 30, 2), ('CSG', 'GEP', 'Customer Success & Growth', 30, 3)
+on conflict (code) do update set name = excluded.name, sort = excluded.sort, paused = false;
+
+delete from quiz_bank where track_code in ('ADM', 'CSP', 'DAT', 'DMK');
+delete from course_items where track_code in ('ADM', 'CSP', 'DAT', 'DMK');
+delete from course_weeks where track_code in ('ADM', 'CSP', 'DAT', 'DMK');
+-- Content made only for the closed tracks goes with them.
+delete from lessons where track_code in ('DAT', 'DMK');
+delete from tasks where track_code in ('DAT', 'DMK');
+delete from sessions where track_code in ('DAT', 'DMK');
+delete from announcements where track_code in ('DAT', 'DMK');
+delete from opportunities where track_code in ('DAT', 'DMK');
+delete from pod_members where pod_id in (select id from pods where track_code in ('DAT', 'DMK'));
+delete from pods where track_code in ('DAT', 'DMK');
+-- Staff limited to a closed track are switched off (an empty track would give them every track). Super Admin re-enables them with a new track.
+insert into audit_log(actor, text)
+select 'system', format('update 28: %s (%s) was limited to a closed track and has been switched off', full_name, email)
+from staff where track_code in ('DAT', 'DMK') and active;
+update staff set active = false where track_code in ('DAT', 'DMK') and role <> 'super';
+update staff set track_code = null where track_code in ('DAT', 'DMK');
+-- Students on a closed track keep their place but need a new track (Admissions: Students list).
+insert into audit_log(actor, text)
+select 'system', format('update 28: %s %s (%s) was on a closed track and needs a new track', first_name, surname, coalesce(matric, ref))
+from applications where track_code in ('DAT', 'DMK');
+update applications set track_code = null where track_code in ('DAT', 'DMK');
+
+do $$
+declare r record;
+begin
+  for r in select k.conrelid::regclass as t, a.attname as c from pg_constraint k
+           join pg_attribute a on a.attrelid = k.conrelid and a.attnum = any(k.conkey)
+           where k.confrelid = 'tracks'::regclass and k.contype = 'f' loop
+    execute format('update %s set %I = %L where %I = %L', r.t, r.c, 'BOP', r.c, 'ADM');
+    execute format('update %s set %I = %L where %I = %L', r.t, r.c, 'CSG', r.c, 'CSP');
+  end loop;
+end $$;
+update host_orgs set tracks = replace(replace(tracks, 'ADM', 'BOP'), 'CSP', 'CSG') where tracks is not null;
+delete from tracks where code in ('ADM', 'CSP', 'DAT', 'DMK');
+
+update programmes set weeks = 20,
+  tagline = 'From graduate to work-ready in 20 weeks: core skills, examinations, a practical project, an internship and job-search coaching.'
+where code = 'GEP';
+
+update email_templates set body = replace(body, 'all 17 weeks', 'all 20 weeks') where key = 'complete';
+update email_templates set body = replace(body, 'your client project', 'your practical project') where key = 'message';
+
+-- Weekly assessments are always 5 questions. Learners get one attempt.
+insert into app_settings(key, value) values ('quiz_size', '5') on conflict (key) do update set value = '5';
+
+-- ---------- 2. Examination timetable, sittings, resits, corrections, exceptions, publishing ----------
+create table if not exists exam_schedule (
+  track_code text primary key references tracks(code) on delete cascade,
+  fund_day int not null default 1 check (fund_day in (1, 2)),       -- 1 Monday, 2 Tuesday of the examination week
+  core_day int not null default 3 check (core_day in (3, 4, 5))     -- 3 Wednesday, 4 Thursday, 5 Friday
+);
+alter table exam_schedule enable row level security;
+insert into exam_schedule(track_code, fund_day, core_day) values ('BOP', 1, 3), ('PTA', 1, 4), ('CSG', 2, 5)
+on conflict (track_code) do nothing;
+insert into app_settings(key, value) values
+  ('exam_open', '09:00'), ('exam_close', '16:00'), ('exam_fund_minutes', '30'), ('exam_core_minutes', '45'), ('exam_published', 'off')
+on conflict (key) do nothing;
+
+create table if not exists exam_sittings (
+  application_id uuid not null references applications(id) on delete cascade,
+  paper text not null check (paper in ('fund', 'core')),
+  attempt int not null default 1,
+  qids int[] not null,
+  answers jsonb not null default '[]'::jsonb,
+  started_at timestamptz not null default now(),
+  deadline timestamptz not null,
+  submitted_at timestamptz,
+  correct int,
+  late boolean not null default false,
+  primary key (application_id, paper, attempt)
+);
+alter table exam_sittings enable row level security;
+
+create table if not exists exam_resits (
+  id bigint generated always as identity primary key,
+  application_id uuid not null references applications(id) on delete cascade,
+  paper text not null check (paper in ('fund', 'core')),
+  exam_date date not null,
+  reason text not null,
+  granted_by text not null,
+  granted_at timestamptz not null default now(),
+  used_at timestamptz
+);
+alter table exam_resits enable row level security;
+
+-- An authorised correction replaces a calculated score. component = an assessment key (w5-2), 'exam-fund', 'exam-core' or 'project'.
+-- value: correct answers for assessments (0-5) and exams (0-30, 0-40), marks for the project (0-100).
+create table if not exists score_overrides (
+  application_id uuid not null references applications(id) on delete cascade,
+  component text not null,
+  value numeric not null,
+  reason text not null,
+  by_name text not null,
+  at timestamptz not null default now(),
+  primary key (application_id, component)
+);
+alter table score_overrides enable row level security;
+
+create table if not exists score_changes (
+  id bigint generated always as identity primary key,
+  application_id uuid not null references applications(id) on delete cascade,
+  component text not null,
+  old_value numeric,
+  new_value numeric,
+  reason text not null,
+  by_name text not null,
+  at timestamptz not null default now()
+);
+alter table score_changes enable row level security;
+
+-- An approved exception lets a result be calculated with missing components counted as zero.
+create table if not exists result_exceptions (
+  application_id uuid primary key references applications(id) on delete cascade,
+  reason text not null,
+  approved_by text not null,
+  at timestamptz not null default now()
+);
+alter table result_exceptions enable row level security;
+
+create table if not exists results_published (
+  cohort_id bigint primary key references cohorts(id) on delete cascade,
+  published_at timestamptz not null default now(),
+  by_name text not null
+);
+alter table results_published enable row level security;
+
+-- ---------- 3. Helpers ----------
+create or replace function private.test_mode() returns boolean
+language sql stable security definer set search_path = public, pg_temp as $$
+  select private.setting('unlock_weeks', 'off') = 'on' or private.setting('week_dates', 'on') = 'off'
+$$;
+
+-- Monday of the examination week: the cohort's chosen date, otherwise the Monday of Week 12.
+create or replace function private.exam_monday(c cohorts) returns date
+language sql immutable as $$ select coalesce(c.exam_week_start, date_trunc('week', c.start_date + 77)::date) $$;
+
+-- Weekly assessments close when the examination week starts.
+create or replace function private.assess_close(c cohorts) returns timestamptz
+language sql stable as $$ select (private.exam_monday(c) + time '00:00') at time zone 'Africa/Lagos' $$;
+
+create or replace function private.grade_band(f numeric) returns jsonb
+language sql immutable as $$
+  select case when f is null then null
+    when f >= 80 then jsonb_build_object('letter', 'A', 'class', 'Distinction')
+    when f >= 60 then jsonb_build_object('letter', 'B', 'class', 'Merit')
+    when f >= 50 then jsonb_build_object('letter', 'C', 'class', 'Pass')
+    else jsonb_build_object('letter', 'F', 'class', 'Fail') end
+$$;
+
+create or replace function private.exam_minutes(p text) returns int
+language sql stable security definer set search_path = public, pg_temp as $$
+  select case when p = 'fund' then coalesce(nullif(private.setting('exam_fund_minutes', '30'), '')::int, 30)
+              else coalesce(nullif(private.setting('exam_core_minutes', '45'), '')::int, 45) end
+$$;
+
+create or replace function private.exam_n(p text) returns int
+language sql immutable as $$ select case when p = 'fund' then 30 else 40 end $$;
+
+-- Correct answers in a sitting: from its saved answers once it is submitted or its time has run out.
+create or replace function private.sitting_correct(a applications, s exam_sittings) returns int
+language sql stable security definer set search_path = public, pg_temp as $$
+  select case when s.submitted_at is null and now() <= s.deadline + interval '90 seconds' then null
+    when s.correct is not null then s.correct
+    else (select count(*)::int from unnest(s.qids) with ordinality u(qid, n)
+          join quiz_bank b on b.track_code = a.track_code and b.key = 'exam-' || s.paper and b.qid = u.qid
+          where nullif(s.answers ->> (u.n::int - 1), '')::int = b.a) end
+$$;
+
+-- The day a learner sits a paper: an unused resit date, otherwise their track's day in the examination week.
+create or replace function private.exam_date(a applications, p text) returns date
+language sql stable security definer set search_path = public, pg_temp as $$
+  select coalesce(
+    (select r.exam_date from exam_resits r where r.application_id = a.id and r.paper = p and r.used_at is null order by r.id desc limit 1),
+    (select private.exam_monday(c) + (case when p = 'fund' then coalesce(x.fund_day, 1) else coalesce(x.core_day, 3) end) - 1
+     from cohorts c left join exam_schedule x on x.track_code = a.track_code where c.id = a.cohort_id))
+$$;
+
+-- Everything about one paper for one learner.
+create or replace function private.exam_info(a applications, p text) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare d date; op timestamptz; cl timestamptz; s exam_sittings; rs exam_resits; st text; ok int; test boolean := private.test_mode();
+begin
+  d := private.exam_date(a, p);
+  op := (d + private.setting('exam_open', '09:00')::time) at time zone 'Africa/Lagos';
+  cl := (d + private.setting('exam_close', '16:00')::time) at time zone 'Africa/Lagos';
+  select * into s from exam_sittings where application_id = a.id and paper = p order by attempt desc limit 1;
+  select * into rs from exam_resits where application_id = a.id and paper = p and used_at is null order by id desc limit 1;
+  ok := case when s.application_id is null then null else private.sitting_correct(a, s) end;
+  st := case
+    when s.application_id is not null and ok is null then 'In progress'
+    when s.application_id is not null and rs.id is null then 'Graded'
+    when a.track_code is null then 'Not scheduled'
+    when test or now() between op and cl then 'Open'
+    when now() < op then 'Upcoming'
+    else 'Missed' end;
+  return jsonb_build_object('paper', p, 'title', case when p = 'fund' then 'Fundamental Examination' else 'Core Skill Learning Examination' end,
+    'date', d, 'opens', op, 'closes', cl, 'minutes', private.exam_minutes(p), 'questions', private.exam_n(p),
+    'status', st, 'attempt', s.attempt, 'correct', ok, 'started_at', s.started_at, 'deadline', s.deadline,
+    'submitted_at', coalesce(s.submitted_at, case when ok is not null then s.deadline end), 'late', s.late,
+    'resit', case when rs.id is null then null else jsonb_build_object('date', rs.exam_date, 'reason', rs.reason) end,
+    'previous', case when rs.id is not null and s.application_id is not null then ok end);
+end $$;
+
+-- The learner's full result. Pure calculation, so every dashboard and export shows the same numbers.
+create or replace function private.result(a applications) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare c cohorts; assess jsonb := '[]'::jsonb; it record; x learn_progress; ov numeric; st text; cor numeric; n_taken int := 0; n_missed int := 0;
+  n_pending int := 0; a_marks numeric := 0; fi jsonb; ci jsonb; fc numeric; cc numeric; e numeric; pi course_items; px learn_progress; p numeric; pst text;
+  exc result_exceptions; missing text[] := '{}'; complete boolean; f numeric; band jsonb; pub results_published; closed boolean; drawing boolean;
+begin
+  select * into c from cohorts where id = a.cohort_id;
+  closed := now() >= private.assess_close(c) and not private.test_mode();
+  for it in select i.key, i.week, i.title from course_items i where i.track_code = a.track_code and i.type = 'quiz' order by i.week loop
+    select * into x from learn_progress where application_id = a.id and key = it.key;
+    select value into ov from score_overrides where application_id = a.id and component = it.key;
+    drawing := exists (select 1 from quiz_draws w where w.application_id = a.id and w.key = it.key and w.submitted_at is null and now() <= w.deadline + interval '90 seconds');
+    cor := coalesce(ov, (x.data ->> 'correct')::numeric, case when x.key is not null then round(coalesce(x.score, 0) * 5 / 100.0) end,
+      -- started but never submitted before the time ran out: no answers were sent, so 0 correct
+      case when exists (select 1 from quiz_draws w where w.application_id = a.id and w.key = it.key and w.submitted_at is null and now() > w.deadline + interval '90 seconds') then 0 end);
+    st := case when cor is not null then 'Graded' when drawing then 'In progress' when closed then 'Missed' else 'Pending' end;
+    if st = 'Graded' then n_taken := n_taken + 1; a_marks := a_marks + cor * 0.8;
+    elsif st = 'Missed' then n_missed := n_missed + 1;
+    else n_pending := n_pending + 1; end if;
+    assess := assess || jsonb_build_object('key', it.key, 'week', it.week, 'title', it.title, 'status', st, 'correct', cor,
+      'marks', case when cor is null then null else round(cor * 0.8, 1) end, 'corrected', ov is not null, 'taken_at', x.done_at);
+  end loop;
+  a_marks := least(40, a_marks);
+
+  fi := private.exam_info(a, 'fund'); ci := private.exam_info(a, 'core');
+  fc := coalesce((select value from score_overrides where application_id = a.id and component = 'exam-fund'), case when fi ->> 'status' = 'Graded' then (fi ->> 'correct')::numeric end);
+  cc := coalesce((select value from score_overrides where application_id = a.id and component = 'exam-core'), case when ci ->> 'status' = 'Graded' then (ci ->> 'correct')::numeric end);
+  if fc is not null and cc is not null then e := least(60, trunc((fc + cc) * 60 / 70.0, 2)); end if;
+
+  select * into pi from course_items where track_code = a.track_code and final limit 1;
+  select * into px from learn_progress where application_id = a.id and key = pi.key;
+  p := coalesce((select value from score_overrides where application_id = a.id and component = 'project'),
+                case when px.status = 'graded' then coalesce(px.grade, px.score) end);
+  pst := case when p is not null then 'Graded' when px.status = 'revise' then 'Revision requested' when px.key is not null then 'Submitted' else 'Not submitted' end;
+
+  if n_pending > 0 then missing := missing || format('%s weekly assessment%s not taken yet', n_pending, case when n_pending = 1 then '' else 's' end); end if;
+  if fc is null then missing := missing || ('Fundamental Examination ' || case fi ->> 'status' when 'Missed' then 'missed' when 'In progress' then 'in progress' else 'not sat yet' end); end if;
+  if cc is null then missing := missing || ('Core Skill Learning Examination ' || case ci ->> 'status' when 'Missed' then 'missed' when 'In progress' then 'in progress' else 'not sat yet' end); end if;
+  if p is null then missing := missing || ('Practical project ' || lower(pst)); end if;
+  select * into exc from result_exceptions where application_id = a.id;
+  complete := cardinality(missing) = 0 or exc.application_id is not null;
+  if complete then
+    f := least(100, trunc((a_marks + coalesce(e, trunc((coalesce(fc, 0) + coalesce(cc, 0)) * 60 / 70.0, 2)) + coalesce(p, 0)) / 2, 1));
+    band := private.grade_band(f);
+  end if;
+  select * into pub from results_published where cohort_id = a.cohort_id;
+  return jsonb_build_object(
+    'assessments', assess, 'assess_taken', n_taken, 'assess_missed', n_missed, 'assess_pending', n_pending,
+    'assess_score', round(a_marks, 1), 'assess_max', 40, 'assess_close', private.assess_close(c),
+    'fund', fi || jsonb_build_object('score', fc, 'corrected', exists (select 1 from score_overrides where application_id = a.id and component = 'exam-fund')),
+    'core', ci || jsonb_build_object('score', cc, 'corrected', exists (select 1 from score_overrides where application_id = a.id and component = 'exam-core')),
+    'exam_score', e, 'exam_max', 60,
+    'project', jsonb_build_object('key', pi.key, 'week', pi.week, 'status', pst, 'score', p, 'feedback', px.feedback, 'rubric', px.data -> 'rubric',
+      'graded_by', px.graded_by, 'graded_at', px.graded_at, 'submitted_at', case when px.key is not null then px.done_at end,
+      'corrected', exists (select 1 from score_overrides where application_id = a.id and component = 'project')),
+    'project_max', 100,
+    'status', case when complete then 'Complete' else 'Pending' end, 'missing', to_jsonb(missing),
+    'exception', case when exc.application_id is null then null else jsonb_build_object('reason', exc.reason, 'by', exc.approved_by, 'at', exc.at) end,
+    'final', f, 'grade', band -> 'letter', 'class', band -> 'class',
+    'published', pub.cohort_id is not null, 'published_at', pub.published_at);
+end $$;
+
+-- What a learner may see: component scores always, the final score and grade only once results are published.
+create or replace function private.result_for_student(a applications) returns jsonb
+language sql stable security definer set search_path = public, pg_temp as $$
+  select case when (r ->> 'published')::boolean then r else r || jsonb_build_object('final', null, 'grade', null, 'class', null) end
+  from (select private.result(a) as r) t
+$$;
+
+-- ---------- 4. Learner: assessments (one attempt, 5 questions, close at the examination week) ----------
+create or replace function public.learn_quiz_start(p_key text) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare a applications; c cohorts; it course_items; d quiz_draws; mins int;
+begin
+  a := private.require_student();
+  select * into c from cohorts where id = a.cohort_id;
+  it := private.learn_item(a, p_key);
+  if it.type <> 'quiz' then raise exception 'That isn''t an assessment.' using errcode = 'P0001'; end if;
+  if exists (select 1 from learn_progress where application_id = a.id and key = p_key) then
+    raise exception 'You''ve already taken this assessment. Each assessment has one attempt.' using errcode = 'P0001';
+  end if;
+  if now() >= private.assess_close(c) and not private.test_mode()
+     and not exists (select 1 from quiz_draws w where w.application_id = a.id and w.key = p_key and w.submitted_at is null) then
+    raise exception 'This assessment closed when the examination week started.' using errcode = 'P0001';
+  end if;
+  perform private.seq_check(a, it);
+  select * into d from quiz_draws where application_id = a.id and key = p_key order by attempt desc limit 1;
+  if d.application_id is not null and d.submitted_at is null then return private.quiz_public(a, d); end if;
+  if d.application_id is not null then raise exception 'You''ve already taken this assessment.' using errcode = 'P0001'; end if;
+  mins := coalesce(nullif(private.setting('quiz_minutes', '10'), '')::int, 10);
+  insert into quiz_draws(application_id, key, attempt, qids, deadline)
+  values (a.id, p_key, 1, (select array_agg(qid) from (
+      select qid from quiz_bank where track_code = a.track_code and key = p_key order by random() limit 5) s), now() + make_interval(mins => mins))
+  returning * into d;
+  if d.qids is null or array_length(d.qids, 1) < 5 then raise exception 'This assessment isn''t ready yet. Tell Student Success.' using errcode = 'P0001'; end if;
+  insert into learn_history(application_id, key, action) values (a.id, p_key, 'Started the assessment');
+  return private.quiz_public(a, d);
+end $$;
+
+create or replace function public.learn_quiz(p_key text, p_answers jsonb) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare a applications; it course_items; d quiz_draws; ok int := 0; i int; sc int; late boolean; rev jsonb := '[]'::jsonb; b quiz_bank; ans int; n int;
+begin
+  a := private.require_student();
+  it := private.learn_item(a, p_key);
+  if it.type <> 'quiz' then raise exception 'That isn''t an assessment.' using errcode = 'P0001'; end if;
+  if exists (select 1 from learn_progress where application_id = a.id and key = p_key) then raise exception 'You''ve already taken this assessment.' using errcode = 'P0001'; end if;
+  select * into d from quiz_draws where application_id = a.id and key = p_key and submitted_at is null order by attempt desc limit 1 for update;
+  if d.application_id is null then raise exception 'Start the assessment first.' using errcode = 'P0001'; end if;
+  late := now() > d.deadline + interval '90 seconds';
+  n := array_length(d.qids, 1);
+  for i in 1..n loop
+    select * into b from quiz_bank where track_code = a.track_code and key = p_key and qid = d.qids[i];
+    ans := case when late then null else nullif(p_answers ->> (i - 1), '')::int end;
+    if ans = b.a then ok := ok + 1; end if;
+    rev := rev || jsonb_build_object('q', b.q, 'o', to_jsonb(b.o), 'a', b.a, 'ans', ans);
+  end loop;
+  sc := round(100.0 * ok / greatest(n, 1));
+  update quiz_draws set submitted_at = now() where application_id = a.id and key = p_key and attempt = d.attempt;
+  insert into learn_progress(application_id, key, week, status, score, cap, data)
+  values (a.id, p_key, it.week, 'done', sc, 1, jsonb_build_object('attempt', 1, 'review', rev, 'last', sc, 'late', late, 'correct', ok, 'total', n));
+  insert into learn_history(application_id, key, action) values (a.id, p_key,
+    format('Assessment: %s of %s correct (%s marks)', ok, n, trim(to_char(ok * 0.8, 'FM990.0'))) || case when late then ' (time ran out)' else '' end);
+  return public.learn_state();
+end $$;
+
+create or replace function public.learn_quiz_retry(p_key text) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  raise exception 'Each weekly assessment has one attempt. There are no resits.' using errcode = 'P0001';
+end $$;
+
+create or replace function public.learn_repeat(p_week int) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  raise exception 'Weeks can''t be repeated. Your assessment scores count towards your final result.' using errcode = 'P0001';
+end $$;
+
+create or replace function public.acad_grant_retake(p_app uuid, p_week int) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+begin
+  raise exception 'Weekly assessments have no resits under the grading policy. To fix a wrong mark, use Correct score on the Results page.' using errcode = 'P0001';
+end $$;
+
+-- ---------- 5. Learner: examinations ----------
+create or replace function private.exam_public(a applications, s exam_sittings) returns jsonb
+language sql stable security definer set search_path = public, pg_temp as $$
+  select jsonb_build_object('paper', s.paper, 'attempt', s.attempt, 'deadline', s.deadline, 'now', now(), 'answers', s.answers,
+    'qs', (select jsonb_agg(jsonb_build_object('q', b.q, 'o', to_jsonb(b.o)) order by u.n)
+           from unnest(s.qids) with ordinality u(qid, n) join quiz_bank b on b.track_code = a.track_code and b.key = 'exam-' || s.paper and b.qid = u.qid))
+$$;
+
+create or replace function public.learn_exam_start(p_paper text) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare a applications; info jsonb; s exam_sittings; rs exam_resits; att int; prev int[]; n int; rules course_items;
+begin
+  a := private.require_student();
+  if p_paper not in ('fund', 'core') then raise exception 'Unknown paper.' using errcode = 'P0001'; end if;
+  if private.fee_lock(a) is not null then raise exception 'Your second instalment is overdue. Pay the balance to continue.' using errcode = 'P0001'; end if;
+  if private.setting('exam_published', 'off') <> 'on' and not private.test_mode() then
+    raise exception 'The examination timetable hasn''t been published yet.' using errcode = 'P0001';
+  end if;
+  select * into rules from course_items where track_code = a.track_code and week = 12 and type = 'task' order by key limit 1;
+  if rules.key is not null and not exists (select 1 from learn_progress where application_id = a.id and key = rules.key) then
+    raise exception 'Read the examination rules first.' using errcode = 'P0001';
+  end if;
+  select * into s from exam_sittings where application_id = a.id and paper = p_paper order by attempt desc limit 1 for update;
+  if s.application_id is not null and private.sitting_correct(a, s) is null then return private.exam_public(a, s); end if;
+  info := private.exam_info(a, p_paper);
+  if info ->> 'status' <> 'Open' then
+    raise exception '%', case info ->> 'status'
+      when 'Graded' then 'You''ve already sat this examination.'
+      when 'Upcoming' then format('This examination opens on %s at %s.', to_char((info ->> 'date')::date, 'FMDay FMDD FMMonth'), private.setting('exam_open', '09:00'))
+      when 'Missed' then 'The time to start this examination has passed. Speak to Student Success about a resit.'
+      else 'This examination isn''t available.' end using errcode = 'P0001';
+  end if;
+  select * into rs from exam_resits where application_id = a.id and paper = p_paper and used_at is null order by id desc limit 1;
+  att := coalesce(s.attempt, 0) + 1;
+  n := private.exam_n(p_paper);
+  select coalesce(array_agg(q), '{}') into prev from exam_sittings w, unnest(w.qids) q where w.application_id = a.id and w.paper = p_paper;
+  insert into exam_sittings(application_id, paper, attempt, qids, deadline)
+  values (a.id, p_paper, att, (select array_agg(qid) from (
+      select qid from quiz_bank where track_code = a.track_code and key = 'exam-' || p_paper order by (qid = any(prev)), random() limit n) z),
+    now() + make_interval(mins => private.exam_minutes(p_paper)))
+  returning * into s;
+  if s.qids is null or array_length(s.qids, 1) < n then raise exception 'This examination isn''t ready yet. Tell Student Success.' using errcode = 'P0001'; end if;
+  if rs.id is not null then update exam_resits set used_at = now() where id = rs.id; end if;
+  insert into learn_history(application_id, key, action) values (a.id, 'exam-' || p_paper,
+    format('Started the %s%s', info ->> 'title', case when att > 1 then ' (authorised resit)' else '' end));
+  return private.exam_public(a, s);
+end $$;
+
+-- Save answers as the learner goes, so nothing is lost if the connection drops.
+create or replace function public.learn_exam_save(p_paper text, p_answers jsonb) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare a applications; s exam_sittings;
+begin
+  a := private.require_student();
+  select * into s from exam_sittings where application_id = a.id and paper = p_paper and submitted_at is null order by attempt desc limit 1 for update;
+  if s.application_id is null or now() > s.deadline + interval '90 seconds' then return jsonb_build_object('saved', false); end if;
+  update exam_sittings set answers = coalesce(p_answers, '[]'::jsonb) where application_id = a.id and paper = p_paper and attempt = s.attempt;
+  return jsonb_build_object('saved', true);
+end $$;
+
+create or replace function public.learn_exam_submit(p_paper text, p_answers jsonb) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare a applications; s exam_sittings; it course_items; ok int; v_late boolean;
+begin
+  a := private.require_student();
+  select * into s from exam_sittings where application_id = a.id and paper = p_paper and submitted_at is null order by attempt desc limit 1 for update;
+  if s.application_id is null then raise exception 'There''s no examination in progress.' using errcode = 'P0001'; end if;
+  v_late := now() > s.deadline + interval '90 seconds';
+  if not v_late then update exam_sittings set answers = coalesce(p_answers, '[]'::jsonb) where application_id = a.id and paper = p_paper and attempt = s.attempt returning * into s; end if;
+  s.submitted_at := now();
+  s.correct := null;
+  ok := private.sitting_correct(a, s);
+  update exam_sittings set submitted_at = least(now(), deadline + interval '90 seconds'), correct = ok, late = v_late
+  where application_id = a.id and paper = p_paper and attempt = s.attempt;
+  select * into it from course_items where track_code = a.track_code and type = 'exam' and paper = p_paper;
+  if it.key is not null then
+    insert into learn_progress(application_id, key, week, status, score, cap, data)
+    values (a.id, it.key, it.week, 'done', round(100.0 * ok / private.exam_n(p_paper)), 1, jsonb_build_object('correct', ok, 'total', private.exam_n(p_paper)))
+    on conflict (application_id, key) do update set status = 'done', score = excluded.score, data = excluded.data, done_at = now();
+  end if;
+  insert into learn_history(application_id, key, action) values (a.id, 'exam-' || p_paper,
+    format('Submitted the %s: %s of %s correct', case when p_paper = 'fund' then 'Fundamental Examination' else 'Core Skill Learning Examination' end, ok, private.exam_n(p_paper))
+    || case when v_late then ' (time ran out)' else '' end);
+  return public.learn_state();
+end $$;
+
+create or replace function public.learn_results() returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare a applications;
+begin
+  a := private.require_student();
+  return private.result_for_student(a);
+end $$;
+
+-- Learner state now carries the examination timetable and results.
+create or replace function public.learn_state() returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare a applications; c cohorts;
+begin
+  a := private.require_student();
+  select * into c from cohorts where id = a.cohort_id;
+  return jsonb_build_object(
+    'track', a.track_code,
+    'start_date', c.start_date,
+    'unlock_all', private.setting('unlock_weeks', 'off') = 'on',
+    'ignore_dates', private.setting('week_dates', 'on') = 'off',
+    'exam_published', private.setting('exam_published', 'off') = 'on' or private.test_mode(),
+    'progress', coalesce((select jsonb_object_agg(x.key, private.learn_row(x)) from learn_progress x where x.application_id = a.id), '{}'::jsonb),
+    'attempts', '{}'::jsonb,
+    'checkins', coalesce((select jsonb_object_agg(k.week, jsonb_build_object('conf', k.conf, 'note', k.note, 'at', k.at)) from learn_checkins k where k.application_id = a.id), '{}'::jsonb),
+    'history', coalesce((select jsonb_agg(jsonb_build_object('key', h.key, 'action', h.action, 'by', h.by_name, 'at', h.at) order by h.at) from learn_history h where h.application_id = a.id), '[]'::jsonb),
+    'results', private.result_for_student(a),
+    'now', now());
+end $$;
+
+-- Graduation: examinations count as done once sat or missed (a missed paper shows on the result instead).
+create or replace function public.grad_complete() returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare a applications; n int;
+begin
+  a := private.require_student();
+  if exists (select 1 from learn_history where application_id = a.id and key = 'complete') then return jsonb_build_object('sent', false); end if;
+  select count(*) into n from course_items i
+  where i.track_code = a.track_code and not i.opt and i.type not in ('exam', 'quiz')
+    and not exists (select 1 from learn_progress x where x.application_id = a.id and x.key = i.key and x.status in ('done','graded'));
+  if n > 0 then return jsonb_build_object('sent', false, 'left', n); end if;
+  insert into learn_history(application_id, key, action) values (a.id, 'complete', 'Completed the programme');
+  perform private.queue_mail(a, 'complete', '{}'::jsonb, private.site() || '/learn/graduate');
+  return jsonb_build_object('sent', true);
+end $$;
+
+-- Staff dashboards: a week is finished when its required steps are done. There is no pass mark or repeat any more.
+create or replace function private.week_table(p_cohort bigint)
+returns table(application_id uuid, track_code text, week int, state text, avg int, quiz int, proj int, attempt int, last_at timestamptz)
+language sql stable security definer set search_path = public, pg_temp as $$
+  with w as (
+    select a.id, a.track_code, i.week,
+      count(*) filter (where not i.opt) req,
+      count(*) filter (where not i.opt and x.status is not null and x.status <> 'revise') done,
+      max(x.score) filter (where i.type = 'quiz') q,
+      max(x.score) filter (where i.proj and x.status = 'graded') pr,
+      coalesce(bool_or(i.proj and x.status = 'revise'), false) rev,
+      max(x.done_at) last_at
+    from applications a join course_items i on i.track_code = a.track_code
+    left join learn_progress x on x.application_id = a.id and x.key = i.key
+    where a.cohort_id = p_cohort and a.status = 'Admitted' and a.matric is not null
+    group by a.id, a.track_code, i.week)
+  select w.id, w.track_code, w.week,
+    case when w.rev then 'revise' when w.done < w.req then 'open' else 'pass' end,
+    null::int, w.q, w.pr, 1, w.last_at
+  from w
+$$;
+
+-- ---------- 6. Staff: results, corrections, resits, exceptions, publishing, examination settings ----------
+create or replace function private.results_staff() returns staff
+language sql stable security definer set search_path = public, pg_temp as $$
+  select private.require_role(array['director','cohort_manager','academy_admin','facilitator'])
+$$;
+
+create or replace function public.acad_results(p_cohort bigint default null) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare s staff; c cohorts;
+begin
+  s := private.results_staff();
+  if p_cohort is null then c := private.ac_cohort(); else select * into c from cohorts where id = p_cohort; end if;
+  return jsonb_build_object(
+    'cohort', jsonb_build_object('id', c.id, 'name', c.name, 'start_date', c.start_date, 'exam_monday', private.exam_monday(c), 'assess_close', private.assess_close(c)),
+    'cohorts', (select coalesce(jsonb_agg(jsonb_build_object('id', id, 'name', name) order by start_date desc), '[]'::jsonb) from cohorts k
+                where exists (select 1 from applications x where x.cohort_id = k.id and x.matric is not null)),
+    'published', (select jsonb_build_object('at', published_at, 'by', by_name) from results_published where cohort_id = c.id),
+    'can_publish', s.role in ('super','director'),
+    'can_correct', s.role in ('super','director','cohort_manager','academy_admin'),
+    'tracks', (select jsonb_object_agg(code, name) from tracks),
+    'students', coalesce((select jsonb_agg(jsonb_build_object('id', a.id, 'matric', a.matric, 'name', trim(a.first_name || ' ' || a.surname),
+        'track', a.track_code, 'result', private.result(a)) order by a.surname, a.first_name)
+      from applications a where a.cohort_id = c.id and a.status = 'Admitted' and a.matric is not null and private.track_ok(s, a.track_code)), '[]'::jsonb));
+end $$;
+
+create or replace function public.acad_result_detail(p_app uuid) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare s staff; a applications;
+begin
+  s := private.results_staff();
+  select * into a from applications where id = p_app;
+  if a.id is null or a.matric is null or not private.track_ok(s, a.track_code) then raise exception 'Student not found.' using errcode = 'P0001'; end if;
+  return jsonb_build_object('id', a.id, 'matric', a.matric, 'name', trim(a.first_name || ' ' || a.surname), 'track', (select name from tracks where code = a.track_code),
+    'result', private.result(a),
+    'sittings', coalesce((select jsonb_agg(jsonb_build_object('paper', x.paper, 'attempt', x.attempt, 'started_at', x.started_at, 'submitted_at', x.submitted_at,
+        'deadline', x.deadline, 'correct', private.sitting_correct(a, x), 'late', x.late) order by x.paper, x.attempt) from exam_sittings x where x.application_id = a.id), '[]'::jsonb),
+    'resits', coalesce((select jsonb_agg(jsonb_build_object('paper', r.paper, 'date', r.exam_date, 'reason', r.reason, 'by', r.granted_by, 'at', r.granted_at, 'used_at', r.used_at) order by r.id) from exam_resits r where r.application_id = a.id), '[]'::jsonb),
+    'changes', coalesce((select jsonb_agg(jsonb_build_object('component', g.component, 'old', g.old_value, 'new', g.new_value, 'reason', g.reason, 'by', g.by_name, 'at', g.at) order by g.at desc) from score_changes g where g.application_id = a.id), '[]'::jsonb),
+    'can_publish', s.role in ('super','director'), 'can_correct', s.role in ('super','director','cohort_manager','academy_admin'),
+    'locked', exists (select 1 from results_published where cohort_id = a.cohort_id));
+end $$;
+
+-- Correct a score (or clear a correction with p_value null). After results are published only Super Admin and the Programme Director can.
+create or replace function public.acad_score_correct(p_app uuid, p_component text, p_value numeric, p_reason text) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare s staff; a applications; mx numeric; old numeric; label text;
+begin
+  s := private.require_role(array['director','cohort_manager','academy_admin']);
+  select * into a from applications where id = p_app;
+  if a.id is null or a.matric is null then raise exception 'Student not found.' using errcode = 'P0001'; end if;
+  if exists (select 1 from results_published where cohort_id = a.cohort_id) and s.role not in ('super','director') then
+    raise exception 'Results are published. Only the Programme Director or Super Admin can change them now.' using errcode = '42501';
+  end if;
+  if coalesce(trim(p_reason), '') = '' then raise exception 'Give a reason for the change.' using errcode = 'P0001'; end if;
+  if p_component = 'exam-fund' then mx := 30; label := 'Fundamental Examination (correct answers)';
+  elsif p_component = 'exam-core' then mx := 40; label := 'Core Skill Learning Examination (correct answers)';
+  elsif p_component = 'project' then mx := 100; label := 'Practical project (marks)';
+  elsif exists (select 1 from course_items where track_code = a.track_code and key = p_component and type = 'quiz') then
+    mx := 5; label := (select title from course_items where track_code = a.track_code and key = p_component) || ' (correct answers)';
+  else raise exception 'Unknown score.' using errcode = 'P0001'; end if;
+  if p_value is not null and (p_value < 0 or p_value > mx or (mx < 100 and p_value <> trunc(p_value))) then
+    raise exception 'Enter a whole number from 0 to %.', mx using errcode = 'P0001';
+  end if;
+  select value into old from score_overrides where application_id = a.id and component = p_component;
+  if p_value is null then delete from score_overrides where application_id = a.id and component = p_component;
+  else
+    insert into score_overrides(application_id, component, value, reason, by_name) values (a.id, p_component, p_value, trim(p_reason), s.full_name)
+    on conflict (application_id, component) do update set value = excluded.value, reason = excluded.reason, by_name = excluded.by_name, at = now();
+  end if;
+  insert into score_changes(application_id, component, old_value, new_value, reason, by_name) values (a.id, p_component, old, p_value, trim(p_reason), s.full_name);
+  insert into audit_log(actor, text) values (s.email, format('%s score for %s: %s (%s)', case when p_value is null then 'cleared the corrected' else 'corrected the' end,
+    a.matric, label || coalesce(' = ' || p_value::text, ''), trim(p_reason)));
+  return public.acad_result_detail(a.id);
+end $$;
+
+create or replace function public.acad_exam_resit(p_app uuid, p_paper text, p_date date, p_reason text) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare s staff; a applications;
+begin
+  s := private.require_role(array['director','cohort_manager','academy_admin']);
+  select * into a from applications where id = p_app;
+  if a.id is null or a.matric is null then raise exception 'Student not found.' using errcode = 'P0001'; end if;
+  if p_paper not in ('fund', 'core') then raise exception 'Choose a paper.' using errcode = 'P0001'; end if;
+  if p_date is null or p_date < current_date then raise exception 'Choose today or a later date.' using errcode = 'P0001'; end if;
+  if coalesce(trim(p_reason), '') = '' then raise exception 'Give a reason for the resit.' using errcode = 'P0001'; end if;
+  if exists (select 1 from exam_resits where application_id = a.id and paper = p_paper and used_at is null) then
+    update exam_resits set exam_date = p_date, reason = trim(p_reason), granted_by = s.full_name, granted_at = now() where application_id = a.id and paper = p_paper and used_at is null;
+  else
+    insert into exam_resits(application_id, paper, exam_date, reason, granted_by) values (a.id, p_paper, p_date, trim(p_reason), s.full_name);
+  end if;
+  insert into audit_log(actor, text) values (s.email, format('authorised a %s resit for %s on %s (%s)',
+    case when p_paper = 'fund' then 'Fundamental Examination' else 'Core Skill Learning Examination' end, a.matric, p_date, trim(p_reason)));
+  insert into learn_history(application_id, key, action, by_name) values (a.id, 'exam-' || p_paper, format('Resit authorised for %s', to_char(p_date, 'FMDD FMMon YYYY')), s.full_name);
+  perform private.notify(a, 'message', 'Examination resit authorised',
+    format('You can sit the %s on %s between %s and %s. A resit replaces your previous score.',
+      case when p_paper = 'fund' then 'Fundamental Examination' else 'Core Skill Learning Examination' end, to_char(p_date, 'FMDay FMDD FMMonth'),
+      private.setting('exam_open', '09:00'), private.setting('exam_close', '16:00')), '/learn/results', null, null);
+  return public.acad_result_detail(a.id);
+end $$;
+
+create or replace function public.acad_exam_resit_cancel(p_app uuid, p_paper text) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare s staff; a applications;
+begin
+  s := private.require_role(array['director','cohort_manager','academy_admin']);
+  select * into a from applications where id = p_app;
+  delete from exam_resits where application_id = p_app and paper = p_paper and used_at is null;
+  insert into audit_log(actor, text) values (s.email, format('cancelled an unused %s resit for %s', p_paper, a.matric));
+  return public.acad_result_detail(p_app);
+end $$;
+
+create or replace function public.acad_result_exception(p_app uuid, p_on boolean, p_reason text) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare s staff; a applications;
+begin
+  s := private.require_role(array['director']);
+  select * into a from applications where id = p_app;
+  if a.id is null then raise exception 'Student not found.' using errcode = 'P0001'; end if;
+  if p_on then
+    if coalesce(trim(p_reason), '') = '' then raise exception 'Give a reason for the exception.' using errcode = 'P0001'; end if;
+    insert into result_exceptions(application_id, reason, approved_by) values (a.id, trim(p_reason), s.full_name)
+    on conflict (application_id) do update set reason = excluded.reason, approved_by = excluded.approved_by, at = now();
+  else
+    delete from result_exceptions where application_id = a.id;
+  end if;
+  insert into audit_log(actor, text) values (s.email, format('%s a result exception for %s%s', case when p_on then 'approved' else 'removed' end, a.matric,
+    case when p_on then ': missing scores count as zero (' || trim(p_reason) || ')' else '' end));
+  return public.acad_result_detail(a.id);
+end $$;
+
+create or replace function public.acad_results_publish(p_cohort bigint, p_on boolean) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare s staff; c cohorts; a applications; r jsonb;
+begin
+  s := private.require_role(array['director']);
+  select * into c from cohorts where id = p_cohort;
+  if c.id is null then raise exception 'Cohort not found.' using errcode = 'P0001'; end if;
+  if p_on then
+    insert into results_published(cohort_id, by_name) values (c.id, s.full_name) on conflict (cohort_id) do nothing;
+    for a in select * from applications where cohort_id = c.id and status = 'Admitted' and matric is not null loop
+      r := private.result(a);
+      if r ->> 'status' = 'Complete' then
+        perform private.notify(a, 'message', 'Your final result is published', format('Final score %s/100: %s.', r ->> 'final', r ->> 'class'), '/learn/results', null, null);
+      end if;
+    end loop;
+  else
+    delete from results_published where cohort_id = c.id;
+  end if;
+  insert into audit_log(actor, text) values (s.email, format('%s results for %s', case when p_on then 'published' else 'unpublished' end, c.name));
+  return public.acad_results(c.id);
+end $$;
+
+create or replace function public.acad_exam_settings(p jsonb default null) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare s staff; c cohorts; t record; k text;
+begin
+  s := private.require_role(array['director','cohort_manager','academy_admin']);
+  if p is not null then
+    for t in select * from jsonb_to_recordset(coalesce(p -> 'schedule', '[]'::jsonb)) as r(track text, fund_day int, core_day int) loop
+      if t.fund_day not in (1, 2) then raise exception 'The Fundamental Examination is on Monday or Tuesday.' using errcode = 'P0001'; end if;
+      if t.core_day not in (3, 4, 5) then raise exception 'Core Skill Learning Examinations are on Wednesday, Thursday or Friday.' using errcode = 'P0001'; end if;
+      if t.track = 'BOP' and t.core_day <> 3 then raise exception 'Business Operations sits its Core Skill Learning Examination on Wednesday.' using errcode = 'P0001'; end if;
+      insert into exam_schedule(track_code, fund_day, core_day) values (t.track, t.fund_day, t.core_day)
+      on conflict (track_code) do update set fund_day = excluded.fund_day, core_day = excluded.core_day;
+    end loop;
+    foreach k in array array['exam_open', 'exam_close', 'exam_fund_minutes', 'exam_core_minutes'] loop
+      if p ? k then
+        if k in ('exam_open', 'exam_close') and (p ->> k) !~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' then raise exception 'Use a time like 09:00.' using errcode = 'P0001'; end if;
+        if k like '%minutes' and ((p ->> k) !~ '^[0-9]+$' or (p ->> k)::int not between 10 and 240) then raise exception 'Time limits are 10 to 240 minutes.' using errcode = 'P0001'; end if;
+        insert into app_settings(key, value) values (k, p ->> k) on conflict (key) do update set value = excluded.value;
+      end if;
+    end loop;
+    if private.setting('exam_open', '09:00') >= private.setting('exam_close', '16:00') then raise exception 'The start window must open before it closes.' using errcode = 'P0001'; end if;
+    if p ? 'exam_week_start' then
+      if nullif(p ->> 'exam_week_start', '') is not null and extract(isodow from (p ->> 'exam_week_start')::date) <> 1 then
+        raise exception 'The examination week starts on a Monday.' using errcode = 'P0001';
+      end if;
+      update cohorts set exam_week_start = nullif(p ->> 'exam_week_start', '')::date where id = (private.ac_cohort()).id;
+    end if;
+    if p ? 'published' then
+      insert into app_settings(key, value) values ('exam_published', case when (p ->> 'published')::boolean then 'on' else 'off' end)
+      on conflict (key) do update set value = excluded.value;
+    end if;
+    insert into audit_log(actor, text) values (s.email, 'updated the examination timetable and settings' || case when p ? 'published' then case when (p ->> 'published')::boolean then ' (published)' else ' (unpublished)' end else '' end);
+  end if;
+  c := private.ac_cohort();
+  return jsonb_build_object('cohort', c.name, 'exam_monday', private.exam_monday(c), 'exam_week_start', c.exam_week_start,
+    'week12_monday', date_trunc('week', c.start_date + 77)::date,
+    'open', private.setting('exam_open', '09:00'), 'close', private.setting('exam_close', '16:00'),
+    'fund_minutes', private.exam_minutes('fund'), 'core_minutes', private.exam_minutes('core'),
+    'published', private.setting('exam_published', 'off') = 'on',
+    'schedule', (select coalesce(jsonb_agg(jsonb_build_object('track', k.code, 'name', k.name, 'fund_day', coalesce(x.fund_day, 1), 'core_day', coalesce(x.core_day, 3),
+        'fund_bank', (select count(*) from quiz_bank b where b.track_code = k.code and b.key = 'exam-fund'),
+        'core_bank', (select count(*) from quiz_bank b where b.track_code = k.code and b.key = 'exam-core')) order by k.sort), '[]'::jsonb)
+      from tracks k left join exam_schedule x on x.track_code = k.code where not k.paused));
+end $$;
+
+-- ---------- 7. Certificates show the final classification ----------
+create or replace function public.acad_issue_certificate(p_app uuid, p_date date default null) returns jsonb
+language plpgsql security definer set search_path = public, pg_temp as $$
+declare s staff; a applications; r jsonb;
+begin
+  s := private.require_role(array['director','academy_admin']);
+  select * into a from applications where id = p_app;
+  if a.id is null or a.status <> 'Admitted' or a.matric is null then
+    raise exception 'Only admitted students can get a certificate.' using errcode = 'P0001';
+  end if;
+  r := private.result(a);
+  if not (r ->> 'published')::boolean then raise exception 'Publish this cohort''s results first (Results page).' using errcode = 'P0001'; end if;
+  if r ->> 'status' <> 'Complete' then raise exception 'Their result is still Pending.' using errcode = 'P0001'; end if;
+  if r ->> 'grade' = 'F' then raise exception 'A Fail result doesn''t receive a certificate.' using errcode = 'P0001'; end if;
+  update applications set completed_on = coalesce(p_date, current_date), cert_id = private.cert_from_matric(a.matric), cert_class = r ->> 'class'
+  where id = a.id returning * into a;
+  insert into audit_log(actor, text) values (s.email, format('issued certificate %s (%s) to %s %s', a.cert_id, a.cert_class, a.first_name, a.surname));
+  perform private.queue_email(a, 'certificate', jsonb_build_object('cert', a.cert_id), 'certificate');
+  return jsonb_build_object('cert_id', a.cert_id, 'completed_on', a.completed_on, 'class', a.cert_class);
+end $$;
+
+create or replace function public.certificate_view(p_cert text) returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare v text := private.cert_norm(p_cert); r jsonb;
+begin
+  select jsonb_build_object('kind', 'internship', 'cert_id', e.cert_id, 'name', trim(a.first_name || ' ' || a.surname),
+    'programme', 'Internship · ' || pl.role, 'role', pl.role, 'org', pl.org, 'sup_name', pl.sup_name, 'weeks', 4,
+    'track', (select name from tracks where code = a.track_code), 'completed_on', (e.at at time zone 'Africa/Lagos')::date, 'year', to_char(e.at, 'YYYY'),
+    'signer_name', private.setting('signer_name', ''), 'signer_title', private.setting('signer_title', 'Programme Director'))
+  into r from learn_evals e join applications a on a.id = e.application_id join placements pl on pl.application_id = a.id
+  where e.cert_id = v and a.status = 'Admitted';
+  if r is not null then return r; end if;
+  select jsonb_build_object('kind', 'programme', 'cert_id', a.cert_id, 'name', trim(a.first_name || ' ' || a.surname),
+    'programme', p.name, 'weeks', p.weeks, 'track', (select name from tracks where code = a.track_code), 'class', a.cert_class,
+    'completed_on', a.completed_on, 'year', to_char(a.completed_on, 'YYYY'),
+    'signer_name', private.setting('signer_name', ''), 'signer_title', private.setting('signer_title', 'Programme Director'))
+  into r from applications a join cohorts c on c.id = a.cohort_id join programmes p on p.code = c.programme_code
+  where a.cert_id = v and a.status = 'Admitted';
+  return r;
+end $$;
+
+create or replace function public.student_certificate() returns jsonb
+language plpgsql stable security definer set search_path = public, pg_temp as $$
+declare a applications;
+begin
+  a := private.require_student();
+  if a.cert_id is null then return null; end if;
+  return jsonb_build_object('cert_id', a.cert_id, 'completed_on', a.completed_on, 'class', a.cert_class);
+end $$;
+
+-- ---------- 9. Week numbers in staff dashboards (20-week programme) ----------
+create or replace function public.acad_jobsearch()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare s staff;
+begin
+  s := private.require_role(array['coach','director','cohort_manager','academy_admin']);
+  return coalesce((select jsonb_agg(jsonb_build_object(
+      'app', a.id, 'name', a.first_name || ' ' || a.surname, 'matric', a.matric, 'phone', a.phone,
+      'track', (select name from tracks where code = a.track_code),
+      'links', coalesce((select jsonb_object_agg(i.title, x.link) from learn_progress x join course_items i on i.track_code = a.track_code and i.key = x.key
+        where x.application_id = a.id and x.link is not null and i.week >= 19), '{}'::jsonb),
+      'done', coalesce((select jsonb_agg(i.title) from learn_progress x join course_items i on i.track_code = a.track_code and i.key = x.key
+        where x.application_id = a.id and i.week >= 19 and x.status <> 'revise'), '[]'::jsonb),
+      'pitch', (select d.data from learn_drafts d where d.application_id = a.id and d.key = 'pitch'),
+      'outreach', coalesce((select d.data from learn_drafts d where d.application_id = a.id and d.key = 'outreach'), '[]'::jsonb),
+      'apps', coalesce((select d.data from learn_drafts d where d.application_id = a.id and d.key = 'apps'), '[]'::jsonb),
+      'cv', (select d.data from learn_drafts d where d.application_id = a.id and d.key = 'cv'),
+      'score', (select r.score from call_results r where r.application_id = a.id),
+      'updated', (select max(d.updated_at) from learn_drafts d where d.application_id = a.id and d.key in ('pitch','outreach','apps')))
+      order by a.surname)
+    from applications a where a.status = 'Admitted' and a.matric is not null and private.track_ok(s, a.track_code)), '[]'::jsonb);
+end $function$;
+create or replace function public.super_overview()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare s staff; c cohorts; ad cohorts; p programmes; wk int; pass int; r jsonb; mode text;
+begin
+  s := private.require_role(array['super']);
+  c := private.ac_cohort(); ad := private.current_cohort();
+  select * into p from programmes where code = c.programme_code;
+  wk := private.cur_week(c);
+  pass := coalesce(nullif(private.setting('learn_pass', '70'), '')::int, 70);
+  mode := case when private.setting('unlock_weeks', 'off') = 'on' then 'open' when private.setting('week_dates', 'on') = 'off' then 'progress' else 'normal' end;
+
+  create temp table if not exists _st on commit drop as select * from private.student_status(c.id) limit 0;
+  delete from _st where true; insert into _st select * from private.student_status(c.id);
+  create temp table if not exists _wt on commit drop as select * from private.week_table(c.id) limit 0;
+  delete from _wt where true; insert into _wt select * from private.week_table(c.id);
+
+  r := jsonb_build_object(
+    'me', s.full_name, 'mode', mode, 'today', private.today(),
+    'cohort', jsonb_build_object('id', c.id, 'name', c.name, 'start_date', c.start_date, 'week', wk, 'weeks', coalesce(p.weeks, 17)),
+    'admissions', jsonb_build_object('id', ad.id, 'name', ad.name, 'open', ad.applications_open),
+    'cohorts', coalesce((select jsonb_agg(jsonb_build_object('id', x.id, 'name', x.name) order by x.start_date desc) from cohorts x), '[]'::jsonb),
+    'launch', (select coalesce(jsonb_agg(v), '[]'::jsonb) from (values
+        (case when mode <> 'normal' then 'Testing mode is on (' || case mode when 'open' then 'all weeks open' else 'progress only' end || ')' end),
+        (case when private.setting('signer_name', '') = '' then 'Admission letter signatory is empty' end),
+        (case when private.setting('call_link', '') = '' then 'Discovery Call meeting link is empty' end),
+        (case when private.setting('site_url', '') = '' then 'Academy address is empty' end)) t(v) where v is not null)
+  );
+
+  -- the journey from application to work
+  r := r || jsonb_build_object('funnel', jsonb_build_array(
+    jsonb_build_object('label', 'Applied', 'n', (select count(*) from applications)),
+    jsonb_build_object('label', 'Passed readiness', 'n', (select count(*) from applications where score >= (select pass_mark from cohorts where id = applications.cohort_id))),
+    jsonb_build_object('label', 'Call done', 'n', (select count(*) from applications where dc1_note is not null or rec is not null or status in ('Under review','Offer sent','Waitlisted','Admitted','Offer declined','Offer expired','Not selected','Deferred'))),
+    jsonb_build_object('label', 'Offered', 'n', (select count(*) from applications where status in ('Offer sent','Admitted','Offer declined','Offer expired'))),
+    jsonb_build_object('label', 'Admitted (paid)', 'n', (select count(*) from applications where status = 'Admitted')),
+    jsonb_build_object('label', 'Active now', 'n', (select count(*) from _st where fee is null)),
+    jsonb_build_object('label', 'Graduated', 'n', (select count(*) from applications where cert_id is not null)),
+    jsonb_build_object('label', 'In work', 'n', (select count(*) from learn_outcomes where status in ('hired','internship','freelance')))));
+
+  -- headline numbers, with the last 12 days for the small charts
+  r := r || jsonb_build_object('kpis', jsonb_build_object(
+    'students', (select count(*) from _st),
+    'on_track', (select count(*) from _st where cur >= least(greatest(wk, 1), 17) or cur >= 17),
+    'grading', (select count(*) from learn_progress x join applications a on a.id = x.application_id join course_items i on i.track_code = a.track_code and i.key = x.key where i.proj and x.status = 'submitted'),
+    'grading_oldest', (select min(x.done_at) from learn_progress x join applications a on a.id = x.application_id join course_items i on i.track_code = a.track_code and i.key = x.key where i.proj and x.status = 'submitted'),
+    'help_open', (select count(*) from support_requests where status <> 'Resolved'),
+    'help_late', (select count(*) from support_requests where status <> 'Resolved' and created_at < now() - interval '1 day' and reply is null),
+    'attend_past', (select count(*) from sessions x join applications a on a.cohort_id = x.cohort_id and a.status = 'Admitted' and (x.track_code is null or x.track_code = a.track_code) where x.cohort_id = c.id and x.starts_at < now()),
+    'attend_yes', (select count(*) from attendance at join sessions x on x.id = at.session_id where x.cohort_id = c.id and x.starts_at < now() and (at.status in ('present','late') or (at.status is null and at.joined_at is not null))),
+    'avg_score', (select round(avg(avg)) from _wt where avg is not null),
+    'apps_admissions', (select count(*) from applications where cohort_id = ad.id),
+    'apps_today', (select count(*) from applications where cohort_id = ad.id and created_at >= private.today()),
+    'spark_apps', (select jsonb_agg((select count(*) from applications x where x.created_at::date = d) order by d) from generate_series(private.today() - 11, private.today(), interval '1 day') d),
+    'spark_sub', (select jsonb_agg((select count(*) from learn_progress x where x.done_at::date = d) order by d) from generate_series(private.today() - 11, private.today(), interval '1 day') d),
+    'spark_help', (select jsonb_agg((select count(*) from support_requests x where x.created_at::date = d) order by d) from generate_series(private.today() - 11, private.today(), interval '1 day') d),
+    'spark_pay', (select jsonb_agg((select coalesce(sum(coalesce(y.amount_paid, y.amount)), 0) from payments y where y.status = 'success' and y.created_at::date = d) order by d) from generate_series(private.today() - 11, private.today(), interval '1 day') d)));
+
+  -- money for the learning cohort
+  r := r || jsonb_build_object('money', jsonb_build_object(
+    'collected', (select coalesce(sum(paid_total), 0) from applications where cohort_id = c.id and status = 'Admitted'),
+    'expected', (select coalesce(sum((private.fees(a) ->> 'plan_total')::int), 0) from applications a where a.cohort_id = c.id and a.status = 'Admitted'),
+    'full_n', (select count(*) from applications where cohort_id = c.id and status = 'Admitted' and plan = 'full'),
+    'full_sum', (select coalesce(sum(paid_total), 0) from applications where cohort_id = c.id and status = 'Admitted' and plan = 'full'),
+    'two_n', (select count(*) from applications where cohort_id = c.id and status = 'Admitted' and plan = 'two'),
+    'two_sum', (select coalesce(sum(paid_total), 0) from applications where cohort_id = c.id and status = 'Admitted' and plan = 'two'),
+    'overdue', coalesce((select jsonb_agg(jsonb_build_object('id', a.id, 'name', a.first_name || ' ' || a.surname, 'matric', a.matric, 'balance', (t.fee ->> 'balance')::int,
+        'days', private.today() - (t.fee ->> 'due_date')::date) order by (t.fee ->> 'due_date')::date)
+      from _st t join applications a on a.id = t.application_id where t.fee is not null), '[]'::jsonb)));
+
+  -- seats by track (admissions cohort)
+  r := r || jsonb_build_object('seats', coalesce((select jsonb_agg(jsonb_build_object('code', t.code, 'track', t.name, 'seats', t.seats, 'paused', t.paused,
+      'n', (select count(*) from applications a where a.cohort_id = ad.id and a.status = 'Admitted' and a.track_code = t.code),
+      'n_learning', (select count(*) from applications a where a.cohort_id = c.id and a.status = 'Admitted' and a.track_code = t.code)) order by t.sort, t.code)
+    from tracks t where t.programme_code = ad.programme_code), '[]'::jsonb));
+
+  -- share of each track's students who have passed each week
+  r := r || jsonb_build_object('heat', coalesce((select jsonb_agg(jsonb_build_object('code', t.code, 'track', t.name,
+      'n', (select count(*) from _st x where x.track_code = t.code),
+      'risk', (select count(*) from _st x where x.track_code = t.code and cardinality(x.reasons) > 0),
+      'cells', (select jsonb_agg((select case when count(*) = 0 then null when count(*) filter (where w.state = 'pass') = 0 and g > (select coalesce(max(cur), 0) from _st x where x.track_code = t.code) then null
+          else round(100.0 * count(*) filter (where w.state = 'pass') / count(*)) end from _wt w where w.track_code = t.code and w.week = g) order by g)
+        from generate_series(1, coalesce(p.weeks, 17)) g)) order by t.sort, t.code)
+    from tracks t where t.programme_code = c.programme_code), '[]'::jsonb));
+
+  -- students to reach
+  r := r || jsonb_build_object('risk', coalesce((select jsonb_agg(jsonb_build_object('id', a.id, 'name', a.first_name || ' ' || a.surname, 'matric', a.matric,
+      'track', (select name from tracks where code = a.track_code), 'week', x.cur, 'reasons', to_jsonb(x.reasons), 'photo', a.photo is not null) order by cardinality(x.reasons) desc, a.surname)
+    from (select * from _st where cardinality(reasons) > 0 order by cardinality(reasons) desc limit 8) x join applications a on a.id = x.application_id), '[]'::jsonb),
+    'risk_n', (select count(*) from _st where cardinality(reasons) > 0));
+
+  -- decisions waiting on someone
+  r := r || jsonb_build_object('queue', coalesce((select jsonb_agg(q order by (q ->> 'rank')::int, q ->> 'oldest') from (
+      select jsonb_build_object('cat', 'academy', 'rank', case when min(x.done_at) < now() - interval '2 days' then 1 else 2 end,
+        'title', count(*) || ' ' || t.name || ' project' || case when count(*) = 1 then '' else 's' end || ' waiting for grading',
+        'detail', 'Week results stay open until these are graded.', 'owner', coalesce((select string_agg(f.full_name, ', ') from staff f where f.active and f.role = 'facilitator' and f.track_code = t.code), 'No facilitator on this track'),
+        'oldest', min(x.done_at), 'tab', 'grading', 'action', 'Open grading') q
+      from learn_progress x join applications a on a.id = x.application_id join course_items i on i.track_code = a.track_code and i.key = x.key join tracks t on t.code = a.track_code
+      where i.proj and x.status = 'submitted' group by t.code, t.name
+      union all
+      select jsonb_build_object('cat', 'money', 'rank', 1, 'title', count(*) || ' second instalment' || case when count(*) = 1 then '' else 's' end || ' overdue',
+        'detail', '₦' || to_char(sum((fee ->> 'balance')::int), 'FM999,999,999') || ' outstanding. Learning is paused until they pay.', 'owner', 'Super Admin',
+        'oldest', min((fee ->> 'due_date')::date)::timestamptz, 'tab', 'overview', 'action', 'Send reminders', 'act', 'fee-remind-all') from _st where fee is not null having count(*) > 0
+      union all
+      select jsonb_build_object('cat', 'academy', 'rank', 1,
+        'title', case when count(*) = 1 then min(a.first_name || ' ' || a.surname) || ' failed a week after the retake' else count(*) || ' students failed a week after the retake' end,
+        'detail', case when count(*) = 1 then 'Decide: give one more retake, repeat with the next cohort, or withdraw.'
+          else (select string_agg(n, ', ') from (select a2.first_name || ' ' || a2.surname n from _st x2 join applications a2 on a2.id = x2.application_id where x2.failed_retake order by x2.last_at limit 3) z3)
+            || case when count(*) > 3 then ' and ' || (count(*) - 3) || ' more' else '' end || '. Each needs a decision: one more retake, repeat with the next cohort, or withdraw.' end,
+        'owner', coalesce((select string_agg(f.full_name, ', ') from staff f where f.active and f.role = 'cohort_manager'), 'Cohort Manager'),
+        'oldest', min(x.last_at), 'tab', case when count(*) = 1 then 'student' else 'risk' end, 'id', case when count(*) = 1 then min(a.id::text) end, 'action', 'Decide')
+        from _st x join applications a on a.id = x.application_id where x.failed_retake having count(*) > 0
+      union all
+      select jsonb_build_object('cat', 'admissions', 'rank', 2, 'title', count(*) || ' application' || case when count(*) = 1 then '' else 's' end || ' waiting for a decision',
+        'detail', 'Calls are done. Send an offer, waitlist or decline.', 'owner', coalesce((select string_agg(f.full_name, ', ') from staff f where f.active and f.role = 'adm_admin'), 'Admissions Admin'),
+        'oldest', min(updated_at), 'tab', 'decide', 'action', 'Review') from applications where status = 'Under review' having count(*) > 0
+      union all
+      select jsonb_build_object('cat', 'academy', 'rank', case when min(created_at) < now() - interval '1 day' then 1 else 2 end, 'title', count(*) || ' help request' || case when count(*) = 1 then '' else 's' end || ' not answered',
+        'detail', count(*) filter (where created_at < now() - interval '1 day') || ' past the 1 working day reply time.', 'owner', 'Student Success',
+        'oldest', min(created_at), 'tab', 'support', 'action', 'Reply') from support_requests where status <> 'Resolved' and reply is null having count(*) > 0
+      union all
+      select jsonb_build_object('cat', 'system', 'rank', 3, 'title', count(*) || ' email' || case when count(*) = 1 then '' else 's' end || ' failed to send',
+        'detail', 'Usually a wrong email address. Fix the address, then resend.', 'owner', 'Super Admin', 'oldest', min(created_at), 'tab', 'emails', 'action', 'Open emails')
+        from outbox where sent_at is null and error is not null having count(*) > 0
+      union all
+      select jsonb_build_object('cat', 'admissions', 'rank', 3, 'title', 'Call times running low',
+        'detail', (select count(*) from slots where application_id is null and starts_at between now() and now() + interval '7 days') || ' free call slots in the next 7 days for ' || count(*) || ' applicants waiting to book.',
+        'owner', coalesce((select string_agg(f.full_name, ', ') from staff f where f.active and f.role = 'adm_officer'), 'Admissions Officer'), 'oldest', min(updated_at), 'tab', 'times', 'action', 'Add times')
+        from applications where status = 'Call to book'
+        having count(*) > (select count(*) from slots where application_id is null and starts_at between now() and now() + interval '7 days')
+      union all
+      select jsonb_build_object('cat', 'academy', 'rank', 2, 'title', count(*) || ' student' || case when count(*) = 1 then '' else 's' end || ' without an internship placement',
+        'detail', 'Internships start in Week 10.', 'owner', coalesce((select string_agg(f.full_name, ', ') from staff f where f.active and f.role = 'academy_admin'), 'Academy Admin'), 'oldest', null, 'tab', 'intern', 'action', 'Place them')
+        from applications a where a.cohort_id = c.id and a.status = 'Admitted' and a.matric is not null and wk >= 13 and not exists (select 1 from placements pl where pl.application_id = a.id) having count(*) > 0
+      union all
+      select jsonb_build_object('cat', 'academy', 'rank', 3, 'title', count(*) || ' student' || case when count(*) = 1 then '' else 's' end || ' not in a pod',
+        'detail', 'Pods keep students accountable each week.', 'owner', coalesce((select string_agg(f.full_name, ', ') from staff f where f.active and f.role = 'cohort_manager'), 'Cohort Manager'), 'oldest', null, 'tab', 'pods', 'action', 'Assign pods')
+        from applications a where a.cohort_id = c.id and a.status = 'Admitted' and a.matric is not null and not exists (select 1 from pod_members m where m.application_id = a.id) having count(*) > 0
+    ) z), '[]'::jsonb));
+
+  -- who is carrying the load
+  r := r || jsonb_build_object('staff', coalesce((select jsonb_agg(jsonb_build_object('email', f.email, 'name', f.full_name, 'role', f.role, 'track', (select name from tracks where code = f.track_code),
+      'last_seen', f.last_seen_at, 'q', w.q, 'what', w.what, 'oldest', w.oldest) order by w.q desc nulls last, f.full_name)
+    from staff f cross join lateral (select
+      case f.role
+        when 'facilitator' then (select count(*) from learn_progress x join applications a on a.id = x.application_id join course_items i on i.track_code = a.track_code and i.key = x.key where i.proj and x.status = 'submitted' and private.track_ok(f, a.track_code))
+        when 'adm_admin' then (select count(*) from applications where status = 'Under review')
+        when 'adm_officer' then (select count(*) from applications a where a.status = 'Call booked' and a.officer_email = f.email)
+        when 'coach' then (select count(*) from coach_slots x where x.coach_email = f.email and x.application_id is not null and not exists (select 1 from call_results cr where cr.application_id = x.application_id))
+        when 'cohort_manager' then (select count(*) from support_requests where status <> 'Resolved')
+        when 'academy_admin' then (select count(*) from applications a where a.cohort_id = c.id and a.status = 'Admitted' and wk >= 13 and not exists (select 1 from placements pl where pl.application_id = a.id))
+        else null end q,
+      case f.role when 'facilitator' then 'to grade' when 'adm_admin' then 'to decide' when 'adm_officer' then 'calls booked' when 'coach' then 'calls to score'
+        when 'cohort_manager' then 'help requests' when 'academy_admin' then 'to place' else '' end what,
+      case f.role when 'facilitator' then (select min(x.done_at) from learn_progress x join applications a on a.id = x.application_id join course_items i on i.track_code = a.track_code and i.key = x.key where i.proj and x.status = 'submitted' and private.track_ok(f, a.track_code))
+        when 'adm_admin' then (select min(updated_at) from applications where status = 'Under review') else null end oldest) w
+    where f.active and f.role <> 'super'), '[]'::jsonb));
+
+  -- what just happened
+  r := r || jsonb_build_object('activity', coalesce((select jsonb_agg(e) from (select e from (
+      select jsonb_build_object('at', l.at, 'who', coalesce((select full_name from staff where email = l.actor), l.actor), 'what', l.text) e from (select * from audit_log order by at desc limit 12) l
+      union all
+      select jsonb_build_object('at', y.created_at, 'who', 'Paystack', 'what', 'confirmed ₦' || to_char(coalesce(y.amount_paid, y.amount), 'FM999,999,999') || ' from ' || a.first_name || ' ' || a.surname || '.')
+        from (select * from payments where status = 'success' order by created_at desc limit 6) y join applications a on a.id = y.application_id
+      union all
+      select jsonb_build_object('at', a.created_at, 'who', a.first_name || ' ' || a.surname, 'what', 'applied (' || a.ref || ').')
+        from (select * from applications order by created_at desc limit 6) a
+      union all
+      select jsonb_build_object('at', q.created_at, 'who', a.first_name || ' ' || a.surname, 'what', 'asked for help: “' || q.subject || '”.')
+        from (select * from support_requests order by created_at desc limit 4) q join applications a on a.id = q.application_id
+    ) u order by e ->> 'at' desc limit 12) v), '[]'::jsonb));
+
+  -- systems
+  r := r || jsonb_build_object('systems', jsonb_build_object(
+    'mail_today', (select count(*) from outbox where sent_at >= private.today()),
+    'mail_pending', (select count(*) from outbox where sent_at is null and error is null),
+    'mail_failed', (select count(*) from outbox where sent_at is null and error is not null),
+    'mail_oldest_pending', (select min(created_at) from outbox where sent_at is null and error is null),
+    'mail_last_sent', (select max(sent_at) from outbox),
+    'pay_last', (select max(created_at) from payments where status = 'success'),
+    'pay_failed_week', (select count(*) from payments where status = 'failed' and created_at > now() - interval '7 days'),
+    'reminders_last', (select max(at) from reminders_sent)));
+  return r;
+end $function$;
+create or replace function public.director_home()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare s staff; c cohorts; wk int; pass int;
+begin
+  s := private.require_role(array['director','super']);
+  c := private.ac_cohort(); wk := private.cur_week(c);
+  pass := coalesce(nullif(private.setting('learn_pass', '70'), '')::int, 70);
+  create temp table if not exists _dst on commit drop as select * from private.student_status(c.id) limit 0;
+  delete from _dst where true; insert into _dst select * from private.student_status(c.id);
+  create temp table if not exists _dwt on commit drop as select * from private.week_table(c.id) limit 0;
+  delete from _dwt where true; insert into _dwt select * from private.week_table(c.id);
+  return jsonb_build_object(
+    'me', s.full_name,
+    'cohort', jsonb_build_object('name', c.name, 'week', wk, 'start_date', c.start_date),
+    'students', (select count(*) from _dst),
+    'pass_rate', (select round(100.0 * count(*) filter (where r ->> 'status' = 'Complete' and r ->> 'grade' <> 'F') / nullif(count(*) filter (where r ->> 'status' = 'Complete'), 0)) from (select private.result(a) r from applications a where a.cohort_id = c.id and a.status = 'Admitted' and a.matric is not null) t),
+    'pass_last', (select round(avg((r ->> 'assess_score')::numeric), 1) from (select private.result(a) r from applications a where a.cohort_id = c.id and a.status = 'Admitted' and a.matric is not null) t),
+    'ahead', jsonb_build_object(
+      'behind2', (select count(*) from _dst where cur <= wk - 2),
+      'behind1', (select count(*) from _dst where cur = wk - 1),
+      'on', (select count(*) from _dst where cur = wk),
+      'ahead', (select count(*) from _dst where cur > wk)),
+    'attend', (select round(100.0 * count(*) filter (where at.status in ('present','late') or (at.status is null and at.joined_at is not null)) / nullif(count(*), 0))
+      from sessions x join applications a on a.cohort_id = x.cohort_id and a.status = 'Admitted' and (x.track_code is null or x.track_code = a.track_code)
+      left join attendance at on at.session_id = x.id and at.application_id = a.id where x.cohort_id = c.id and x.starts_at < now()),
+    'grading_fast', (select round(100.0 * count(*) filter (where x.graded_at - x.done_at <= interval '2 days') / nullif(count(*), 0))
+      from learn_progress x join applications a on a.id = x.application_id where a.cohort_id = c.id and x.graded_at is not null),
+    'in_work', (select round(100.0 * count(*) filter (where o.status in ('hired','internship','freelance')) / nullif(count(*), 0))
+      from applications a left join learn_outcomes o on o.application_id = a.id where a.cert_id is not null),
+    'escalations', coalesce((select jsonb_agg(jsonb_build_object('id', e.id, 'app', e.application_id, 'kind', e.kind, 'title', e.title, 'detail', e.detail, 'week', e.week,
+        'by', e.raised_by_name, 'at', e.created_at, 'status', e.status, 'decided_by', e.decided_by, 'note', e.decision_note,
+        'name', (select first_name || ' ' || surname from applications where id = e.application_id)) order by e.status = 'open' desc, e.created_at desc)
+      from (select * from escalations where status = 'open' or decided_at > now() - interval '3 days' order by created_at desc limit 20) e), '[]'::jsonb),
+    'tracks', coalesce((select jsonb_agg(jsonb_build_object('code', t.code, 'name', t.name,
+        'n', (select count(*) from _dst x where x.track_code = t.code),
+        'pass', (select jsonb_agg((select round(100.0 * count(*) filter (where w.state = 'pass') / nullif(count(*) filter (where w.state in ('pass','fail')), 0)) from _dwt w where w.track_code = t.code and w.week = g) order by g) from generate_series(1, greatest(wk, 1)) g),
+        'score', (select jsonb_agg((select round(avg(w.avg)) from _dwt w where w.track_code = t.code and w.week = g) order by g) from generate_series(1, greatest(wk, 1)) g),
+        'att', (select jsonb_agg((select round(100.0 * count(*) filter (where at.status in ('present','late') or (at.status is null and at.joined_at is not null)) / nullif(count(*), 0))
+            from sessions x join applications a on a.cohort_id = x.cohort_id and a.status = 'Admitted' and a.track_code = t.code and (x.track_code is null or x.track_code = t.code)
+            left join attendance at on at.session_id = x.id and at.application_id = a.id
+            where x.cohort_id = c.id and x.starts_at < now() and floor(extract(epoch from (x.starts_at - c.start_date::timestamptz)) / 604800)::int + 1 = g) order by g) from generate_series(1, greatest(wk, 1)) g),
+        'avg', (select round(avg(w.avg)) from _dwt w where w.track_code = t.code and w.avg is not null),
+        'ontime', (select round(100.0 * count(*) filter (where coalesce(x.cap, 1) >= 1) / nullif(count(*), 0)) from learn_progress x join applications a on a.id = x.application_id
+          join course_items i on i.track_code = a.track_code and i.key = x.key where a.cohort_id = c.id and a.track_code = t.code and i.proj),
+        'turn', (select round(extract(epoch from avg(x.graded_at - x.done_at)) / 86400.0, 1) from learn_progress x join applications a on a.id = x.application_id
+          where a.cohort_id = c.id and a.track_code = t.code and x.graded_at is not null),
+        'waiting', (select count(*) from learn_progress x join applications a on a.id = x.application_id join course_items i on i.track_code = a.track_code and i.key = x.key
+          where a.cohort_id = c.id and a.track_code = t.code and i.proj and x.status = 'submitted'),
+        'fac', (select string_agg(f.full_name, ', ') from staff f where f.active and f.role = 'facilitator' and f.track_code = t.code)) order by t.sort, t.code)
+      from tracks t where t.programme_code = c.programme_code), '[]'::jsonb),
+    'hard', coalesce((select jsonb_agg(h) from (select jsonb_build_object('q', r ->> 'q', 'track', (select name from tracks where code = a.track_code), 'week', x.week,
+          'n', count(*), 'wrong', round(100.0 * count(*) filter (where (r ->> 'ans') is null or (r ->> 'ans')::int <> (r ->> 'a')::int) / count(*))) h
+        from learn_progress x join applications a on a.id = x.application_id cross join lateral jsonb_array_elements(coalesce(x.data -> 'review', '[]'::jsonb)) r
+        where a.cohort_id = c.id and x.week >= greatest(wk - 2, 1)
+        group by r ->> 'q', a.track_code, x.week having count(*) >= 3
+        order by round(100.0 * count(*) filter (where (r ->> 'ans') is null or (r ->> 'ans')::int <> (r ->> 'a')::int) / count(*)) desc limit 5) z), '[]'::jsonb),
+    'feel', (select jsonb_build_object('avg', round(avg(k.conf)::numeric, 1), 'n', count(*), 'c1', count(*) filter (where k.conf = 1), 'c2', count(*) filter (where k.conf = 2),
+        'c3', count(*) filter (where k.conf = 3), 'c4', count(*) filter (where k.conf = 4), 'c5', count(*) filter (where k.conf = 5))
+      from learn_checkins k join applications a on a.id = k.application_id where a.cohort_id = c.id and k.week = (select max(week) from learn_checkins k2 join applications a2 on a2.id = k2.application_id where a2.cohort_id = c.id)),
+    'notes', coalesce((select jsonb_agg(k.note order by k.at desc) from (select k.note, k.at from learn_checkins k join applications a on a.id = k.application_id
+        where a.cohort_id = c.id and coalesce(trim(k.note), '') <> '' order by k.at desc limit 3) k), '[]'::jsonb));
+end $function$;
+create or replace function public.coach_home()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare s staff; c cohorts; wk int; dc2 int;
+begin
+  s := private.require_role(array['coach','director','cohort_manager','super']);
+  c := private.ac_cohort(); wk := private.cur_week(c);
+  dc2 := coalesce((select min(week) from course_weeks where title ilike '%job search%'), 20);
+  return jsonb_build_object('me', s.full_name, 'cohort', jsonb_build_object('name', c.name, 'week', wk), 'dc2_week', dc2,
+    'to_book', coalesce((select jsonb_agg(jsonb_build_object('id', a.id, 'name', a.first_name || ' ' || a.surname, 'track', (select name from tracks where code = a.track_code)) order by a.surname)
+      from applications a where a.cohort_id = c.id and a.status = 'Admitted' and a.matric is not null and wk >= dc2 - 1
+        and not exists (select 1 from coach_slots x where x.application_id = a.id)), '[]'::jsonb),
+    'pipeline', (select jsonb_build_object(
+        'interested', count(*) filter (where st in ('Interested','Planning to apply','Saved')),
+        'applied', count(*) filter (where st = 'Applied'),
+        'interviewing', count(*) filter (where st = 'Interviewing'),
+        'offer', count(*) filter (where st in ('Offer','Offer received')))
+      from (select coalesce(e ->> 'st', 'Applied') st from learn_drafts d join applications a on a.id = d.application_id cross join lateral jsonb_array_elements(case when jsonb_typeof(d.data) = 'array' then d.data else '[]'::jsonb end) e
+              where d.key = 'apps' and a.cohort_id = c.id
+            union all select v.value #>> '{}' from learn_drafts d join applications a on a.id = d.application_id cross join lateral jsonb_each(coalesce(d.data -> 'st', '{}'::jsonb)) v
+              where d.key = 'opps' and a.cohort_id = c.id) z),
+    'pipe_people', coalesce((select jsonb_agg(p) from (select jsonb_build_object('name', a.first_name || ' ' || a.surname, 'id', a.id, 'st', e ->> 'st', 'role', coalesce(e ->> 'role', e ->> 't', ''), 'org', coalesce(e ->> 'co', e ->> 'org', '')) p
+        from learn_drafts d join applications a on a.id = d.application_id cross join lateral jsonb_array_elements(case when jsonb_typeof(d.data) = 'array' then d.data else '[]'::jsonb end) e
+        where d.key = 'apps' and a.cohort_id = c.id order by d.updated_at desc limit 40) z), '[]'::jsonb),
+    'working', (select count(*) from learn_outcomes o where o.status in ('hired','internship','freelance')),
+    'opps_live', (select count(*) from opportunities o where o.active and (o.deadline is null or o.deadline >= private.today())),
+    'chat', coalesce((select jsonb_agg(jsonb_build_object('id', p.id, 'body', p.body, 'author', p.author, 'at', p.created_at) order by p.created_at)
+      from discussion_posts p where p.cohort_id = c.id and p.channel = 'career' and p.parent_id is null and not p.hidden and not p.is_staff
+        and not exists (select 1 from discussion_posts r where r.parent_id = p.id and r.is_staff)), '[]'::jsonb));
+end $function$;
+create or replace function public.aa_home()
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+declare s staff; c cohorts; wk int;
+begin
+  s := private.require_role(array['academy_admin','director','cohort_manager','super']);
+  c := private.ac_cohort(); wk := private.cur_week(c);
+  return jsonb_build_object('me', s.full_name, 'cohort', jsonb_build_object('id', c.id, 'name', c.name, 'week', wk, 'start_date', c.start_date),
+    'intern_start', private.week_start(c, 10),
+    'hosts', coalesce((select jsonb_agg(jsonb_build_object('id', h.id, 'name', h.name, 'city', h.city, 'tracks', h.tracks, 'spots', h.spots, 'contact_name', h.contact_name,
+        'contact_phone', h.contact_phone, 'contact_email', h.contact_email, 'notes', h.notes, 'active', h.active,
+        'used', (select count(*) from placements pl join applications a on a.id = pl.application_id where a.cohort_id = c.id and lower(trim(pl.org)) = lower(trim(h.name)))) order by h.active desc, h.name)
+      from host_orgs h), '[]'::jsonb),
+    'unhosted_orgs', coalesce((select jsonb_agg(distinct pl.org) from placements pl join applications a on a.id = pl.application_id
+      where a.cohort_id = c.id and not exists (select 1 from host_orgs h where lower(trim(h.name)) = lower(trim(pl.org)))), '[]'::jsonb),
+    'no_account', (select count(*) from applications a where a.cohort_id = c.id and a.status = 'Admitted' and a.matric is not null and a.account_set_at is null),
+    'certs_ready', (select count(*) from applications a where a.cohort_id = c.id and a.status = 'Admitted' and a.cert_id is null
+      and exists (select 1 from learn_progress x join course_items i on i.track_code = a.track_code and i.key = x.key where x.application_id = a.id and i.week = 20)),
+    'sessions_nolink', (select count(*) from sessions x where x.cohort_id = c.id and x.starts_at between now() and now() + interval '8 days' and coalesce(x.link, '') = ''),
+    'checks', coalesce((select jsonb_object_agg(item, jsonb_build_object('by', done_by, 'at', done_at)) from ops_checks where cohort_id = c.id and week = wk), '{}'::jsonb));
+end $function$;
+
+-- ---------- 8. Permissions ----------
+revoke execute on function public.learn_exam_start(text), public.learn_exam_save(text, jsonb), public.learn_exam_submit(text, jsonb), public.learn_results(),
+  public.acad_results(bigint), public.acad_result_detail(uuid), public.acad_score_correct(uuid, text, numeric, text), public.acad_exam_resit(uuid, text, date, text),
+  public.acad_exam_resit_cancel(uuid, text), public.acad_result_exception(uuid, boolean, text), public.acad_results_publish(bigint, boolean), public.acad_exam_settings(jsonb)
+  from public, anon;
+grant execute on function public.learn_exam_start(text), public.learn_exam_save(text, jsonb), public.learn_exam_submit(text, jsonb), public.learn_results(),
+  public.acad_results(bigint), public.acad_result_detail(uuid), public.acad_score_correct(uuid, text, numeric, text), public.acad_exam_resit(uuid, text, date, text),
+  public.acad_exam_resit_cancel(uuid, text), public.acad_result_exception(uuid, boolean, text), public.acad_results_publish(bigint, boolean), public.acad_exam_settings(jsonb)
+  to authenticated;
+
+notify pgrst, 'reload schema';
+select 'Programme v2: tracks, examinations and grading installed' as done;
+
+
+-- Jobnest Academy update 28b: the 20-week programme for the three tracks (generated by dev/course_v2/build.mjs).
+delete from course_items;
+insert into course_items(track_code, week, key, type, title, proj, opt, link, staff, paper, final) values
+($q$BOP$q$, 1, $q$w1-1$q$, $q$guide$q$, $q$How to navigate the platform$q$, false, false, false, false, null, false),
+($q$BOP$q$, 1, $q$w1-2$q$, $q$oath$q$, $q$Read & sign the Student Oath$q$, false, false, false, false, null, false),
+($q$BOP$q$, 1, $q$w1-3$q$, $q$task$q$, $q$Read the Student Handbook$q$, false, false, false, false, null, false),
+($q$BOP$q$, 1, $q$w1-4$q$, $q$task$q$, $q$Join your cohort community$q$, false, true, false, false, null, false),
+($q$BOP$q$, 2, $q$w2-1$q$, $q$lesson$q$, $q$Professional communication$q$, false, false, false, false, null, false),
+($q$BOP$q$, 2, $q$w2-2$q$, $q$lesson$q$, $q$Remote work etiquette$q$, false, false, false, false, null, false),
+($q$BOP$q$, 2, $q$w2-3$q$, $q$lesson$q$, $q$File organisation in Google Drive & OneDrive$q$, false, false, false, false, null, false),
+($q$BOP$q$, 2, $q$w2-4$q$, $q$quiz$q$, $q$Assessment 1 · Communication & Remote Work$q$, false, false, false, false, null, false),
+($q$BOP$q$, 2, $q$w2-5$q$, $q$task$q$, $q$Week project: rewrite a messy email$q$, true, false, true, false, null, false),
+($q$BOP$q$, 3, $q$w3-1$q$, $q$lesson$q$, $q$Time management$q$, false, false, false, false, null, false),
+($q$BOP$q$, 3, $q$w3-2$q$, $q$lesson$q$, $q$Task tracking with Trello & Notion$q$, false, false, false, false, null, false),
+($q$BOP$q$, 3, $q$w3-3$q$, $q$quiz$q$, $q$Assessment 2 · Workplace Readiness$q$, false, false, false, false, null, false),
+($q$BOP$q$, 3, $q$w3-4$q$, $q$task$q$, $q$Week project: set up your clean digital workspace$q$, true, false, true, false, null, false),
+($q$BOP$q$, 4, $q$w4-1$q$, $q$lesson$q$, $q$Calendar & inbox management$q$, false, false, false, false, null, false),
+($q$BOP$q$, 4, $q$w4-2$q$, $q$quiz$q$, $q$Assessment 3 · Calendar & Inbox Management$q$, false, false, false, false, null, false),
+($q$BOP$q$, 4, $q$w4-3$q$, $q$task$q$, $q$Week task: Calendar & Inbox Management$q$, true, false, true, false, null, false),
+($q$BOP$q$, 4, $q$w4-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$BOP$q$, 5, $q$w5-1$q$, $q$lesson$q$, $q$Business documents in Google Docs & Word$q$, false, false, false, false, null, false),
+($q$BOP$q$, 5, $q$w5-2$q$, $q$quiz$q$, $q$Assessment 4 · Business Documents$q$, false, false, false, false, null, false),
+($q$BOP$q$, 5, $q$w5-3$q$, $q$task$q$, $q$Week task: Business Documents$q$, true, false, true, false, null, false),
+($q$BOP$q$, 5, $q$w5-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$BOP$q$, 6, $q$w6-1$q$, $q$lesson$q$, $q$Spreadsheets for operations$q$, false, false, false, false, null, false),
+($q$BOP$q$, 6, $q$w6-2$q$, $q$quiz$q$, $q$Assessment 5 · Spreadsheets for Operations$q$, false, false, false, false, null, false),
+($q$BOP$q$, 6, $q$w6-3$q$, $q$task$q$, $q$Week task: Spreadsheets for Operations$q$, true, false, true, false, null, false),
+($q$BOP$q$, 6, $q$w6-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$BOP$q$, 7, $q$w7-1$q$, $q$lesson$q$, $q$Travel, expenses & vendor coordination$q$, false, false, false, false, null, false),
+($q$BOP$q$, 7, $q$w7-2$q$, $q$quiz$q$, $q$Assessment 6 · Travel, Expenses & Vendors$q$, false, false, false, false, null, false),
+($q$BOP$q$, 7, $q$w7-3$q$, $q$task$q$, $q$Week task: Travel, Expenses & Vendors$q$, true, false, true, false, null, false),
+($q$BOP$q$, 7, $q$w7-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$BOP$q$, 8, $q$w8-1$q$, $q$lesson$q$, $q$Coordinating a project$q$, false, false, false, false, null, false),
+($q$BOP$q$, 8, $q$w8-2$q$, $q$quiz$q$, $q$Assessment 7 · Project Coordination Basics$q$, false, false, false, false, null, false),
+($q$BOP$q$, 8, $q$w8-3$q$, $q$task$q$, $q$Week task: Project Coordination Basics$q$, true, false, true, false, null, false),
+($q$BOP$q$, 8, $q$w8-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$BOP$q$, 9, $q$w9-1$q$, $q$lesson$q$, $q$Mapping processes and writing SOPs$q$, false, false, false, false, null, false),
+($q$BOP$q$, 9, $q$w9-2$q$, $q$quiz$q$, $q$Assessment 8 · Processes & SOPs$q$, false, false, false, false, null, false),
+($q$BOP$q$, 9, $q$w9-3$q$, $q$task$q$, $q$Week task: Processes & SOPs$q$, true, false, true, false, null, false),
+($q$BOP$q$, 9, $q$w9-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$BOP$q$, 10, $q$w10-1$q$, $q$lesson$q$, $q$Supporting an executive remotely$q$, false, false, false, false, null, false),
+($q$BOP$q$, 10, $q$w10-2$q$, $q$quiz$q$, $q$Assessment 9 · Executive & Virtual Assistance$q$, false, false, false, false, null, false),
+($q$BOP$q$, 10, $q$w10-3$q$, $q$task$q$, $q$Week task: Executive & Virtual Assistance$q$, true, false, true, false, null, false),
+($q$BOP$q$, 10, $q$w10-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$BOP$q$, 11, $q$w11-1$q$, $q$lesson$q$, $q$Records, procurement and petty cash$q$, false, false, false, false, null, false),
+($q$BOP$q$, 11, $q$w11-2$q$, $q$quiz$q$, $q$Assessment 10 · Office Administration & Records$q$, false, false, false, false, null, false),
+($q$BOP$q$, 11, $q$w11-3$q$, $q$task$q$, $q$Week task: Office Administration & Records$q$, true, false, true, false, null, false),
+($q$BOP$q$, 11, $q$w11-4$q$, $q$task$q$, $q$Technical competency check$q$, false, false, false, false, null, false),
+($q$BOP$q$, 11, $q$w11-5$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$BOP$q$, 12, $q$w12-1$q$, $q$task$q$, $q$Read the examination rules$q$, false, false, false, false, null, false),
+($q$BOP$q$, 12, $q$w12-2$q$, $q$exam$q$, $q$Fundamental Examination$q$, false, false, false, false, $q$fund$q$, false),
+($q$BOP$q$, 12, $q$w12-3$q$, $q$exam$q$, $q$Core Skill Learning Examination$q$, false, false, false, false, $q$core$q$, false),
+($q$BOP$q$, 13, $q$w13-1$q$, $q$task$q$, $q$Read your project brief$q$, false, false, false, false, null, false),
+($q$BOP$q$, 13, $q$w13-2$q$, $q$task$q$, $q$Submit your project plan$q$, true, false, true, false, null, false),
+($q$BOP$q$, 13, $q$w13-3$q$, $q$task$q$, $q$Check-in with your project supervisor$q$, false, false, false, false, null, false),
+($q$BOP$q$, 14, $q$w14-1$q$, $q$task$q$, $q$Submit your final project$q$, true, false, true, false, null, true),
+($q$BOP$q$, 14, $q$w14-2$q$, $q$task$q$, $q$Self-review against the rubric$q$, false, false, false, false, null, false),
+($q$BOP$q$, 14, $q$w14-3$q$, $q$task$q$, $q$Supervisor grading$q$, false, false, false, true, null, false),
+($q$BOP$q$, 15, $q$w15-1$q$, $q$task$q$, $q$Confirm your placement$q$, false, false, false, false, null, false),
+($q$BOP$q$, 15, $q$w15-2$q$, $q$logweek$q$, $q$Logbook entry · Week 1$q$, false, false, false, false, null, false),
+($q$BOP$q$, 16, $q$w16-1$q$, $q$logweek$q$, $q$Logbook entry · Week 2$q$, false, false, false, false, null, false),
+($q$BOP$q$, 17, $q$w17-1$q$, $q$logweek$q$, $q$Logbook entry · Week 3$q$, false, false, false, false, null, false),
+($q$BOP$q$, 18, $q$w18-1$q$, $q$logweek$q$, $q$Logbook entry · Week 4$q$, false, false, false, false, null, false),
+($q$BOP$q$, 18, $q$w18-2$q$, $q$task$q$, $q$Supervisor performance evaluation$q$, false, false, false, true, null, false),
+($q$BOP$q$, 18, $q$w18-3$q$, $q$task$q$, $q$Collect your internship certificate$q$, false, false, false, false, null, false),
+($q$BOP$q$, 19, $q$w19-1$q$, $q$task$q$, $q$ATS-compliant resume$q$, false, false, true, false, null, false),
+($q$BOP$q$, 19, $q$w19-2$q$, $q$task$q$, $q$LinkedIn profile makeover$q$, false, false, true, false, null, false),
+($q$BOP$q$, 19, $q$w19-3$q$, $q$task$q$, $q$Publish your portfolio$q$, false, false, true, false, null, false),
+($q$BOP$q$, 19, $q$w19-4$q$, $q$task$q$, $q$CV swap with a pod member$q$, false, true, false, false, null, false),
+($q$BOP$q$, 20, $q$w20-1$q$, $q$task$q$, $q$Record your elevator pitch$q$, false, false, true, false, null, false),
+($q$BOP$q$, 20, $q$w20-2$q$, $q$task$q$, $q$Send 10 cold outreach messages$q$, false, false, false, false, null, false),
+($q$BOP$q$, 20, $q$w20-3$q$, $q$task$q$, $q$Book your 1-on-1 session$q$, false, false, false, false, null, false),
+($q$BOP$q$, 20, $q$w20-4$q$, $q$task$q$, $q$Weekly job application tracker$q$, false, false, true, false, null, false),
+($q$BOP$q$, 20, $q$w20-5$q$, $q$task$q$, $q$Report your first interview invite$q$, false, true, false, false, null, false),
+($q$BOP$q$, 20, $q$w20-6$q$, $q$task$q$, $q$Mock interview simulation$q$, false, false, false, false, null, false),
+($q$BOP$q$, 20, $q$w20-7$q$, $q$task$q$, $q$Finalise your Job Search Action Plan$q$, false, false, true, false, null, false),
+($q$PTA$q$, 1, $q$w1-1$q$, $q$guide$q$, $q$How to navigate the platform$q$, false, false, false, false, null, false),
+($q$PTA$q$, 1, $q$w1-2$q$, $q$oath$q$, $q$Read & sign the Student Oath$q$, false, false, false, false, null, false),
+($q$PTA$q$, 1, $q$w1-3$q$, $q$task$q$, $q$Read the Student Handbook$q$, false, false, false, false, null, false),
+($q$PTA$q$, 1, $q$w1-4$q$, $q$task$q$, $q$Join your cohort community$q$, false, true, false, false, null, false),
+($q$PTA$q$, 2, $q$w2-1$q$, $q$lesson$q$, $q$Professional communication$q$, false, false, false, false, null, false),
+($q$PTA$q$, 2, $q$w2-2$q$, $q$lesson$q$, $q$Remote work etiquette$q$, false, false, false, false, null, false),
+($q$PTA$q$, 2, $q$w2-3$q$, $q$lesson$q$, $q$File organisation in Google Drive & OneDrive$q$, false, false, false, false, null, false),
+($q$PTA$q$, 2, $q$w2-4$q$, $q$quiz$q$, $q$Assessment 1 · Communication & Remote Work$q$, false, false, false, false, null, false),
+($q$PTA$q$, 2, $q$w2-5$q$, $q$task$q$, $q$Week project: rewrite a messy email$q$, true, false, true, false, null, false),
+($q$PTA$q$, 3, $q$w3-1$q$, $q$lesson$q$, $q$Time management$q$, false, false, false, false, null, false),
+($q$PTA$q$, 3, $q$w3-2$q$, $q$lesson$q$, $q$Task tracking with Trello & Notion$q$, false, false, false, false, null, false),
+($q$PTA$q$, 3, $q$w3-3$q$, $q$quiz$q$, $q$Assessment 2 · Workplace Readiness$q$, false, false, false, false, null, false),
+($q$PTA$q$, 3, $q$w3-4$q$, $q$task$q$, $q$Week project: set up your clean digital workspace$q$, true, false, true, false, null, false),
+($q$PTA$q$, 4, $q$w4-1$q$, $q$lesson$q$, $q$How hiring works$q$, false, false, false, false, null, false),
+($q$PTA$q$, 4, $q$w4-2$q$, $q$quiz$q$, $q$Assessment 3 · The Recruitment Lifecycle$q$, false, false, false, false, null, false),
+($q$PTA$q$, 4, $q$w4-3$q$, $q$task$q$, $q$Week task: The Recruitment Lifecycle$q$, true, false, true, false, null, false),
+($q$PTA$q$, 4, $q$w4-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$PTA$q$, 5, $q$w5-1$q$, $q$lesson$q$, $q$Writing job descriptions and job ads$q$, false, false, false, false, null, false),
+($q$PTA$q$, 5, $q$w5-2$q$, $q$quiz$q$, $q$Assessment 4 · Job Descriptions & Job Ads$q$, false, false, false, false, null, false),
+($q$PTA$q$, 5, $q$w5-3$q$, $q$task$q$, $q$Week task: Job Descriptions & Job Ads$q$, true, false, true, false, null, false),
+($q$PTA$q$, 5, $q$w5-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$PTA$q$, 6, $q$w6-1$q$, $q$lesson$q$, $q$Finding candidates$q$, false, false, false, false, null, false),
+($q$PTA$q$, 6, $q$w6-2$q$, $q$quiz$q$, $q$Assessment 5 · Sourcing Candidates$q$, false, false, false, false, null, false),
+($q$PTA$q$, 6, $q$w6-3$q$, $q$task$q$, $q$Week task: Sourcing Candidates$q$, true, false, true, false, null, false),
+($q$PTA$q$, 6, $q$w6-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$PTA$q$, 7, $q$w7-1$q$, $q$lesson$q$, $q$Screening CVs and phone screens$q$, false, false, false, false, null, false),
+($q$PTA$q$, 7, $q$w7-2$q$, $q$quiz$q$, $q$Assessment 6 · Screening & Shortlisting$q$, false, false, false, false, null, false),
+($q$PTA$q$, 7, $q$w7-3$q$, $q$task$q$, $q$Week task: Screening & Shortlisting$q$, true, false, true, false, null, false),
+($q$PTA$q$, 7, $q$w7-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$PTA$q$, 8, $q$w8-1$q$, $q$lesson$q$, $q$Coordinating interviews$q$, false, false, false, false, null, false),
+($q$PTA$q$, 8, $q$w8-2$q$, $q$quiz$q$, $q$Assessment 7 · Interviews & Candidate Experience$q$, false, false, false, false, null, false),
+($q$PTA$q$, 8, $q$w8-3$q$, $q$task$q$, $q$Week task: Interviews & Candidate Experience$q$, true, false, true, false, null, false),
+($q$PTA$q$, 8, $q$w8-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$PTA$q$, 9, $q$w9-1$q$, $q$lesson$q$, $q$Offers, onboarding and employee records$q$, false, false, false, false, null, false),
+($q$PTA$q$, 9, $q$w9-2$q$, $q$quiz$q$, $q$Assessment 8 · Onboarding & HR Administration$q$, false, false, false, false, null, false),
+($q$PTA$q$, 9, $q$w9-3$q$, $q$task$q$, $q$Week task: Onboarding & HR Administration$q$, true, false, true, false, null, false),
+($q$PTA$q$, 9, $q$w9-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$PTA$q$, 10, $q$w10-1$q$, $q$lesson$q$, $q$HR policies and handling people data$q$, false, false, false, false, null, false),
+($q$PTA$q$, 10, $q$w10-2$q$, $q$quiz$q$, $q$Assessment 9 · HR Policies, Employment Basics & Data Privacy$q$, false, false, false, false, null, false),
+($q$PTA$q$, 10, $q$w10-3$q$, $q$task$q$, $q$Week task: HR Policies, Employment Basics & Data Privacy$q$, true, false, true, false, null, false),
+($q$PTA$q$, 10, $q$w10-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$PTA$q$, 11, $q$w11-1$q$, $q$lesson$q$, $q$Measuring hiring and people data$q$, false, false, false, false, null, false),
+($q$PTA$q$, 11, $q$w11-2$q$, $q$quiz$q$, $q$Assessment 10 · HR Metrics & Reporting$q$, false, false, false, false, null, false),
+($q$PTA$q$, 11, $q$w11-3$q$, $q$task$q$, $q$Week task: HR Metrics & Reporting$q$, true, false, true, false, null, false),
+($q$PTA$q$, 11, $q$w11-4$q$, $q$task$q$, $q$Technical competency check$q$, false, false, false, false, null, false),
+($q$PTA$q$, 11, $q$w11-5$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$PTA$q$, 12, $q$w12-1$q$, $q$task$q$, $q$Read the examination rules$q$, false, false, false, false, null, false),
+($q$PTA$q$, 12, $q$w12-2$q$, $q$exam$q$, $q$Fundamental Examination$q$, false, false, false, false, $q$fund$q$, false),
+($q$PTA$q$, 12, $q$w12-3$q$, $q$exam$q$, $q$Core Skill Learning Examination$q$, false, false, false, false, $q$core$q$, false),
+($q$PTA$q$, 13, $q$w13-1$q$, $q$task$q$, $q$Read your project brief$q$, false, false, false, false, null, false),
+($q$PTA$q$, 13, $q$w13-2$q$, $q$task$q$, $q$Submit your project plan$q$, true, false, true, false, null, false),
+($q$PTA$q$, 13, $q$w13-3$q$, $q$task$q$, $q$Check-in with your project supervisor$q$, false, false, false, false, null, false),
+($q$PTA$q$, 14, $q$w14-1$q$, $q$task$q$, $q$Submit your final project$q$, true, false, true, false, null, true),
+($q$PTA$q$, 14, $q$w14-2$q$, $q$task$q$, $q$Self-review against the rubric$q$, false, false, false, false, null, false),
+($q$PTA$q$, 14, $q$w14-3$q$, $q$task$q$, $q$Supervisor grading$q$, false, false, false, true, null, false),
+($q$PTA$q$, 15, $q$w15-1$q$, $q$task$q$, $q$Confirm your placement$q$, false, false, false, false, null, false),
+($q$PTA$q$, 15, $q$w15-2$q$, $q$logweek$q$, $q$Logbook entry · Week 1$q$, false, false, false, false, null, false),
+($q$PTA$q$, 16, $q$w16-1$q$, $q$logweek$q$, $q$Logbook entry · Week 2$q$, false, false, false, false, null, false),
+($q$PTA$q$, 17, $q$w17-1$q$, $q$logweek$q$, $q$Logbook entry · Week 3$q$, false, false, false, false, null, false),
+($q$PTA$q$, 18, $q$w18-1$q$, $q$logweek$q$, $q$Logbook entry · Week 4$q$, false, false, false, false, null, false),
+($q$PTA$q$, 18, $q$w18-2$q$, $q$task$q$, $q$Supervisor performance evaluation$q$, false, false, false, true, null, false),
+($q$PTA$q$, 18, $q$w18-3$q$, $q$task$q$, $q$Collect your internship certificate$q$, false, false, false, false, null, false),
+($q$PTA$q$, 19, $q$w19-1$q$, $q$task$q$, $q$ATS-compliant resume$q$, false, false, true, false, null, false),
+($q$PTA$q$, 19, $q$w19-2$q$, $q$task$q$, $q$LinkedIn profile makeover$q$, false, false, true, false, null, false),
+($q$PTA$q$, 19, $q$w19-3$q$, $q$task$q$, $q$Publish your portfolio$q$, false, false, true, false, null, false),
+($q$PTA$q$, 19, $q$w19-4$q$, $q$task$q$, $q$CV swap with a pod member$q$, false, true, false, false, null, false),
+($q$PTA$q$, 20, $q$w20-1$q$, $q$task$q$, $q$Record your elevator pitch$q$, false, false, true, false, null, false),
+($q$PTA$q$, 20, $q$w20-2$q$, $q$task$q$, $q$Send 10 cold outreach messages$q$, false, false, false, false, null, false),
+($q$PTA$q$, 20, $q$w20-3$q$, $q$task$q$, $q$Book your 1-on-1 session$q$, false, false, false, false, null, false),
+($q$PTA$q$, 20, $q$w20-4$q$, $q$task$q$, $q$Weekly job application tracker$q$, false, false, true, false, null, false),
+($q$PTA$q$, 20, $q$w20-5$q$, $q$task$q$, $q$Report your first interview invite$q$, false, true, false, false, null, false),
+($q$PTA$q$, 20, $q$w20-6$q$, $q$task$q$, $q$Mock interview simulation$q$, false, false, false, false, null, false),
+($q$PTA$q$, 20, $q$w20-7$q$, $q$task$q$, $q$Finalise your Job Search Action Plan$q$, false, false, true, false, null, false),
+($q$CSG$q$, 1, $q$w1-1$q$, $q$guide$q$, $q$How to navigate the platform$q$, false, false, false, false, null, false),
+($q$CSG$q$, 1, $q$w1-2$q$, $q$oath$q$, $q$Read & sign the Student Oath$q$, false, false, false, false, null, false),
+($q$CSG$q$, 1, $q$w1-3$q$, $q$task$q$, $q$Read the Student Handbook$q$, false, false, false, false, null, false),
+($q$CSG$q$, 1, $q$w1-4$q$, $q$task$q$, $q$Join your cohort community$q$, false, true, false, false, null, false),
+($q$CSG$q$, 2, $q$w2-1$q$, $q$lesson$q$, $q$Professional communication$q$, false, false, false, false, null, false),
+($q$CSG$q$, 2, $q$w2-2$q$, $q$lesson$q$, $q$Remote work etiquette$q$, false, false, false, false, null, false),
+($q$CSG$q$, 2, $q$w2-3$q$, $q$lesson$q$, $q$File organisation in Google Drive & OneDrive$q$, false, false, false, false, null, false),
+($q$CSG$q$, 2, $q$w2-4$q$, $q$quiz$q$, $q$Assessment 1 · Communication & Remote Work$q$, false, false, false, false, null, false),
+($q$CSG$q$, 2, $q$w2-5$q$, $q$task$q$, $q$Week project: rewrite a messy email$q$, true, false, true, false, null, false),
+($q$CSG$q$, 3, $q$w3-1$q$, $q$lesson$q$, $q$Time management$q$, false, false, false, false, null, false),
+($q$CSG$q$, 3, $q$w3-2$q$, $q$lesson$q$, $q$Task tracking with Trello & Notion$q$, false, false, false, false, null, false),
+($q$CSG$q$, 3, $q$w3-3$q$, $q$quiz$q$, $q$Assessment 2 · Workplace Readiness$q$, false, false, false, false, null, false),
+($q$CSG$q$, 3, $q$w3-4$q$, $q$task$q$, $q$Week project: set up your clean digital workspace$q$, true, false, true, false, null, false),
+($q$CSG$q$, 4, $q$w4-1$q$, $q$lesson$q$, $q$Customer support fundamentals$q$, false, false, false, false, null, false),
+($q$CSG$q$, 4, $q$w4-2$q$, $q$quiz$q$, $q$Assessment 3 · Support Fundamentals$q$, false, false, false, false, null, false),
+($q$CSG$q$, 4, $q$w4-3$q$, $q$task$q$, $q$Week task: Support Fundamentals$q$, true, false, true, false, null, false),
+($q$CSG$q$, 4, $q$w4-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$CSG$q$, 5, $q$w5-1$q$, $q$lesson$q$, $q$Working in a ticketing tool$q$, false, false, false, false, null, false),
+($q$CSG$q$, 5, $q$w5-2$q$, $q$quiz$q$, $q$Assessment 4 · Ticketing Tools$q$, false, false, false, false, null, false),
+($q$CSG$q$, 5, $q$w5-3$q$, $q$task$q$, $q$Week task: Ticketing Tools$q$, true, false, true, false, null, false),
+($q$CSG$q$, 5, $q$w5-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$CSG$q$, 6, $q$w6-1$q$, $q$lesson$q$, $q$Live chat & email etiquette$q$, false, false, false, false, null, false),
+($q$CSG$q$, 6, $q$w6-2$q$, $q$quiz$q$, $q$Assessment 5 · Live Chat & Email Etiquette$q$, false, false, false, false, null, false),
+($q$CSG$q$, 6, $q$w6-3$q$, $q$task$q$, $q$Week task: Live Chat & Email Etiquette$q$, true, false, true, false, null, false),
+($q$CSG$q$, 6, $q$w6-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$CSG$q$, 7, $q$w7-1$q$, $q$lesson$q$, $q$CX metrics: CSAT, FRT and NPS$q$, false, false, false, false, null, false),
+($q$CSG$q$, 7, $q$w7-2$q$, $q$quiz$q$, $q$Assessment 6 · CX Metrics$q$, false, false, false, false, null, false),
+($q$CSG$q$, 7, $q$w7-3$q$, $q$task$q$, $q$Week task: CX Metrics$q$, true, false, true, false, null, false),
+($q$CSG$q$, 7, $q$w7-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$CSG$q$, 8, $q$w8-1$q$, $q$lesson$q$, $q$Helping customers succeed$q$, false, false, false, false, null, false),
+($q$CSG$q$, 8, $q$w8-2$q$, $q$quiz$q$, $q$Assessment 7 · Customer Success & Onboarding$q$, false, false, false, false, null, false),
+($q$CSG$q$, 8, $q$w8-3$q$, $q$task$q$, $q$Week task: Customer Success & Onboarding$q$, true, false, true, false, null, false),
+($q$CSG$q$, 8, $q$w8-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$CSG$q$, 9, $q$w9-1$q$, $q$lesson$q$, $q$Working in a CRM$q$, false, false, false, false, null, false),
+($q$CSG$q$, 9, $q$w9-2$q$, $q$quiz$q$, $q$Assessment 8 · CRM Management$q$, false, false, false, false, null, false),
+($q$CSG$q$, 9, $q$w9-3$q$, $q$task$q$, $q$Week task: CRM Management$q$, true, false, true, false, null, false),
+($q$CSG$q$, 9, $q$w9-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$CSG$q$, 10, $q$w10-1$q$, $q$lesson$q$, $q$Prospecting and booking meetings$q$, false, false, false, false, null, false),
+($q$CSG$q$, 10, $q$w10-2$q$, $q$quiz$q$, $q$Assessment 9 · Sales Development & Prospecting$q$, false, false, false, false, null, false),
+($q$CSG$q$, 10, $q$w10-3$q$, $q$task$q$, $q$Week task: Sales Development & Prospecting$q$, true, false, true, false, null, false),
+($q$CSG$q$, 10, $q$w10-4$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$CSG$q$, 11, $q$w11-1$q$, $q$lesson$q$, $q$Keeping and growing customers$q$, false, false, false, false, null, false),
+($q$CSG$q$, 11, $q$w11-2$q$, $q$quiz$q$, $q$Assessment 10 · Retention, Upsell & Growth Reporting$q$, false, false, false, false, null, false),
+($q$CSG$q$, 11, $q$w11-3$q$, $q$task$q$, $q$Week task: Retention, Upsell & Growth Reporting$q$, true, false, true, false, null, false),
+($q$CSG$q$, 11, $q$w11-4$q$, $q$task$q$, $q$Technical competency check$q$, false, false, false, false, null, false),
+($q$CSG$q$, 11, $q$w11-5$q$, $q$task$q$, $q$Stretch challenge$q$, false, true, true, false, null, false),
+($q$CSG$q$, 12, $q$w12-1$q$, $q$task$q$, $q$Read the examination rules$q$, false, false, false, false, null, false),
+($q$CSG$q$, 12, $q$w12-2$q$, $q$exam$q$, $q$Fundamental Examination$q$, false, false, false, false, $q$fund$q$, false),
+($q$CSG$q$, 12, $q$w12-3$q$, $q$exam$q$, $q$Core Skill Learning Examination$q$, false, false, false, false, $q$core$q$, false),
+($q$CSG$q$, 13, $q$w13-1$q$, $q$task$q$, $q$Read your project brief$q$, false, false, false, false, null, false),
+($q$CSG$q$, 13, $q$w13-2$q$, $q$task$q$, $q$Submit your project plan$q$, true, false, true, false, null, false),
+($q$CSG$q$, 13, $q$w13-3$q$, $q$task$q$, $q$Check-in with your project supervisor$q$, false, false, false, false, null, false),
+($q$CSG$q$, 14, $q$w14-1$q$, $q$task$q$, $q$Submit your final project$q$, true, false, true, false, null, true),
+($q$CSG$q$, 14, $q$w14-2$q$, $q$task$q$, $q$Self-review against the rubric$q$, false, false, false, false, null, false),
+($q$CSG$q$, 14, $q$w14-3$q$, $q$task$q$, $q$Supervisor grading$q$, false, false, false, true, null, false),
+($q$CSG$q$, 15, $q$w15-1$q$, $q$task$q$, $q$Confirm your placement$q$, false, false, false, false, null, false),
+($q$CSG$q$, 15, $q$w15-2$q$, $q$logweek$q$, $q$Logbook entry · Week 1$q$, false, false, false, false, null, false),
+($q$CSG$q$, 16, $q$w16-1$q$, $q$logweek$q$, $q$Logbook entry · Week 2$q$, false, false, false, false, null, false),
+($q$CSG$q$, 17, $q$w17-1$q$, $q$logweek$q$, $q$Logbook entry · Week 3$q$, false, false, false, false, null, false),
+($q$CSG$q$, 18, $q$w18-1$q$, $q$logweek$q$, $q$Logbook entry · Week 4$q$, false, false, false, false, null, false),
+($q$CSG$q$, 18, $q$w18-2$q$, $q$task$q$, $q$Supervisor performance evaluation$q$, false, false, false, true, null, false),
+($q$CSG$q$, 18, $q$w18-3$q$, $q$task$q$, $q$Collect your internship certificate$q$, false, false, false, false, null, false),
+($q$CSG$q$, 19, $q$w19-1$q$, $q$task$q$, $q$ATS-compliant resume$q$, false, false, true, false, null, false),
+($q$CSG$q$, 19, $q$w19-2$q$, $q$task$q$, $q$LinkedIn profile makeover$q$, false, false, true, false, null, false),
+($q$CSG$q$, 19, $q$w19-3$q$, $q$task$q$, $q$Publish your portfolio$q$, false, false, true, false, null, false),
+($q$CSG$q$, 19, $q$w19-4$q$, $q$task$q$, $q$CV swap with a pod member$q$, false, true, false, false, null, false),
+($q$CSG$q$, 20, $q$w20-1$q$, $q$task$q$, $q$Record your elevator pitch$q$, false, false, true, false, null, false),
+($q$CSG$q$, 20, $q$w20-2$q$, $q$task$q$, $q$Send 10 cold outreach messages$q$, false, false, false, false, null, false),
+($q$CSG$q$, 20, $q$w20-3$q$, $q$task$q$, $q$Book your 1-on-1 session$q$, false, false, false, false, null, false),
+($q$CSG$q$, 20, $q$w20-4$q$, $q$task$q$, $q$Weekly job application tracker$q$, false, false, true, false, null, false),
+($q$CSG$q$, 20, $q$w20-5$q$, $q$task$q$, $q$Report your first interview invite$q$, false, true, false, false, null, false),
+($q$CSG$q$, 20, $q$w20-6$q$, $q$task$q$, $q$Mock interview simulation$q$, false, false, false, false, null, false),
+($q$CSG$q$, 20, $q$w20-7$q$, $q$task$q$, $q$Finalise your Job Search Action Plan$q$, false, false, true, false, null, false);
+delete from course_weeks;
+insert into course_weeks(track_code, week, title) values
+($q$BOP$q$, 1, $q$Welcome & Orientation$q$),
+($q$BOP$q$, 2, $q$Communication & Remote Work$q$),
+($q$BOP$q$, 3, $q$Productivity & Workplace Readiness$q$),
+($q$BOP$q$, 4, $q$Calendar & Inbox Management$q$),
+($q$BOP$q$, 5, $q$Business Documents$q$),
+($q$BOP$q$, 6, $q$Spreadsheets for Operations$q$),
+($q$BOP$q$, 7, $q$Travel, Expenses & Vendors$q$),
+($q$BOP$q$, 8, $q$Project Coordination Basics$q$),
+($q$BOP$q$, 9, $q$Processes & SOPs$q$),
+($q$BOP$q$, 10, $q$Executive & Virtual Assistance$q$),
+($q$BOP$q$, 11, $q$Office Administration & Records$q$),
+($q$BOP$q$, 12, $q$Examinations$q$),
+($q$BOP$q$, 13, $q$Project: Plan & Build$q$),
+($q$BOP$q$, 14, $q$Project: Delivery$q$),
+($q$BOP$q$, 15, $q$Internship · Week 1$q$),
+($q$BOP$q$, 16, $q$Internship · Week 2$q$),
+($q$BOP$q$, 17, $q$Internship · Week 3$q$),
+($q$BOP$q$, 18, $q$Internship · Week 4$q$),
+($q$BOP$q$, 19, $q$CV, LinkedIn & Portfolio$q$),
+($q$BOP$q$, 20, $q$Job Search & Pitching$q$),
+($q$PTA$q$, 1, $q$Welcome & Orientation$q$),
+($q$PTA$q$, 2, $q$Communication & Remote Work$q$),
+($q$PTA$q$, 3, $q$Productivity & Workplace Readiness$q$),
+($q$PTA$q$, 4, $q$The Recruitment Lifecycle$q$),
+($q$PTA$q$, 5, $q$Job Descriptions & Job Ads$q$),
+($q$PTA$q$, 6, $q$Sourcing Candidates$q$),
+($q$PTA$q$, 7, $q$Screening & Shortlisting$q$),
+($q$PTA$q$, 8, $q$Interviews & Candidate Experience$q$),
+($q$PTA$q$, 9, $q$Onboarding & HR Administration$q$),
+($q$PTA$q$, 10, $q$HR Policies, Employment Basics & Data Privacy$q$),
+($q$PTA$q$, 11, $q$HR Metrics & Reporting$q$),
+($q$PTA$q$, 12, $q$Examinations$q$),
+($q$PTA$q$, 13, $q$Project: Plan & Build$q$),
+($q$PTA$q$, 14, $q$Project: Delivery$q$),
+($q$PTA$q$, 15, $q$Internship · Week 1$q$),
+($q$PTA$q$, 16, $q$Internship · Week 2$q$),
+($q$PTA$q$, 17, $q$Internship · Week 3$q$),
+($q$PTA$q$, 18, $q$Internship · Week 4$q$),
+($q$PTA$q$, 19, $q$CV, LinkedIn & Portfolio$q$),
+($q$PTA$q$, 20, $q$Job Search & Pitching$q$),
+($q$CSG$q$, 1, $q$Welcome & Orientation$q$),
+($q$CSG$q$, 2, $q$Communication & Remote Work$q$),
+($q$CSG$q$, 3, $q$Productivity & Workplace Readiness$q$),
+($q$CSG$q$, 4, $q$Support Fundamentals$q$),
+($q$CSG$q$, 5, $q$Ticketing Tools$q$),
+($q$CSG$q$, 6, $q$Live Chat & Email Etiquette$q$),
+($q$CSG$q$, 7, $q$CX Metrics$q$),
+($q$CSG$q$, 8, $q$Customer Success & Onboarding$q$),
+($q$CSG$q$, 9, $q$CRM Management$q$),
+($q$CSG$q$, 10, $q$Sales Development & Prospecting$q$),
+($q$CSG$q$, 11, $q$Retention, Upsell & Growth Reporting$q$),
+($q$CSG$q$, 12, $q$Examinations$q$),
+($q$CSG$q$, 13, $q$Project: Plan & Build$q$),
+($q$CSG$q$, 14, $q$Project: Delivery$q$),
+($q$CSG$q$, 15, $q$Internship · Week 1$q$),
+($q$CSG$q$, 16, $q$Internship · Week 2$q$),
+($q$CSG$q$, 17, $q$Internship · Week 3$q$),
+($q$CSG$q$, 18, $q$Internship · Week 4$q$),
+($q$CSG$q$, 19, $q$CV, LinkedIn & Portfolio$q$),
+($q$CSG$q$, 20, $q$Job Search & Pitching$q$);
+select 'Programme v2 course installed' as done, (select count(*) from course_items) as course_items;
+
+
+-- Jobnest Academy update 28c: question banks for the 20-week programme (generated by dev/quiz_bank_v2.py).
+-- Weekly assessments draw 5 per learner. exam-fund: Fundamental Examination (30 drawn). exam-core: Core Skill Learning Examination (40 drawn).
+delete from quiz_bank;
+insert into quiz_bank(track_code, key, qid, q, o, a) values
+($q$BOP$q$,$q$w2-4$q$,1,$q$A good email subject line should:$q$,array[$q$Be one word, like “Hello”$q$,$q$State the ask or topic clearly, e.g. “Approval needed: Q3 budget by Friday”$q$,$q$Repeat the sender's name$q$,$q$Be left empty so people open the email$q$],1),
+($q$BOP$q$,$q$w2-4$q$,2,$q$You need two separate decisions from your manager. Best practice is to:$q$,array[$q$Wait for your weekly meeting$q$,$q$Ask on WhatsApp late at night$q$,$q$Send two short emails, one topic each, with a clear next step$q$,$q$Put both in one long email with no headings$q$],2),
+($q$BOP$q$,$q$w2-4$q$,3,$q$A client emails a question you can't answer today. What should you do?$q$,array[$q$Forward it to a colleague without comment$q$,$q$Acknowledge it within one working day and say when you'll reply$q$,$q$Reply “ok” and nothing else$q$,$q$Ignore it until you have the full answer$q$],1),
+($q$BOP$q$,$q$w2-4$q$,4,$q$Which channel suits an urgent, informal question to a teammate?$q$,array[$q$An email to the whole company$q$,$q$A post on your public social media$q$,$q$A formal letter$q$,$q$A work chat tool such as Slack or Teams$q$],3),
+($q$BOP$q$,$q$w2-4$q$,5,$q$In a remote team meeting where you are not presenting, you should:$q$,array[$q$Mute and use raise-hand when you want to speak$q$,$q$Keep your mic on so people know you're there$q$,$q$Type every comment in capital letters$q$,$q$Leave your camera on and walk away$q$],0),
+($q$BOP$q$,$q$w2-4$q$,6,$q$Your team agreed cameras on for team meetings. Today your internet is poor. You should:$q$,array[$q$Keep the camera on even if the call keeps dropping$q$,$q$Skip the meeting$q$,$q$Tell the host briefly and turn the camera off to save data$q$,$q$Join late without saying anything$q$],2),
+($q$BOP$q$,$q$w2-4$q$,7,$q$You're stuck on a task working from home. The best move is to:$q$,array[$q$Tell your lead early, say what you've tried, and ask a specific question$q$,$q$Say nothing and hope it resolves$q$,$q$Wait until the deadline, then explain$q$,$q$Quietly hand it to a colleague$q$],0),
+($q$BOP$q$,$q$w2-4$q$,8,$q$You'll be away from your desk for two hours during work time. You should:$q$,array[$q$Leave without telling anyone$q$,$q$Change your profile picture$q$,$q$Log out of everything so nobody can reach you$q$,$q$Update your status or tell the team when you'll be back$q$],3),
+($q$BOP$q$,$q$w2-4$q$,9,$q$Which file name follows good practice?$q$,array[$q$Untitled document$q$,$q$2026-11-04_AcmeCo_Onboarding-Guide_v2.docx$q$,$q$report-new(2).docx$q$,$q$final final.docx$q$],1),
+($q$BOP$q$,$q$w2-4$q$,10,$q$A sensible top-level folder structure for your work is:$q$,array[$q$One folder per client or project, with clear subfolders$q$,$q$Files only on your desktop$q$,$q$Everything in Downloads$q$,$q$One folder per day$q$],0),
+($q$BOP$q$,$q$w2-4$q$,11,$q$You need a colleague to comment on a document but not change it. Share it with:$q$,array[$q$No access, and email a screenshot$q$,$q$Owner access$q$,$q$Commenter access$q$,$q$Editor access for everyone with the link$q$],2),
+($q$BOP$q$,$q$w2-4$q$,12,$q$Why should work files not live only on your laptop desktop?$q$,array[$q$Desktops are slower to load$q$,$q$Laptops can't open shared files$q$,$q$It uses too much battery$q$,$q$They can be lost and your team can't find or open them$q$],3),
+($q$BOP$q$,$q$w3-3$q$,1,$q$In the Eisenhower matrix, a task that is important but not urgent should be:$q$,array[$q$Scheduled$q$,$q$Delegated$q$,$q$Done immediately$q$,$q$Deleted$q$],0),
+($q$BOP$q$,$q$w3-3$q$,2,$q$Time-blocking means:$q$,array[$q$Reserving set times in your calendar for focused work$q$,$q$Doing every task as it arrives$q$,$q$Blocking colleagues' calendars$q$,$q$Working without breaks$q$],0),
+($q$BOP$q$,$q$w3-3$q$,3,$q$You estimated a task at 2 hours and it took 5. What's the most useful next step?$q$,array[$q$Blame the tools$q$,$q$Stop estimating tasks$q$,$q$Ignore it$q$,$q$Note the difference and use it to estimate similar tasks better$q$],3),
+($q$BOP$q$,$q$w3-3$q$,4,$q$A daily shutdown routine helps you:$q$,array[$q$Work later every night$q$,$q$Review what's done, plan tomorrow and switch off$q$,$q$Avoid checking any messages$q$,$q$Skip planning$q$],1),
+($q$BOP$q$,$q$w3-3$q$,5,$q$A simple task board usually has columns like:$q$,array[$q$Mine and Not mine$q$,$q$Monday to Friday only$q$,$q$Easy, Medium, Hard, Impossible$q$,$q$To do, Doing, Review, Done$q$],3),
+($q$BOP$q$,$q$w3-3$q$,6,$q$A Trello or Notion card for a deliverable should always have:$q$,array[$q$No description$q$,$q$At least ten checklist items$q$,$q$A due date and a clear owner$q$,$q$A colourful cover image$q$],2),
+($q$BOP$q$,$q$w3-3$q$,7,$q$Why use a checklist for repeatable work?$q$,array[$q$So steps aren't missed and quality stays consistent$q$,$q$To make the task take longer$q$,$q$So nobody needs to think$q$,$q$Because managers like long lists$q$],0),
+($q$BOP$q$,$q$w3-3$q$,8,$q$A weekly review of your task board is for:$q$,array[$q$Clearing finished cards, updating dates and planning next week$q$,$q$Deleting tasks you don't like$q$,$q$Changing the board's colours$q$,$q$Showing off to colleagues$q$],0),
+($q$BOP$q$,$q$w3-3$q$,9,$q$Three urgent requests arrive at once. A good first step is to:$q$,array[$q$Check priorities and deadlines, then confirm the order with your manager if unsure$q$,$q$Start all three at the same time$q$,$q$Do the easiest one and ignore the rest$q$,$q$Wait for someone to follow up$q$],0),
+($q$BOP$q$,$q$w3-3$q$,10,$q$You realise you will miss a deadline. When should you tell your manager?$q$,array[$q$Never, just submit it late$q$,$q$As soon as you know, with a new date and what you need$q$,$q$After the deadline has passed$q$,$q$Only if they ask$q$],1),
+($q$BOP$q$,$q$w3-3$q$,11,$q$Which habit best shows you are workplace-ready?$q$,array[$q$Working only on tasks you enjoy$q$,$q$Arriving on time and keeping people updated on your progress$q$,$q$Avoiding questions so you look confident$q$,$q$Replying only when it suits you$q$],1),
+($q$BOP$q$,$q$w3-3$q$,12,$q$When you finish a task, a good habit is to:$q$,array[$q$Delete your notes$q$,$q$Move on without telling anyone$q$,$q$Wait for someone to discover it$q$,$q$Check your work, share it, and update your task board$q$],3),
+($q$BOP$q$,$q$w4-2$q$,1,$q$“Inbox zero” mainly means:$q$,array[$q$Every email is actioned, filed or archived, so the inbox only holds what needs attention$q$,$q$Never replying to emails$q$,$q$Deleting all emails every day$q$,$q$Turning off email notifications forever$q$],0),
+($q$BOP$q$,$q$w4-2$q$,2,$q$Which tool helps sort incoming email automatically?$q$,array[$q$Marking all as read$q$,$q$Printing every email$q$,$q$Filters or rules that label and move messages$q$,$q$Forwarding everything to your manager$q$],2),
+($q$BOP$q$,$q$w4-2$q$,3,$q$Labels such as “Waiting on”, “To reply” and “Receipts” help you:$q$,array[$q$Make emails load faster$q$,$q$Delete emails automatically$q$,$q$See at a glance what needs action$q$,$q$Hide emails from your manager$q$],2),
+($q$BOP$q$,$q$w4-2$q$,4,$q$Your manager is in Lagos and a client is in London. When scheduling, you should:$q$,array[$q$Book outside working hours for both$q$,$q$Check both time zones and show the time for each person$q$,$q$Use only Lagos time without saying so$q$,$q$Let the client guess$q$],1),
+($q$BOP$q$,$q$w4-2$q$,5,$q$A good meeting invite includes:$q$,array[$q$A clear title, purpose, agenda and the call link$q$,$q$No time zone$q$,$q$Only the word “Meeting”$q$,$q$A long story about why the meeting exists$q$],0),
+($q$BOP$q$,$q$w4-2$q$,6,$q$Before booking a meeting for your manager, you should:$q$,array[$q$Check their calendar for clashes and travel time$q$,$q$Book back-to-back all day$q$,$q$Ask the client to choose any time$q$,$q$Book over existing meetings$q$],0),
+($q$BOP$q$,$q$w4-2$q$,7,$q$A recurring weekly meeting is best set up as:$q$,array[$q$A WhatsApp reminder$q$,$q$One recurring calendar event$q$,$q$A sticky note$q$,$q$A new invite every week by hand$q$],1),
+($q$BOP$q$,$q$w4-2$q$,8,$q$You get an email that needs your manager's decision. You should:$q$,array[$q$Flag or label it, add a short summary and bring it to their attention$q$,$q$Leave it unread$q$,$q$Answer it yourself without asking$q$,$q$Delete it$q$],0),
+($q$BOP$q$,$q$w4-2$q$,9,$q$Good practice when declining a meeting on your manager's behalf is to:$q$,array[$q$Decline politely and suggest another time$q$,$q$Decline with no message$q$,$q$Ignore the invite$q$,$q$Accept and not attend$q$],0),
+($q$BOP$q$,$q$w4-2$q$,10,$q$Which is the clearest meeting title?$q$,array[$q$Q3 budget review: decide on marketing spend$q$,$q$Catch up???$q$,$q$Quick chat$q$,$q$Meeting$q$],0),
+($q$BOP$q$,$q$w4-2$q$,11,$q$Colour-coding calendar events by type helps you:$q$,array[$q$Make the calendar look busy$q$,$q$Hide private events from yourself$q$,$q$Avoid planning$q$,$q$See the week's balance of meetings, focus time and travel$q$],3),
+($q$BOP$q$,$q$w4-2$q$,12,$q$You manage two inboxes. A good routine is to:$q$,array[$q$Keep both open and react to every alert$q$,$q$Check them at set times and process each email once$q$,$q$Check once a week$q$,$q$Forward one inbox to the other and ignore it$q$],1),
+($q$BOP$q$,$q$w5-2$q$,1,$q$Why use built-in heading styles in Docs or Word?$q$,array[$q$They make the file smaller$q$,$q$They keep formatting consistent and create a clickable outline or contents$q$,$q$They lock the document$q$,$q$They change the font to bold everywhere$q$],1),
+($q$BOP$q$,$q$w5-2$q$,2,$q$A document template is useful because:$q$,array[$q$It emails the document automatically$q$,$q$It deletes old versions$q$,$q$It stops anyone editing$q$,$q$Everyone starts from the same layout, branding and sections$q$],3),
+($q$BOP$q$,$q$w5-2$q$,3,$q$Suggestion mode (track changes) lets you:$q$,array[$q$Delete the original text forever$q$,$q$Lock the document$q$,$q$Propose edits the owner can accept or reject$q$,$q$Hide your changes$q$],2),
+($q$BOP$q$,$q$w5-2$q$,4,$q$Version history helps you:$q$,array[$q$See who changed what and restore an earlier version$q$,$q$Translate the document$q$,$q$Print the document$q$,$q$Make the document load faster$q$],0),
+($q$BOP$q$,$q$w5-2$q$,5,$q$Good meeting minutes capture:$q$,array[$q$Only who attended$q$,$q$Every word people said$q$,$q$Your personal opinions$q$,$q$Decisions, action items, owners and due dates$q$],3),
+($q$BOP$q$,$q$w5-2$q$,6,$q$An action item in minutes should include:$q$,array[$q$Only the topic$q$,$q$What will be done, who owns it, and by when$q$,$q$The meeting room$q$,$q$A long background story$q$],1),
+($q$BOP$q$,$q$w5-2$q$,7,$q$When should minutes be shared?$q$,array[$q$Never$q$,$q$A month later$q$,$q$Soon after the meeting, ideally the same day$q$,$q$Only if someone asks$q$],2),
+($q$BOP$q$,$q$w5-2$q$,8,$q$Which file name is best for a final contract draft?$q$,array[$q$2026-11-10_ClientName_Service-Agreement_v3.docx$q$,$q$doc1.docx$q$,$q$contract FINAL final.docx$q$,$q$new.docx$q$],0),
+($q$BOP$q$,$q$w5-2$q$,9,$q$To share a document so only your team can edit it, you should:$q$,array[$q$Share with team members' emails as editors$q$,$q$Post it on social media$q$,$q$Make it public to anyone with the link as editor$q$,$q$Email it as an attachment to everyone$q$],0),
+($q$BOP$q$,$q$w5-2$q$,10,$q$A professional business document usually starts with:$q$,array[$q$A clear title, date and purpose$q$,$q$A joke$q$,$q$A list of everyone's phone numbers$q$,$q$No title$q$],0),
+($q$BOP$q$,$q$w5-2$q$,11,$q$Consistent fonts and spacing in documents matter because:$q$,array[$q$They are required by law$q$,$q$They use less paper$q$,$q$They make documents longer$q$,$q$They make documents easier to read and look professional$q$],3),
+($q$BOP$q$,$q$w5-2$q$,12,$q$Comments in a shared document are best used to:$q$,array[$q$Chat about the weekend$q$,$q$Rewrite the whole document$q$,$q$Hide text$q$,$q$Ask questions or give feedback on a specific part$q$],3),
+($q$BOP$q$,$q$w6-2$q$,1,$q$Sorting a spreadsheet by a column:$q$,array[$q$Changes the numbers$q$,$q$Deletes duplicate rows$q$,$q$Hides other columns$q$,$q$Reorders the rows by that column's values$q$],3),
+($q$BOP$q$,$q$w6-2$q$,2,$q$A filter in a spreadsheet lets you:$q$,array[$q$Delete rows permanently$q$,$q$Lock the sheet$q$,$q$Show only the rows that match what you choose$q$,$q$Colour every cell$q$],2),
+($q$BOP$q$,$q$w6-2$q$,3,$q$Data validation is used to:$q$,array[$q$Make the sheet read-only$q$,$q$Limit what can be typed in a cell, e.g. a dropdown list$q$,$q$Check spelling in every cell$q$,$q$Back up the file$q$],1),
+($q$BOP$q$,$q$w6-2$q$,4,$q$Conditional formatting can:$q$,array[$q$Send emails$q$,$q$Delete old rows$q$,$q$Rename the sheet$q$,$q$Highlight cells automatically, e.g. overdue dates in red$q$],3),
+($q$BOP$q$,$q$w6-2$q$,5,$q$A simple tracker should have:$q$,array[$q$No headings$q$,$q$Merged cells everywhere$q$,$q$One row per item and clear columns such as status, owner and due date$q$,$q$Notes typed in random cells$q$],2),
+($q$BOP$q$,$q$w6-2$q$,6,$q$Why freeze the header row?$q$,array[$q$To stop people editing it$q$,$q$So column names stay visible when you scroll$q$,$q$To make it print in colour$q$,$q$To hide it$q$],1),
+($q$BOP$q$,$q$w6-2$q$,7,$q$You want colleagues to view a tracker but not change it. Share it as:$q$,array[$q$Viewer$q$,$q$Editor$q$,$q$Public editor$q$,$q$Owner$q$],0),
+($q$BOP$q$,$q$w6-2$q$,8,$q$A good way to avoid typos in a “Status” column is to:$q$,array[$q$Leave it blank$q$,$q$Use different colours of text$q$,$q$Use a dropdown with fixed options$q$,$q$Let people type anything$q$],2),
+($q$BOP$q$,$q$w6-2$q$,9,$q$Before sorting a table, you should:$q$,array[$q$Select only one column$q$,$q$Merge the cells$q$,$q$Delete the headers$q$,$q$Select the whole table so rows stay together$q$],3),
+($q$BOP$q$,$q$w6-2$q$,10,$q$COUNTIF can tell you:$q$,array[$q$The average of a column$q$,$q$How many rows match a condition, e.g. how many are “Done”$q$,$q$Today's date$q$,$q$Who edited the sheet$q$],1),
+($q$BOP$q$,$q$w6-2$q$,11,$q$Protecting a range in a shared sheet is useful when:$q$,array[$q$You want the file to load faster$q$,$q$You want to print it$q$,$q$You want to delete it$q$,$q$Some cells, like formulas, must not be changed$q$],3),
+($q$BOP$q$,$q$w6-2$q$,12,$q$A date column works best when:$q$,array[$q$Dates are typed as words$q$,$q$Every cell uses the same date format$q$,$q$It is left empty$q$,$q$Some cells say “next week”$q$],1),
+($q$BOP$q$,$q$w7-2$q$,1,$q$A good travel itinerary includes:$q$,array[$q$Flights, times, addresses, booking references and contacts in one place$q$,$q$Just the hotel name$q$,$q$Only the destination city$q$,$q$A list of restaurants$q$],0),
+($q$BOP$q$,$q$w7-2$q$,2,$q$When booking travel for a manager, you should first confirm:$q$,array[$q$Nothing, just book$q$,$q$Their favourite colour$q$,$q$What the client is wearing$q$,$q$Dates, budget and preferences$q$],3),
+($q$BOP$q$,$q$w7-2$q$,3,$q$An expense report needs:$q$,array[$q$Each cost with a receipt, date, purpose and amount$q$,$q$A total only$q$,$q$No receipts$q$,$q$Photos of the trip$q$],0),
+($q$BOP$q$,$q$w7-2$q$,4,$q$A receipt is missing for a business expense. You should:$q$,array[$q$Leave it out and say nothing$q$,$q$Follow your company's missing-receipt process and explain it$q$,$q$Make up a receipt$q$,$q$Double another receipt$q$],1),
+($q$BOP$q$,$q$w7-2$q$,5,$q$Why keep a vendor contact list?$q$,array[$q$It isn't useful$q$,$q$To avoid paying vendors$q$,$q$So anyone on the team can reach suppliers quickly$q$,$q$To share on social media$q$],2),
+($q$BOP$q$,$q$w7-2$q$,6,$q$A vendor hasn't delivered on the agreed date. A professional follow-up:$q$,array[$q$Is skipped$q$,$q$Threatens legal action immediately$q$,$q$Politely restates what was agreed and asks for a new firm date$q$,$q$Is posted publicly online$q$],2),
+($q$BOP$q$,$q$w7-2$q$,7,$q$When comparing vendor quotes, you should look at:$q$,array[$q$Only the lowest price$q$,$q$Price, what's included, delivery time and reliability$q$,$q$The longest quote$q$,$q$Only the logo$q$],1),
+($q$BOP$q$,$q$w7-2$q$,8,$q$Before paying a vendor invoice, check that:$q$,array[$q$It matches the order, the agreed price and what was delivered$q$,$q$It is in colour$q$,$q$It was sent on a Monday$q$,$q$It looks professional$q$],0),
+($q$BOP$q$,$q$w7-2$q$,9,$q$Travel booking references should be shared:$q$,array[$q$Only in your head$q$,$q$Never$q$,$q$With the traveller and saved in the itinerary$q$,$q$On social media$q$],2),
+($q$BOP$q$,$q$w7-2$q$,10,$q$A per diem is:$q$,array[$q$A type of flight$q$,$q$A penalty for late receipts$q$,$q$A hotel brand$q$,$q$A fixed daily allowance for travel costs like meals$q$],3),
+($q$BOP$q$,$q$w7-2$q$,11,$q$When a trip changes at short notice, you should:$q$,array[$q$Update bookings, the itinerary and everyone affected$q$,$q$Tell only the hotel$q$,$q$Cancel everything$q$,$q$Leave the old itinerary as it is$q$],0),
+($q$BOP$q$,$q$w7-2$q$,12,$q$Good vendor relationships are built by:$q$,array[$q$Changing requirements without notice$q$,$q$Never giving feedback$q$,$q$Clear requests, timely payment and polite communication$q$,$q$Paying late on purpose$q$],2),
+($q$BOP$q$,$q$w8-2$q$,1,$q$A milestone in a project plan is:$q$,array[$q$A key checkpoint that marks a stage is complete$q$,$q$A task that takes one day$q$,$q$A meeting with the client$q$,$q$The project budget$q$],0),
+($q$BOP$q$,$q$w8-2$q$,2,$q$In a RACI chart, the person who is Accountable:$q$,array[$q$Does all the work alone$q$,$q$Is only kept informed$q$,$q$Has no role in the task$q$,$q$Owns the final decision and signs off the work$q$],3),
+($q$BOP$q$,$q$w8-2$q$,3,$q$A Gantt chart mainly shows:$q$,array[$q$The company's org chart$q$,$q$How much each person is paid$q$,$q$Tasks laid out against time, with start and end dates$q$,$q$Customer complaints by week$q$],2),
+($q$BOP$q$,$q$w8-2$q$,4,$q$Your weekly status report should lead with:$q$,array[$q$A full list of every email you sent$q$,$q$Nothing, since status reports are optional$q$,$q$Overall status, key progress and risks that need a decision$q$,$q$Personal opinions about teammates$q$],2),
+($q$BOP$q$,$q$w8-2$q$,5,$q$A task depends on another task finishing first. This is called a:$q$,array[$q$Stakeholder$q$,$q$Deliverable$q$,$q$Milestone$q$,$q$Dependency$q$],3),
+($q$BOP$q$,$q$w8-2$q$,6,$q$You notice a supplier delay will push the project back a week. You should:$q$,array[$q$Quietly change the deadline$q$,$q$Flag the risk early with its impact and options$q$,$q$Blame the supplier in the team chat$q$,$q$Wait and hope it resolves$q$],1),
+($q$BOP$q$,$q$w8-2$q$,7,$q$Breaking a big project into smaller tasks helps you:$q$,array[$q$Estimate time, assign owners and track progress$q$,$q$Avoid planning$q$,$q$Skip the deadline$q$,$q$Make the project look bigger$q$],0),
+($q$BOP$q$,$q$w8-2$q$,8,$q$A project kickoff meeting is mainly for:$q$,array[$q$Celebrating the end of the project$q$,$q$Reviewing last year's accounts$q$,$q$Hiring new staff$q$,$q$Agreeing goals, scope, roles and timelines$q$],3),
+($q$BOP$q$,$q$w8-2$q$,9,$q$Scope creep means:$q$,array[$q$The budget is reduced$q$,$q$A teammate leaves the team$q$,$q$Extra work keeps being added beyond what was agreed$q$,$q$The project finishes early$q$],2),
+($q$BOP$q$,$q$w8-2$q$,10,$q$The best place to keep the single source of truth for task status is:$q$,array[$q$Scattered WhatsApp messages$q$,$q$A shared project board everyone updates$q$,$q$Each person's private notes$q$,$q$Your memory$q$],1),
+($q$BOP$q$,$q$w9-2$q$,1,$q$A standard operating procedure (SOP) is:$q$,array[$q$A list of job vacancies$q$,$q$Written step-by-step instructions for doing a task the same way every time$q$,$q$A company's annual budget$q$,$q$A customer complaint form$q$],1),
+($q$BOP$q$,$q$w9-2$q$,2,$q$Before writing an SOP, the most useful first step is to:$q$,array[$q$Write it from memory without checking$q$,$q$Copy an SOP from another industry$q$,$q$Watch or ask someone who does the task and map each step$q$,$q$Ask the client to write it$q$],2),
+($q$BOP$q$,$q$w9-2$q$,3,$q$A good SOP step is written as:$q$,array[$q$A long paragraph of background$q$,$q$A short, clear action, e.g. Save the invoice to the Finance folder$q$,$q$A list of names only$q$,$q$A vague goal like Be efficient$q$],1),
+($q$BOP$q$,$q$w9-2$q$,4,$q$A process map helps a team:$q$,array[$q$Replace all meetings$q$,$q$See every step, handover and decision point at a glance$q$,$q$Hide problems from managers$q$,$q$Avoid writing anything down$q$],1),
+($q$BOP$q$,$q$w9-2$q$,5,$q$A bottleneck in a process is:$q$,array[$q$The final sign-off$q$,$q$The first step of a process$q$,$q$A step that is optional$q$,$q$A step where work piles up and slows everything after it$q$],3),
+($q$BOP$q$,$q$w9-2$q$,6,$q$Why should an SOP have an owner and a review date?$q$,array[$q$Because it makes the file larger$q$,$q$So it stays accurate as the process changes$q$,$q$So nobody else can read it$q$,$q$To make the process slower$q$],1),
+($q$BOP$q$,$q$w9-2$q$,7,$q$A checklist is most useful for:$q$,array[$q$Personal hobbies only$q$,$q$Repeatable tasks where missing a step causes problems$q$,$q$One-off creative work$q$,$q$Tasks nobody does$q$],1),
+($q$BOP$q$,$q$w9-2$q$,8,$q$You find a faster way to do a step in a documented process. You should:$q$,array[$q$Suggest the change to the process owner and update the SOP once agreed$q$,$q$Delete the old SOP$q$,$q$Keep it secret$q$,$q$Do it your way without telling anyone$q$],0),
+($q$BOP$q$,$q$w9-2$q$,9,$q$Version control on an SOP means:$q$,array[$q$It is printed and filed$q$,$q$It cannot be changed$q$,$q$Only one person can ever open it$q$,$q$Each change is dated and numbered so everyone uses the latest version$q$],3),
+($q$BOP$q$,$q$w9-2$q$,10,$q$Which is a sign that a process needs improving?$q$,array[$q$It has a clear owner$q$,$q$Several people follow it$q$,$q$The same mistakes or delays keep happening$q$,$q$It is written down$q$],2),
+($q$BOP$q$,$q$w10-2$q$,1,$q$At the start of the week, an executive assistant should first:$q$,array[$q$Agree priorities and the week's key meetings with the executive$q$,$q$Clear the executive's whole calendar$q$,$q$Wait for instructions all week$q$,$q$Reply to every email as the executive$q$],0),
+($q$BOP$q$,$q$w10-2$q$,2,$q$Two senior people want the same time slot with your executive. You should:$q$,array[$q$Book both at the same time$q$,$q$Ignore both requests$q$,$q$Pick whoever asked first without checking$q$,$q$Check priorities with the executive or their rules, then offer an alternative to the other$q$],3),
+($q$BOP$q$,$q$w10-2$q$,3,$q$Confidential information you see as an assistant should be:$q$,array[$q$Forwarded to your personal email for safekeeping$q$,$q$Shared only with people who are authorised to see it$q$,$q$Discussed with friends if you don't use names$q$,$q$Posted in the team chat to keep everyone informed$q$],1),
+($q$BOP$q$,$q$w10-2$q$,4,$q$A virtual assistant working for a client abroad should always:$q$,array[$q$Avoid written updates$q$,$q$Confirm time zones and agreed response times$q$,$q$Use personal social media to send files$q$,$q$Work only in their own time zone without saying$q$],1),
+($q$BOP$q$,$q$w10-2$q$,5,$q$A good daily update to your executive is:$q$,array[$q$Nothing, unless they ask$q$,$q$Short: what's done, what's next and what needs their decision$q$,$q$A copy of every email you received$q$,$q$A long story of your day$q$],1),
+($q$BOP$q$,$q$w10-2$q$,6,$q$Which tool is best for tracking delegated tasks with due dates?$q$,array[$q$Your phone's photo gallery$q$,$q$A printed calendar only$q$,$q$Sticky notes on your desk$q$,$q$A task tool such as Asana, ClickUp or Trello$q$],3),
+($q$BOP$q$,$q$w10-2$q$,7,$q$Before booking travel for your executive, you should know:$q$,array[$q$Their preferences, budget and the meeting schedule at the destination$q$,$q$Only the destination city$q$,$q$Your own travel preferences$q$,$q$Nothing, just book the cheapest option$q$],0),
+($q$BOP$q$,$q$w10-2$q$,8,$q$When drafting an email for your executive to send, you should:$q$,array[$q$Leave out the main request$q$,$q$Copy in everyone you know$q$,$q$Write it in their tone and let them review it before it goes$q$,$q$Send it immediately in your own name$q$],2),
+($q$BOP$q$,$q$w10-2$q$,9,$q$Managing an executive's inbox well means:$q$,array[$q$Deleting anything older than a day$q$,$q$Forwarding every email to them$q$,$q$Sorting by priority, drafting replies and flagging what needs their decision$q$,$q$Marking everything as read$q$],2),
+($q$BOP$q$,$q$w10-2$q$,10,$q$You make a scheduling mistake that causes a clash. The best response is:$q$,array[$q$Hide it and hope nobody notices$q$,$q$Tell your executive quickly, fix it and explain how you'll prevent it$q$,$q$Blame the calendar app$q$,$q$Cancel both meetings without saying anything$q$],1),
+($q$BOP$q$,$q$w11-2$q$,1,$q$A good records system lets you:$q$,array[$q$Print every document$q$,$q$Store everything in one unnamed folder$q$,$q$Keep files only on your personal laptop$q$,$q$Find any document quickly using a clear folder and naming structure$q$],3),
+($q$BOP$q$,$q$w11-2$q$,2,$q$The usual order for a simple procurement is:$q$,array[$q$Purchase first, approval later$q$,$q$Quotes after payment$q$,$q$Payment, then request$q$,$q$Request, quotes, approval, purchase, receipt and payment$q$],3),
+($q$BOP$q$,$q$w11-2$q$,3,$q$Why get more than one quote before buying?$q$,array[$q$To delay the purchase$q$,$q$To compare price and quality and show a fair choice$q$,$q$Because suppliers like it$q$,$q$It is never useful$q$],1),
+($q$BOP$q$,$q$w11-2$q$,4,$q$A petty cash log should record:$q$,array[$q$Date, amount, purpose, who received it and the receipt$q$,$q$Just the name of the person$q$,$q$Only the total spent each year$q$,$q$Nothing, cash doesn't need records$q$],0),
+($q$BOP$q$,$q$w11-2$q$,5,$q$Reconciling petty cash means:$q$,array[$q$Checking that cash in hand plus receipts equals the starting float$q$,$q$Spending the rest of the cash$q$,$q$Writing a new budget$q$,$q$Throwing away old receipts$q$],0),
+($q$BOP$q$,$q$w11-2$q$,6,$q$Under Nigeria's data protection law (NDPA), personal data should be:$q$,array[$q$Collected for a clear purpose and kept secure$q$,$q$Shared freely within the company$q$,$q$Kept forever just in case$q$,$q$Posted on notice boards$q$],0),
+($q$BOP$q$,$q$w11-2$q$,7,$q$A staff member asks for a colleague's home address. You should:$q$,array[$q$Email it to everyone$q$,$q$Not share it without a valid reason and the right authorisation$q$,$q$Share it if they say it's urgent$q$,$q$Post it in the group chat$q$],1),
+($q$BOP$q$,$q$w11-2$q$,8,$q$Archiving old records means:$q$,array[$q$Deleting them immediately$q$,$q$Leaving them on your desk$q$,$q$Renaming them randomly$q$,$q$Moving them to a long-term store with clear labels and retention dates$q$],3),
+($q$BOP$q$,$q$w11-2$q$,9,$q$A visitor log at reception is useful because it:$q$,array[$q$Tracks office supplies$q$,$q$Replaces staff attendance$q$,$q$Lists customer complaints$q$,$q$Records who is on site, for safety and security$q$],3),
+($q$BOP$q$,$q$w11-2$q$,10,$q$An office supplies tracker should flag:$q$,array[$q$Unpaid invoices from customers$q$,$q$Only items that are full$q$,$q$Items running low so they can be reordered in time$q$,$q$Staff birthdays$q$],2),
+($q$BOP$q$,$q$exam-fund$q$,1,$q$A good email subject line should:$q$,array[$q$Be one word, like “Hello”$q$,$q$Repeat the sender's name$q$,$q$State the ask or topic clearly, e.g. “Approval needed: Q3 budget by Friday”$q$,$q$Be left empty so people open the email$q$],2),
+($q$BOP$q$,$q$exam-fund$q$,2,$q$You need two separate decisions from your manager. Best practice is to:$q$,array[$q$Wait for your weekly meeting$q$,$q$Put both in one long email with no headings$q$,$q$Send two short emails, one topic each, with a clear next step$q$,$q$Ask on WhatsApp late at night$q$],2),
+($q$BOP$q$,$q$exam-fund$q$,3,$q$A client emails a question you can't answer today. What should you do?$q$,array[$q$Ignore it until you have the full answer$q$,$q$Acknowledge it within one working day and say when you'll reply$q$,$q$Forward it to a colleague without comment$q$,$q$Reply “ok” and nothing else$q$],1),
+($q$BOP$q$,$q$exam-fund$q$,4,$q$Which channel suits an urgent, informal question to a teammate?$q$,array[$q$A work chat tool such as Slack or Teams$q$,$q$An email to the whole company$q$,$q$A formal letter$q$,$q$A post on your public social media$q$],0),
+($q$BOP$q$,$q$exam-fund$q$,5,$q$In a remote team meeting where you are not presenting, you should:$q$,array[$q$Keep your mic on so people know you're there$q$,$q$Type every comment in capital letters$q$,$q$Leave your camera on and walk away$q$,$q$Mute and use raise-hand when you want to speak$q$],3),
+($q$BOP$q$,$q$exam-fund$q$,6,$q$Your team agreed cameras on for team meetings. Today your internet is poor. You should:$q$,array[$q$Tell the host briefly and turn the camera off to save data$q$,$q$Keep the camera on even if the call keeps dropping$q$,$q$Skip the meeting$q$,$q$Join late without saying anything$q$],0),
+($q$BOP$q$,$q$exam-fund$q$,7,$q$You're stuck on a task working from home. The best move is to:$q$,array[$q$Quietly hand it to a colleague$q$,$q$Tell your lead early, say what you've tried, and ask a specific question$q$,$q$Wait until the deadline, then explain$q$,$q$Say nothing and hope it resolves$q$],1),
+($q$BOP$q$,$q$exam-fund$q$,8,$q$You'll be away from your desk for two hours during work time. You should:$q$,array[$q$Log out of everything so nobody can reach you$q$,$q$Update your status or tell the team when you'll be back$q$,$q$Change your profile picture$q$,$q$Leave without telling anyone$q$],1),
+($q$BOP$q$,$q$exam-fund$q$,9,$q$Which file name follows good practice?$q$,array[$q$final final.docx$q$,$q$report-new(2).docx$q$,$q$2026-11-04_AcmeCo_Onboarding-Guide_v2.docx$q$,$q$Untitled document$q$],2),
+($q$BOP$q$,$q$exam-fund$q$,10,$q$A sensible top-level folder structure for your work is:$q$,array[$q$Everything in Downloads$q$,$q$Files only on your desktop$q$,$q$One folder per day$q$,$q$One folder per client or project, with clear subfolders$q$],3),
+($q$BOP$q$,$q$exam-fund$q$,11,$q$You need a colleague to comment on a document but not change it. Share it with:$q$,array[$q$Owner access$q$,$q$Commenter access$q$,$q$Editor access for everyone with the link$q$,$q$No access, and email a screenshot$q$],1),
+($q$BOP$q$,$q$exam-fund$q$,12,$q$Why should work files not live only on your laptop desktop?$q$,array[$q$Laptops can't open shared files$q$,$q$It uses too much battery$q$,$q$Desktops are slower to load$q$,$q$They can be lost and your team can't find or open them$q$],3),
+($q$BOP$q$,$q$exam-fund$q$,13,$q$In the Eisenhower matrix, a task that is important but not urgent should be:$q$,array[$q$Delegated$q$,$q$Deleted$q$,$q$Done immediately$q$,$q$Scheduled$q$],3),
+($q$BOP$q$,$q$exam-fund$q$,14,$q$Time-blocking means:$q$,array[$q$Blocking colleagues' calendars$q$,$q$Doing every task as it arrives$q$,$q$Working without breaks$q$,$q$Reserving set times in your calendar for focused work$q$],3),
+($q$BOP$q$,$q$exam-fund$q$,15,$q$You estimated a task at 2 hours and it took 5. What's the most useful next step?$q$,array[$q$Blame the tools$q$,$q$Ignore it$q$,$q$Note the difference and use it to estimate similar tasks better$q$,$q$Stop estimating tasks$q$],2),
+($q$BOP$q$,$q$exam-fund$q$,16,$q$A daily shutdown routine helps you:$q$,array[$q$Skip planning$q$,$q$Review what's done, plan tomorrow and switch off$q$,$q$Work later every night$q$,$q$Avoid checking any messages$q$],1),
+($q$BOP$q$,$q$exam-fund$q$,17,$q$A simple task board usually has columns like:$q$,array[$q$Easy, Medium, Hard, Impossible$q$,$q$To do, Doing, Review, Done$q$,$q$Monday to Friday only$q$,$q$Mine and Not mine$q$],1),
+($q$BOP$q$,$q$exam-fund$q$,18,$q$A Trello or Notion card for a deliverable should always have:$q$,array[$q$A due date and a clear owner$q$,$q$At least ten checklist items$q$,$q$No description$q$,$q$A colourful cover image$q$],0),
+($q$BOP$q$,$q$exam-fund$q$,19,$q$Why use a checklist for repeatable work?$q$,array[$q$So nobody needs to think$q$,$q$So steps aren't missed and quality stays consistent$q$,$q$To make the task take longer$q$,$q$Because managers like long lists$q$],1),
+($q$BOP$q$,$q$exam-fund$q$,20,$q$A weekly review of your task board is for:$q$,array[$q$Showing off to colleagues$q$,$q$Deleting tasks you don't like$q$,$q$Clearing finished cards, updating dates and planning next week$q$,$q$Changing the board's colours$q$],2),
+($q$BOP$q$,$q$exam-fund$q$,21,$q$Three urgent requests arrive at once. A good first step is to:$q$,array[$q$Do the easiest one and ignore the rest$q$,$q$Check priorities and deadlines, then confirm the order with your manager if unsure$q$,$q$Wait for someone to follow up$q$,$q$Start all three at the same time$q$],1),
+($q$BOP$q$,$q$exam-fund$q$,22,$q$You realise you will miss a deadline. When should you tell your manager?$q$,array[$q$As soon as you know, with a new date and what you need$q$,$q$After the deadline has passed$q$,$q$Never, just submit it late$q$,$q$Only if they ask$q$],0),
+($q$BOP$q$,$q$exam-fund$q$,23,$q$Which habit best shows you are workplace-ready?$q$,array[$q$Arriving on time and keeping people updated on your progress$q$,$q$Avoiding questions so you look confident$q$,$q$Replying only when it suits you$q$,$q$Working only on tasks you enjoy$q$],0),
+($q$BOP$q$,$q$exam-fund$q$,24,$q$When you finish a task, a good habit is to:$q$,array[$q$Check your work, share it, and update your task board$q$,$q$Move on without telling anyone$q$,$q$Wait for someone to discover it$q$,$q$Delete your notes$q$],0),
+($q$BOP$q$,$q$exam-fund$q$,25,$q$Which email subject line is clearest?$q$,array[$q$Urgent!!!$q$,$q$Question$q$,$q$Hi$q$,$q$Approval needed: venue booking by Thursday$q$],3),
+($q$BOP$q$,$q$exam-fund$q$,26,$q$You need to share a large file with a client. Best practice is to:$q$,array[$q$Send it on WhatsApp to their personal number$q$,$q$Share a link with the right permission level$q$,$q$Print and post it$q$,$q$Attach it in pieces across ten emails$q$],1),
+($q$BOP$q$,$q$exam-fund$q$,27,$q$During a video call your connection keeps dropping. You should:$q$,array[$q$Blame the host's connection$q$,$q$Leave without saying anything$q$,$q$Tell the host briefly, turn off your camera and stay on audio$q$,$q$Keep rejoining without explanation$q$],2),
+($q$BOP$q$,$q$exam-fund$q$,28,$q$A colleague asks for an update you can't give yet. You should:$q$,array[$q$Ignore the message$q$,$q$Guess an answer$q$,$q$Tell them to ask someone else$q$,$q$Say when you'll have it and follow up by then$q$],3),
+($q$BOP$q$,$q$exam-fund$q$,29,$q$Which file name will be easiest to find later?$q$,array[$q$final FINAL.docx$q$,$q$2026-12-01_Jobnest_Report_v1.docx$q$,$q$new doc (3).docx$q$,$q$Untitled$q$],1),
+($q$BOP$q$,$q$exam-fund$q$,30,$q$Writing in all capital letters in a work message usually comes across as:$q$,array[$q$Shouting$q$,$q$Professional$q$,$q$Friendly$q$,$q$Neutral$q$],0),
+($q$BOP$q$,$q$exam-fund$q$,31,$q$When you finish a task someone is waiting on, you should:$q$,array[$q$Wait for them to notice$q$,$q$Move straight to the next task$q$,$q$Mention it next week$q$,$q$Tell them it's done and where to find it$q$],3),
+($q$BOP$q$,$q$exam-fund$q$,32,$q$The Eisenhower matrix sorts tasks by:$q$,array[$q$Urgency and importance$q$,$q$Who asked first$q$,$q$Colour and shape$q$,$q$Cost and size$q$],0),
+($q$BOP$q$,$q$exam-fund$q$,33,$q$A task that is urgent but not important should usually be:$q$,array[$q$Delegated where possible$q$,$q$Ignored$q$,$q$Deleted$q$,$q$Done before everything else$q$],0),
+($q$BOP$q$,$q$exam-fund$q$,34,$q$Time-blocking works best when you:$q$,array[$q$Book every minute with meetings$q$,$q$Never plan ahead$q$,$q$Reserve focused time for important work and protect it$q$,$q$Work only when you feel like it$q$],2),
+($q$BOP$q$,$q$exam-fund$q$,35,$q$On a task board, a card in the Review column means:$q$,array[$q$Nobody has started it$q$,$q$It is cancelled$q$,$q$The work is done and waiting to be checked$q$,$q$It is overdue$q$],2),
+($q$BOP$q$,$q$exam-fund$q$,36,$q$You have more work than you can finish this week. The best step is to:$q$,array[$q$Quietly drop tasks$q$,$q$Work through the night every night$q$,$q$Tell your manager early and agree priorities$q$,$q$Wait until deadlines pass$q$],2),
+($q$BOP$q$,$q$exam-fund$q$,37,$q$Which is the best channel for a formal request to a client?$q$,array[$q$A message through a friend$q$,$q$A clear, polite email$q$,$q$A voice note at midnight$q$,$q$A comment on their social media$q$],1),
+($q$BOP$q$,$q$exam-fund$q$,38,$q$Professional tone in a written reply means:$q$,array[$q$Long and full of jargon$q$,$q$Very casual with lots of slang$q$,$q$Polite, clear and focused on the next step$q$,$q$Short and rude$q$],2),
+($q$BOP$q$,$q$exam-fund$q$,39,$q$Why update your status when you step away from work online?$q$,array[$q$It has no purpose$q$,$q$So colleagues know when to expect a reply$q$,$q$Because it's fun$q$,$q$To look busy$q$],1),
+($q$BOP$q$,$q$exam-fund$q$,40,$q$A shared drive folder should be organised:$q$,array[$q$By the date you joined$q$,$q$By file size$q$,$q$By client or project with clear subfolders$q$,$q$In one big folder$q$],2),
+($q$BOP$q$,$q$exam-fund$q$,41,$q$Giving someone Viewer access to a document means they can:$q$,array[$q$Nothing at all$q$,$q$Read it but not change it$q$,$q$Share it as the owner$q$,$q$Edit and delete it$q$],1),
+($q$BOP$q$,$q$exam-fund$q$,42,$q$Before you send an important email, you should:$q$,array[$q$Copy in everyone you know$q$,$q$Send it as fast as possible$q$,$q$Check the recipient, attachment, spelling and the ask$q$,$q$Remove the subject line$q$],2),
+($q$BOP$q$,$q$exam-fund$q$,43,$q$A workplace-ready professional handles feedback by:$q$,array[$q$Listening, asking questions and acting on it$q$,$q$Ignoring it$q$,$q$Arguing straight away$q$,$q$Complaining to colleagues$q$],0),
+($q$BOP$q$,$q$exam-fund$q$,44,$q$Meeting notes are most useful when they record:$q$,array[$q$Decisions, actions, owners and due dates$q$,$q$Every word that was said$q$,$q$Personal opinions$q$,$q$Only who was late$q$],0),
+($q$BOP$q$,$q$exam-fund$q$,45,$q$A daily shutdown routine ends your day by:$q$,array[$q$Leaving all tabs open$q$,$q$Deleting your to-do list$q$,$q$Checking social media$q$,$q$Reviewing what's done and planning tomorrow$q$],3),
+($q$BOP$q$,$q$exam-core$q$,1,$q$“Inbox zero” mainly means:$q$,array[$q$Turning off email notifications forever$q$,$q$Deleting all emails every day$q$,$q$Never replying to emails$q$,$q$Every email is actioned, filed or archived, so the inbox only holds what needs attention$q$],3),
+($q$BOP$q$,$q$exam-core$q$,2,$q$Which tool helps sort incoming email automatically?$q$,array[$q$Printing every email$q$,$q$Filters or rules that label and move messages$q$,$q$Forwarding everything to your manager$q$,$q$Marking all as read$q$],1),
+($q$BOP$q$,$q$exam-core$q$,3,$q$Labels such as “Waiting on”, “To reply” and “Receipts” help you:$q$,array[$q$Hide emails from your manager$q$,$q$Delete emails automatically$q$,$q$Make emails load faster$q$,$q$See at a glance what needs action$q$],3),
+($q$BOP$q$,$q$exam-core$q$,4,$q$Your manager is in Lagos and a client is in London. When scheduling, you should:$q$,array[$q$Check both time zones and show the time for each person$q$,$q$Book outside working hours for both$q$,$q$Use only Lagos time without saying so$q$,$q$Let the client guess$q$],0),
+($q$BOP$q$,$q$exam-core$q$,5,$q$A good meeting invite includes:$q$,array[$q$No time zone$q$,$q$A clear title, purpose, agenda and the call link$q$,$q$Only the word “Meeting”$q$,$q$A long story about why the meeting exists$q$],1),
+($q$BOP$q$,$q$exam-core$q$,6,$q$Before booking a meeting for your manager, you should:$q$,array[$q$Book over existing meetings$q$,$q$Check their calendar for clashes and travel time$q$,$q$Ask the client to choose any time$q$,$q$Book back-to-back all day$q$],1),
+($q$BOP$q$,$q$exam-core$q$,7,$q$A recurring weekly meeting is best set up as:$q$,array[$q$A new invite every week by hand$q$,$q$A WhatsApp reminder$q$,$q$A sticky note$q$,$q$One recurring calendar event$q$],3),
+($q$BOP$q$,$q$exam-core$q$,8,$q$You get an email that needs your manager's decision. You should:$q$,array[$q$Answer it yourself without asking$q$,$q$Leave it unread$q$,$q$Flag or label it, add a short summary and bring it to their attention$q$,$q$Delete it$q$],2),
+($q$BOP$q$,$q$exam-core$q$,9,$q$Good practice when declining a meeting on your manager's behalf is to:$q$,array[$q$Ignore the invite$q$,$q$Accept and not attend$q$,$q$Decline politely and suggest another time$q$,$q$Decline with no message$q$],2),
+($q$BOP$q$,$q$exam-core$q$,10,$q$Which is the clearest meeting title?$q$,array[$q$Catch up???$q$,$q$Meeting$q$,$q$Quick chat$q$,$q$Q3 budget review: decide on marketing spend$q$],3),
+($q$BOP$q$,$q$exam-core$q$,11,$q$Colour-coding calendar events by type helps you:$q$,array[$q$Hide private events from yourself$q$,$q$Avoid planning$q$,$q$Make the calendar look busy$q$,$q$See the week's balance of meetings, focus time and travel$q$],3),
+($q$BOP$q$,$q$exam-core$q$,12,$q$You manage two inboxes. A good routine is to:$q$,array[$q$Check once a week$q$,$q$Keep both open and react to every alert$q$,$q$Check them at set times and process each email once$q$,$q$Forward one inbox to the other and ignore it$q$],2),
+($q$BOP$q$,$q$exam-core$q$,13,$q$Why use built-in heading styles in Docs or Word?$q$,array[$q$They lock the document$q$,$q$They keep formatting consistent and create a clickable outline or contents$q$,$q$They make the file smaller$q$,$q$They change the font to bold everywhere$q$],1),
+($q$BOP$q$,$q$exam-core$q$,14,$q$A document template is useful because:$q$,array[$q$Everyone starts from the same layout, branding and sections$q$,$q$It emails the document automatically$q$,$q$It stops anyone editing$q$,$q$It deletes old versions$q$],0),
+($q$BOP$q$,$q$exam-core$q$,15,$q$Suggestion mode (track changes) lets you:$q$,array[$q$Propose edits the owner can accept or reject$q$,$q$Lock the document$q$,$q$Delete the original text forever$q$,$q$Hide your changes$q$],0),
+($q$BOP$q$,$q$exam-core$q$,16,$q$Version history helps you:$q$,array[$q$Translate the document$q$,$q$See who changed what and restore an earlier version$q$,$q$Print the document$q$,$q$Make the document load faster$q$],1),
+($q$BOP$q$,$q$exam-core$q$,17,$q$Good meeting minutes capture:$q$,array[$q$Every word people said$q$,$q$Decisions, action items, owners and due dates$q$,$q$Your personal opinions$q$,$q$Only who attended$q$],1),
+($q$BOP$q$,$q$exam-core$q$,18,$q$An action item in minutes should include:$q$,array[$q$The meeting room$q$,$q$Only the topic$q$,$q$A long background story$q$,$q$What will be done, who owns it, and by when$q$],3),
+($q$BOP$q$,$q$exam-core$q$,19,$q$When should minutes be shared?$q$,array[$q$Only if someone asks$q$,$q$A month later$q$,$q$Soon after the meeting, ideally the same day$q$,$q$Never$q$],2),
+($q$BOP$q$,$q$exam-core$q$,20,$q$Which file name is best for a final contract draft?$q$,array[$q$doc1.docx$q$,$q$new.docx$q$,$q$2026-11-10_ClientName_Service-Agreement_v3.docx$q$,$q$contract FINAL final.docx$q$],2),
+($q$BOP$q$,$q$exam-core$q$,21,$q$To share a document so only your team can edit it, you should:$q$,array[$q$Email it as an attachment to everyone$q$,$q$Share with team members' emails as editors$q$,$q$Post it on social media$q$,$q$Make it public to anyone with the link as editor$q$],1),
+($q$BOP$q$,$q$exam-core$q$,22,$q$A professional business document usually starts with:$q$,array[$q$A joke$q$,$q$A list of everyone's phone numbers$q$,$q$A clear title, date and purpose$q$,$q$No title$q$],2),
+($q$BOP$q$,$q$exam-core$q$,23,$q$Consistent fonts and spacing in documents matter because:$q$,array[$q$They make documents longer$q$,$q$They use less paper$q$,$q$They are required by law$q$,$q$They make documents easier to read and look professional$q$],3),
+($q$BOP$q$,$q$exam-core$q$,24,$q$Comments in a shared document are best used to:$q$,array[$q$Chat about the weekend$q$,$q$Hide text$q$,$q$Rewrite the whole document$q$,$q$Ask questions or give feedback on a specific part$q$],3),
+($q$BOP$q$,$q$exam-core$q$,25,$q$Sorting a spreadsheet by a column:$q$,array[$q$Changes the numbers$q$,$q$Deletes duplicate rows$q$,$q$Reorders the rows by that column's values$q$,$q$Hides other columns$q$],2),
+($q$BOP$q$,$q$exam-core$q$,26,$q$A filter in a spreadsheet lets you:$q$,array[$q$Delete rows permanently$q$,$q$Show only the rows that match what you choose$q$,$q$Lock the sheet$q$,$q$Colour every cell$q$],1),
+($q$BOP$q$,$q$exam-core$q$,27,$q$Data validation is used to:$q$,array[$q$Back up the file$q$,$q$Check spelling in every cell$q$,$q$Make the sheet read-only$q$,$q$Limit what can be typed in a cell, e.g. a dropdown list$q$],3),
+($q$BOP$q$,$q$exam-core$q$,28,$q$Conditional formatting can:$q$,array[$q$Send emails$q$,$q$Rename the sheet$q$,$q$Delete old rows$q$,$q$Highlight cells automatically, e.g. overdue dates in red$q$],3),
+($q$BOP$q$,$q$exam-core$q$,29,$q$A simple tracker should have:$q$,array[$q$No headings$q$,$q$Notes typed in random cells$q$,$q$One row per item and clear columns such as status, owner and due date$q$,$q$Merged cells everywhere$q$],2),
+($q$BOP$q$,$q$exam-core$q$,30,$q$Why freeze the header row?$q$,array[$q$To hide it$q$,$q$So column names stay visible when you scroll$q$,$q$To make it print in colour$q$,$q$To stop people editing it$q$],1),
+($q$BOP$q$,$q$exam-core$q$,31,$q$You want colleagues to view a tracker but not change it. Share it as:$q$,array[$q$Public editor$q$,$q$Owner$q$,$q$Editor$q$,$q$Viewer$q$],3),
+($q$BOP$q$,$q$exam-core$q$,32,$q$A good way to avoid typos in a “Status” column is to:$q$,array[$q$Let people type anything$q$,$q$Leave it blank$q$,$q$Use a dropdown with fixed options$q$,$q$Use different colours of text$q$],2),
+($q$BOP$q$,$q$exam-core$q$,33,$q$Before sorting a table, you should:$q$,array[$q$Merge the cells$q$,$q$Delete the headers$q$,$q$Select only one column$q$,$q$Select the whole table so rows stay together$q$],3),
+($q$BOP$q$,$q$exam-core$q$,34,$q$COUNTIF can tell you:$q$,array[$q$Today's date$q$,$q$The average of a column$q$,$q$How many rows match a condition, e.g. how many are “Done”$q$,$q$Who edited the sheet$q$],2),
+($q$BOP$q$,$q$exam-core$q$,35,$q$Protecting a range in a shared sheet is useful when:$q$,array[$q$You want to delete it$q$,$q$You want the file to load faster$q$,$q$You want to print it$q$,$q$Some cells, like formulas, must not be changed$q$],3),
+($q$BOP$q$,$q$exam-core$q$,36,$q$A date column works best when:$q$,array[$q$Every cell uses the same date format$q$,$q$It is left empty$q$,$q$Some cells say “next week”$q$,$q$Dates are typed as words$q$],0),
+($q$BOP$q$,$q$exam-core$q$,37,$q$A good travel itinerary includes:$q$,array[$q$Just the hotel name$q$,$q$Flights, times, addresses, booking references and contacts in one place$q$,$q$Only the destination city$q$,$q$A list of restaurants$q$],1),
+($q$BOP$q$,$q$exam-core$q$,38,$q$When booking travel for a manager, you should first confirm:$q$,array[$q$Nothing, just book$q$,$q$What the client is wearing$q$,$q$Their favourite colour$q$,$q$Dates, budget and preferences$q$],3),
+($q$BOP$q$,$q$exam-core$q$,39,$q$An expense report needs:$q$,array[$q$Photos of the trip$q$,$q$No receipts$q$,$q$Each cost with a receipt, date, purpose and amount$q$,$q$A total only$q$],2),
+($q$BOP$q$,$q$exam-core$q$,40,$q$A receipt is missing for a business expense. You should:$q$,array[$q$Double another receipt$q$,$q$Follow your company's missing-receipt process and explain it$q$,$q$Leave it out and say nothing$q$,$q$Make up a receipt$q$],1),
+($q$BOP$q$,$q$exam-core$q$,41,$q$Why keep a vendor contact list?$q$,array[$q$To share on social media$q$,$q$So anyone on the team can reach suppliers quickly$q$,$q$To avoid paying vendors$q$,$q$It isn't useful$q$],1),
+($q$BOP$q$,$q$exam-core$q$,42,$q$A vendor hasn't delivered on the agreed date. A professional follow-up:$q$,array[$q$Politely restates what was agreed and asks for a new firm date$q$,$q$Is posted publicly online$q$,$q$Is skipped$q$,$q$Threatens legal action immediately$q$],0),
+($q$BOP$q$,$q$exam-core$q$,43,$q$When comparing vendor quotes, you should look at:$q$,array[$q$The longest quote$q$,$q$Only the lowest price$q$,$q$Price, what's included, delivery time and reliability$q$,$q$Only the logo$q$],2),
+($q$BOP$q$,$q$exam-core$q$,44,$q$Before paying a vendor invoice, check that:$q$,array[$q$It looks professional$q$,$q$It matches the order, the agreed price and what was delivered$q$,$q$It is in colour$q$,$q$It was sent on a Monday$q$],1),
+($q$BOP$q$,$q$exam-core$q$,45,$q$Travel booking references should be shared:$q$,array[$q$With the traveller and saved in the itinerary$q$,$q$On social media$q$,$q$Never$q$,$q$Only in your head$q$],0),
+($q$BOP$q$,$q$exam-core$q$,46,$q$A per diem is:$q$,array[$q$A fixed daily allowance for travel costs like meals$q$,$q$A hotel brand$q$,$q$A type of flight$q$,$q$A penalty for late receipts$q$],0),
+($q$BOP$q$,$q$exam-core$q$,47,$q$When a trip changes at short notice, you should:$q$,array[$q$Cancel everything$q$,$q$Update bookings, the itinerary and everyone affected$q$,$q$Leave the old itinerary as it is$q$,$q$Tell only the hotel$q$],1),
+($q$BOP$q$,$q$exam-core$q$,48,$q$Good vendor relationships are built by:$q$,array[$q$Clear requests, timely payment and polite communication$q$,$q$Paying late on purpose$q$,$q$Changing requirements without notice$q$,$q$Never giving feedback$q$],0),
+($q$BOP$q$,$q$exam-core$q$,49,$q$A milestone in a project plan is:$q$,array[$q$A key checkpoint that marks a stage is complete$q$,$q$The project budget$q$,$q$A meeting with the client$q$,$q$A task that takes one day$q$],0),
+($q$BOP$q$,$q$exam-core$q$,50,$q$In a RACI chart, the person who is Accountable:$q$,array[$q$Is only kept informed$q$,$q$Owns the final decision and signs off the work$q$,$q$Does all the work alone$q$,$q$Has no role in the task$q$],1),
+($q$BOP$q$,$q$exam-core$q$,51,$q$A Gantt chart mainly shows:$q$,array[$q$The company's org chart$q$,$q$Tasks laid out against time, with start and end dates$q$,$q$Customer complaints by week$q$,$q$How much each person is paid$q$],1),
+($q$BOP$q$,$q$exam-core$q$,52,$q$Your weekly status report should lead with:$q$,array[$q$Nothing, since status reports are optional$q$,$q$Personal opinions about teammates$q$,$q$Overall status, key progress and risks that need a decision$q$,$q$A full list of every email you sent$q$],2),
+($q$BOP$q$,$q$exam-core$q$,53,$q$A task depends on another task finishing first. This is called a:$q$,array[$q$Milestone$q$,$q$Dependency$q$,$q$Deliverable$q$,$q$Stakeholder$q$],1),
+($q$BOP$q$,$q$exam-core$q$,54,$q$You notice a supplier delay will push the project back a week. You should:$q$,array[$q$Flag the risk early with its impact and options$q$,$q$Quietly change the deadline$q$,$q$Blame the supplier in the team chat$q$,$q$Wait and hope it resolves$q$],0),
+($q$BOP$q$,$q$exam-core$q$,55,$q$Breaking a big project into smaller tasks helps you:$q$,array[$q$Skip the deadline$q$,$q$Make the project look bigger$q$,$q$Avoid planning$q$,$q$Estimate time, assign owners and track progress$q$],3),
+($q$BOP$q$,$q$exam-core$q$,56,$q$A project kickoff meeting is mainly for:$q$,array[$q$Celebrating the end of the project$q$,$q$Hiring new staff$q$,$q$Reviewing last year's accounts$q$,$q$Agreeing goals, scope, roles and timelines$q$],3),
+($q$BOP$q$,$q$exam-core$q$,57,$q$Scope creep means:$q$,array[$q$Extra work keeps being added beyond what was agreed$q$,$q$A teammate leaves the team$q$,$q$The budget is reduced$q$,$q$The project finishes early$q$],0),
+($q$BOP$q$,$q$exam-core$q$,58,$q$The best place to keep the single source of truth for task status is:$q$,array[$q$Scattered WhatsApp messages$q$,$q$Your memory$q$,$q$Each person's private notes$q$,$q$A shared project board everyone updates$q$],3),
+($q$BOP$q$,$q$exam-core$q$,59,$q$A standard operating procedure (SOP) is:$q$,array[$q$Written step-by-step instructions for doing a task the same way every time$q$,$q$A customer complaint form$q$,$q$A company's annual budget$q$,$q$A list of job vacancies$q$],0),
+($q$BOP$q$,$q$exam-core$q$,60,$q$Before writing an SOP, the most useful first step is to:$q$,array[$q$Copy an SOP from another industry$q$,$q$Write it from memory without checking$q$,$q$Watch or ask someone who does the task and map each step$q$,$q$Ask the client to write it$q$],2),
+($q$BOP$q$,$q$exam-core$q$,61,$q$A good SOP step is written as:$q$,array[$q$A vague goal like Be efficient$q$,$q$A list of names only$q$,$q$A long paragraph of background$q$,$q$A short, clear action, e.g. Save the invoice to the Finance folder$q$],3),
+($q$BOP$q$,$q$exam-core$q$,62,$q$A process map helps a team:$q$,array[$q$Hide problems from managers$q$,$q$See every step, handover and decision point at a glance$q$,$q$Replace all meetings$q$,$q$Avoid writing anything down$q$],1),
+($q$BOP$q$,$q$exam-core$q$,63,$q$A bottleneck in a process is:$q$,array[$q$A step that is optional$q$,$q$The final sign-off$q$,$q$The first step of a process$q$,$q$A step where work piles up and slows everything after it$q$],3),
+($q$BOP$q$,$q$exam-core$q$,64,$q$Why should an SOP have an owner and a review date?$q$,array[$q$So it stays accurate as the process changes$q$,$q$Because it makes the file larger$q$,$q$So nobody else can read it$q$,$q$To make the process slower$q$],0),
+($q$BOP$q$,$q$exam-core$q$,65,$q$A checklist is most useful for:$q$,array[$q$Tasks nobody does$q$,$q$One-off creative work$q$,$q$Repeatable tasks where missing a step causes problems$q$,$q$Personal hobbies only$q$],2),
+($q$BOP$q$,$q$exam-core$q$,66,$q$You find a faster way to do a step in a documented process. You should:$q$,array[$q$Delete the old SOP$q$,$q$Keep it secret$q$,$q$Suggest the change to the process owner and update the SOP once agreed$q$,$q$Do it your way without telling anyone$q$],2),
+($q$BOP$q$,$q$exam-core$q$,67,$q$Version control on an SOP means:$q$,array[$q$Only one person can ever open it$q$,$q$It cannot be changed$q$,$q$It is printed and filed$q$,$q$Each change is dated and numbered so everyone uses the latest version$q$],3),
+($q$BOP$q$,$q$exam-core$q$,68,$q$Which is a sign that a process needs improving?$q$,array[$q$It is written down$q$,$q$The same mistakes or delays keep happening$q$,$q$It has a clear owner$q$,$q$Several people follow it$q$],1),
+($q$BOP$q$,$q$exam-core$q$,69,$q$At the start of the week, an executive assistant should first:$q$,array[$q$Clear the executive's whole calendar$q$,$q$Reply to every email as the executive$q$,$q$Agree priorities and the week's key meetings with the executive$q$,$q$Wait for instructions all week$q$],2),
+($q$BOP$q$,$q$exam-core$q$,70,$q$Two senior people want the same time slot with your executive. You should:$q$,array[$q$Pick whoever asked first without checking$q$,$q$Ignore both requests$q$,$q$Check priorities with the executive or their rules, then offer an alternative to the other$q$,$q$Book both at the same time$q$],2),
+($q$BOP$q$,$q$exam-core$q$,71,$q$Confidential information you see as an assistant should be:$q$,array[$q$Shared only with people who are authorised to see it$q$,$q$Forwarded to your personal email for safekeeping$q$,$q$Posted in the team chat to keep everyone informed$q$,$q$Discussed with friends if you don't use names$q$],0),
+($q$BOP$q$,$q$exam-core$q$,72,$q$A virtual assistant working for a client abroad should always:$q$,array[$q$Avoid written updates$q$,$q$Work only in their own time zone without saying$q$,$q$Use personal social media to send files$q$,$q$Confirm time zones and agreed response times$q$],3),
+($q$BOP$q$,$q$exam-core$q$,73,$q$A good daily update to your executive is:$q$,array[$q$A long story of your day$q$,$q$A copy of every email you received$q$,$q$Short: what's done, what's next and what needs their decision$q$,$q$Nothing, unless they ask$q$],2),
+($q$BOP$q$,$q$exam-core$q$,74,$q$Which tool is best for tracking delegated tasks with due dates?$q$,array[$q$Sticky notes on your desk$q$,$q$Your phone's photo gallery$q$,$q$A task tool such as Asana, ClickUp or Trello$q$,$q$A printed calendar only$q$],2),
+($q$BOP$q$,$q$exam-core$q$,75,$q$Before booking travel for your executive, you should know:$q$,array[$q$Only the destination city$q$,$q$Their preferences, budget and the meeting schedule at the destination$q$,$q$Your own travel preferences$q$,$q$Nothing, just book the cheapest option$q$],1),
+($q$BOP$q$,$q$exam-core$q$,76,$q$When drafting an email for your executive to send, you should:$q$,array[$q$Copy in everyone you know$q$,$q$Send it immediately in your own name$q$,$q$Write it in their tone and let them review it before it goes$q$,$q$Leave out the main request$q$],2),
+($q$BOP$q$,$q$exam-core$q$,77,$q$Managing an executive's inbox well means:$q$,array[$q$Marking everything as read$q$,$q$Forwarding every email to them$q$,$q$Sorting by priority, drafting replies and flagging what needs their decision$q$,$q$Deleting anything older than a day$q$],2),
+($q$BOP$q$,$q$exam-core$q$,78,$q$You make a scheduling mistake that causes a clash. The best response is:$q$,array[$q$Cancel both meetings without saying anything$q$,$q$Hide it and hope nobody notices$q$,$q$Blame the calendar app$q$,$q$Tell your executive quickly, fix it and explain how you'll prevent it$q$],3),
+($q$BOP$q$,$q$exam-core$q$,79,$q$A good records system lets you:$q$,array[$q$Keep files only on your personal laptop$q$,$q$Print every document$q$,$q$Store everything in one unnamed folder$q$,$q$Find any document quickly using a clear folder and naming structure$q$],3),
+($q$BOP$q$,$q$exam-core$q$,80,$q$The usual order for a simple procurement is:$q$,array[$q$Request, quotes, approval, purchase, receipt and payment$q$,$q$Payment, then request$q$,$q$Purchase first, approval later$q$,$q$Quotes after payment$q$],0),
+($q$BOP$q$,$q$exam-core$q$,81,$q$Why get more than one quote before buying?$q$,array[$q$To compare price and quality and show a fair choice$q$,$q$It is never useful$q$,$q$To delay the purchase$q$,$q$Because suppliers like it$q$],0),
+($q$BOP$q$,$q$exam-core$q$,82,$q$A petty cash log should record:$q$,array[$q$Just the name of the person$q$,$q$Date, amount, purpose, who received it and the receipt$q$,$q$Only the total spent each year$q$,$q$Nothing, cash doesn't need records$q$],1),
+($q$BOP$q$,$q$exam-core$q$,83,$q$Reconciling petty cash means:$q$,array[$q$Writing a new budget$q$,$q$Checking that cash in hand plus receipts equals the starting float$q$,$q$Throwing away old receipts$q$,$q$Spending the rest of the cash$q$],1),
+($q$BOP$q$,$q$exam-core$q$,84,$q$Under Nigeria's data protection law (NDPA), personal data should be:$q$,array[$q$Shared freely within the company$q$,$q$Collected for a clear purpose and kept secure$q$,$q$Posted on notice boards$q$,$q$Kept forever just in case$q$],1),
+($q$BOP$q$,$q$exam-core$q$,85,$q$A staff member asks for a colleague's home address. You should:$q$,array[$q$Email it to everyone$q$,$q$Share it if they say it's urgent$q$,$q$Not share it without a valid reason and the right authorisation$q$,$q$Post it in the group chat$q$],2),
+($q$BOP$q$,$q$exam-core$q$,86,$q$Archiving old records means:$q$,array[$q$Deleting them immediately$q$,$q$Leaving them on your desk$q$,$q$Renaming them randomly$q$,$q$Moving them to a long-term store with clear labels and retention dates$q$],3),
+($q$BOP$q$,$q$exam-core$q$,87,$q$A visitor log at reception is useful because it:$q$,array[$q$Replaces staff attendance$q$,$q$Tracks office supplies$q$,$q$Records who is on site, for safety and security$q$,$q$Lists customer complaints$q$],2),
+($q$BOP$q$,$q$exam-core$q$,88,$q$An office supplies tracker should flag:$q$,array[$q$Only items that are full$q$,$q$Items running low so they can be reordered in time$q$,$q$Staff birthdays$q$,$q$Unpaid invoices from customers$q$],1),
+($q$BOP$q$,$q$exam-core$q$,89,$q$Your manager's flight is cancelled the night before a client meeting in Abuja. Your first step is to:$q$,array[$q$Check alternatives, tell your manager and the client, and rebook$q$,$q$Book the most expensive option without checking$q$,$q$Wait until morning$q$,$q$Cancel the meeting without telling anyone$q$],0),
+($q$BOP$q$,$q$exam-core$q$,90,$q$You're asked to coordinate a team offsite with a fixed budget. You should start with:$q$,array[$q$Sending invitations with no date$q$,$q$Booking the first venue you find$q$,$q$The goals, date, headcount and budget, then gather quotes$q$,$q$Ordering food$q$],2),
+($q$BOP$q$,$q$exam-core$q$,91,$q$A recurring report takes you 3 hours every week. The best improvement is to:$q$,array[$q$Do it faster with less care$q$,$q$Stop doing the report$q$,$q$Ask a colleague to do it secretly$q$,$q$Map the steps, then template or automate the repetitive parts$q$],3),
+($q$BOP$q$,$q$exam-core$q$,92,$q$Two vendors quote the same price. The best way to choose is to compare:$q$,array[$q$Whose name sounds better$q$,$q$Who replied first$q$,$q$Nothing, pick at random$q$,$q$Quality, reliability, delivery time and terms$q$],3),
+($q$BOP$q$,$q$exam-core$q$,93,$q$An executive asks you to keep a restructuring plan confidential. A colleague asks what's happening. You should:$q$,array[$q$Tell them everything$q$,$q$Politely say you can't discuss it$q$,$q$Share a few hints$q$,$q$Forward them the document$q$],1),
+($q$BOP$q$,$q$exam-core$q$,94,$q$A project task is three days late and blocking two others. You should:$q$,array[$q$Remove the task from the plan$q$,$q$Raise it in the status update with the impact and a recovery plan$q$,$q$Hide it until it's fixed$q$,$q$Wait for someone to ask$q$],1),
+($q$BOP$q$,$q$exam-core$q$,95,$q$You receive an expense claim with no receipt. You should:$q$,array[$q$Pay it from petty cash$q$,$q$Approve it anyway$q$,$q$Ask for the receipt or follow the policy for missing receipts$q$,$q$Reject it without explaining$q$],2),
+($q$BOP$q$,$q$exam-core$q$,96,$q$Which is the best way to share a new SOP with the team?$q$,array[$q$Keep it on your laptop$q$,$q$Publish it in the shared folder, announce it and walk through the changes$q$,$q$Print one copy for your desk$q$,$q$Email it once without a subject$q$],1),
+($q$BOP$q$,$q$exam-core$q$,97,$q$Your manager has back-to-back meetings all day. A good assistant would:$q$,array[$q$Add more meetings$q$,$q$Add short breaks and travel time where possible and flag the risk$q$,$q$Say nothing$q$,$q$Cancel all meetings$q$],1),
+($q$BOP$q$,$q$exam-core$q$,98,$q$An operations dashboard should mainly show:$q$,array[$q$Every data point you can find$q$,$q$Staff birthdays$q$,$q$Only last year's numbers$q$,$q$The few numbers that tell you if operations are on track$q$],3),
+($q$BOP$q$,$q$exam-core$q$,99,$q$A supplier misses a delivery for the second time. You should:$q$,array[$q$Log it, raise it with the supplier and review alternatives$q$,$q$Cancel the contract by text$q$,$q$Pay them extra$q$,$q$Ignore it$q$],0),
+($q$BOP$q$,$q$exam-core$q$,100,$q$The best way to hand over your tasks before leave is:$q$,array[$q$Nothing, they'll work it out$q$,$q$A written handover with status, contacts and next steps$q$,$q$Telling one person in passing$q$,$q$Leaving sticky notes$q$],1),
+($q$BOP$q$,$q$exam-core$q$,101,$q$To check the final cost of an event against budget, you should use:$q$,array[$q$Only the biggest invoice$q$,$q$A tracker comparing budgeted and actual spend for each item$q$,$q$A guess at the end$q$,$q$The venue's website$q$],1),
+($q$BOP$q$,$q$exam-core$q$,102,$q$Your executive asks for a one-page brief before a meeting. It should include:$q$,array[$q$Every email about the topic$q$,$q$Purpose, attendees, background, key decisions and suggested talking points$q$,$q$A list of restaurants$q$,$q$Your personal opinions only$q$],1),
+($q$BOP$q$,$q$exam-core$q$,103,$q$A new admin process is causing confusion. The first thing to do is:$q$,array[$q$Blame the team$q$,$q$Ask the people using it where they get stuck$q$,$q$Remove all documentation$q$,$q$Make the process longer$q$],1),
+($q$PTA$q$,$q$w2-4$q$,1,$q$A good email subject line should:$q$,array[$q$Be left empty so people open the email$q$,$q$State the ask or topic clearly, e.g. “Approval needed: Q3 budget by Friday”$q$,$q$Repeat the sender's name$q$,$q$Be one word, like “Hello”$q$],1),
+($q$PTA$q$,$q$w2-4$q$,2,$q$You need two separate decisions from your manager. Best practice is to:$q$,array[$q$Ask on WhatsApp late at night$q$,$q$Send two short emails, one topic each, with a clear next step$q$,$q$Wait for your weekly meeting$q$,$q$Put both in one long email with no headings$q$],1),
+($q$PTA$q$,$q$w2-4$q$,3,$q$A client emails a question you can't answer today. What should you do?$q$,array[$q$Forward it to a colleague without comment$q$,$q$Reply “ok” and nothing else$q$,$q$Ignore it until you have the full answer$q$,$q$Acknowledge it within one working day and say when you'll reply$q$],3),
+($q$PTA$q$,$q$w2-4$q$,4,$q$Which channel suits an urgent, informal question to a teammate?$q$,array[$q$A post on your public social media$q$,$q$An email to the whole company$q$,$q$A work chat tool such as Slack or Teams$q$,$q$A formal letter$q$],2),
+($q$PTA$q$,$q$w2-4$q$,5,$q$In a remote team meeting where you are not presenting, you should:$q$,array[$q$Type every comment in capital letters$q$,$q$Keep your mic on so people know you're there$q$,$q$Leave your camera on and walk away$q$,$q$Mute and use raise-hand when you want to speak$q$],3),
+($q$PTA$q$,$q$w2-4$q$,6,$q$Your team agreed cameras on for team meetings. Today your internet is poor. You should:$q$,array[$q$Keep the camera on even if the call keeps dropping$q$,$q$Tell the host briefly and turn the camera off to save data$q$,$q$Join late without saying anything$q$,$q$Skip the meeting$q$],1),
+($q$PTA$q$,$q$w2-4$q$,7,$q$You're stuck on a task working from home. The best move is to:$q$,array[$q$Say nothing and hope it resolves$q$,$q$Tell your lead early, say what you've tried, and ask a specific question$q$,$q$Quietly hand it to a colleague$q$,$q$Wait until the deadline, then explain$q$],1),
+($q$PTA$q$,$q$w2-4$q$,8,$q$You'll be away from your desk for two hours during work time. You should:$q$,array[$q$Leave without telling anyone$q$,$q$Change your profile picture$q$,$q$Log out of everything so nobody can reach you$q$,$q$Update your status or tell the team when you'll be back$q$],3),
+($q$PTA$q$,$q$w2-4$q$,9,$q$Which file name follows good practice?$q$,array[$q$report-new(2).docx$q$,$q$final final.docx$q$,$q$2026-11-04_AcmeCo_Onboarding-Guide_v2.docx$q$,$q$Untitled document$q$],2),
+($q$PTA$q$,$q$w2-4$q$,10,$q$A sensible top-level folder structure for your work is:$q$,array[$q$Files only on your desktop$q$,$q$Everything in Downloads$q$,$q$One folder per client or project, with clear subfolders$q$,$q$One folder per day$q$],2),
+($q$PTA$q$,$q$w2-4$q$,11,$q$You need a colleague to comment on a document but not change it. Share it with:$q$,array[$q$Owner access$q$,$q$No access, and email a screenshot$q$,$q$Editor access for everyone with the link$q$,$q$Commenter access$q$],3),
+($q$PTA$q$,$q$w2-4$q$,12,$q$Why should work files not live only on your laptop desktop?$q$,array[$q$Laptops can't open shared files$q$,$q$They can be lost and your team can't find or open them$q$,$q$Desktops are slower to load$q$,$q$It uses too much battery$q$],1),
+($q$PTA$q$,$q$w3-3$q$,1,$q$In the Eisenhower matrix, a task that is important but not urgent should be:$q$,array[$q$Scheduled$q$,$q$Delegated$q$,$q$Done immediately$q$,$q$Deleted$q$],0),
+($q$PTA$q$,$q$w3-3$q$,2,$q$Time-blocking means:$q$,array[$q$Blocking colleagues' calendars$q$,$q$Reserving set times in your calendar for focused work$q$,$q$Doing every task as it arrives$q$,$q$Working without breaks$q$],1),
+($q$PTA$q$,$q$w3-3$q$,3,$q$You estimated a task at 2 hours and it took 5. What's the most useful next step?$q$,array[$q$Stop estimating tasks$q$,$q$Note the difference and use it to estimate similar tasks better$q$,$q$Blame the tools$q$,$q$Ignore it$q$],1),
+($q$PTA$q$,$q$w3-3$q$,4,$q$A daily shutdown routine helps you:$q$,array[$q$Avoid checking any messages$q$,$q$Review what's done, plan tomorrow and switch off$q$,$q$Work later every night$q$,$q$Skip planning$q$],1),
+($q$PTA$q$,$q$w3-3$q$,5,$q$A simple task board usually has columns like:$q$,array[$q$Monday to Friday only$q$,$q$To do, Doing, Review, Done$q$,$q$Mine and Not mine$q$,$q$Easy, Medium, Hard, Impossible$q$],1),
+($q$PTA$q$,$q$w3-3$q$,6,$q$A Trello or Notion card for a deliverable should always have:$q$,array[$q$A colourful cover image$q$,$q$No description$q$,$q$A due date and a clear owner$q$,$q$At least ten checklist items$q$],2),
+($q$PTA$q$,$q$w3-3$q$,7,$q$Why use a checklist for repeatable work?$q$,array[$q$So nobody needs to think$q$,$q$To make the task take longer$q$,$q$Because managers like long lists$q$,$q$So steps aren't missed and quality stays consistent$q$],3),
+($q$PTA$q$,$q$w3-3$q$,8,$q$A weekly review of your task board is for:$q$,array[$q$Clearing finished cards, updating dates and planning next week$q$,$q$Showing off to colleagues$q$,$q$Changing the board's colours$q$,$q$Deleting tasks you don't like$q$],0),
+($q$PTA$q$,$q$w3-3$q$,9,$q$Three urgent requests arrive at once. A good first step is to:$q$,array[$q$Do the easiest one and ignore the rest$q$,$q$Check priorities and deadlines, then confirm the order with your manager if unsure$q$,$q$Start all three at the same time$q$,$q$Wait for someone to follow up$q$],1),
+($q$PTA$q$,$q$w3-3$q$,10,$q$You realise you will miss a deadline. When should you tell your manager?$q$,array[$q$As soon as you know, with a new date and what you need$q$,$q$Only if they ask$q$,$q$Never, just submit it late$q$,$q$After the deadline has passed$q$],0),
+($q$PTA$q$,$q$w3-3$q$,11,$q$Which habit best shows you are workplace-ready?$q$,array[$q$Avoiding questions so you look confident$q$,$q$Arriving on time and keeping people updated on your progress$q$,$q$Replying only when it suits you$q$,$q$Working only on tasks you enjoy$q$],1),
+($q$PTA$q$,$q$w3-3$q$,12,$q$When you finish a task, a good habit is to:$q$,array[$q$Wait for someone to discover it$q$,$q$Delete your notes$q$,$q$Check your work, share it, and update your task board$q$,$q$Move on without telling anyone$q$],2),
+($q$PTA$q$,$q$w4-2$q$,1,$q$Which comes first in a typical hiring process?$q$,array[$q$Confirming the hiring need and writing the job description$q$,$q$Onboarding the new hire$q$,$q$Making an offer$q$,$q$Running interviews$q$],0),
+($q$PTA$q$,$q$w4-2$q$,2,$q$A recruitment coordinator usually owns:$q$,array[$q$Firing staff$q$,$q$Writing company accounts$q$,$q$Scheduling, candidate communication and keeping the process on track$q$,$q$Deciding the final salary alone$q$],2),
+($q$PTA$q$,$q$w4-2$q$,3,$q$The hiring manager is usually:$q$,array[$q$The newest employee$q$,$q$The person the new hire will report to, who makes the final hiring decision$q$,$q$The company's accountant$q$,$q$An external customer$q$],1),
+($q$PTA$q$,$q$w4-2$q$,4,$q$Candidate experience matters because:$q$,array[$q$It has no effect on hiring$q$,$q$Candidates share their experience and it affects your employer brand$q$,$q$It only matters for senior roles$q$,$q$Only hired candidates count$q$],1),
+($q$PTA$q$,$q$w4-2$q$,5,$q$Time to hire is measured from:$q$,array[$q$The job ad going live to the end of probation$q$,$q$The interview to the first payslip$q$,$q$The hire's first day to their last day$q$,$q$When a candidate applies or is approached to when they accept the offer$q$],3),
+($q$PTA$q$,$q$w4-2$q$,6,$q$A talent pipeline is:$q$,array[$q$A list of current staff salaries$q$,$q$A group of suitable candidates you keep in touch with for future roles$q$,$q$The office internet connection$q$,$q$A training course$q$],1),
+($q$PTA$q$,$q$w4-2$q$,7,$q$The offer stage usually includes:$q$,array[$q$Screening CVs$q$,$q$Sourcing candidates$q$,$q$Posting the job ad$q$,$q$Agreeing terms and sending a written offer letter$q$],3),
+($q$PTA$q$,$q$w4-2$q$,8,$q$Why agree a hiring timeline with the hiring manager at the start?$q$,array[$q$To delay the process$q$,$q$Because candidates set the timeline$q$,$q$So everyone knows the target dates and can plan interviews$q$,$q$It isn't necessary$q$],2),
+($q$PTA$q$,$q$w4-2$q$,9,$q$Internal recruitment means:$q$,array[$q$Filling a role with someone already working in the organisation$q$,$q$Hiring friends of the CEO$q$,$q$Recruiting only from abroad$q$,$q$Hiring only through agencies$q$],0),
+($q$PTA$q$,$q$w4-2$q$,10,$q$Which stage comes straight after interviews in most processes?$q$,array[$q$Onboarding$q$,$q$Sourcing$q$,$q$Writing the job description$q$,$q$Decision and reference checks$q$],3),
+($q$PTA$q$,$q$w5-2$q$,1,$q$A job description should include:$q$,array[$q$Purpose of the role, responsibilities, requirements and reporting line$q$,$q$Only the salary$q$,$q$A list of company parties$q$,$q$The interviewer's personal opinions$q$],0),
+($q$PTA$q$,$q$w5-2$q$,2,$q$Must-have requirements are:$q$,array[$q$The manager's hobbies$q$,$q$Nice extras that would help$q$,$q$Skills or qualifications a candidate cannot do the job without$q$,$q$Optional training courses$q$],2),
+($q$PTA$q$,$q$w5-2$q$,3,$q$Which wording is most inclusive?$q$,array[$q$Male candidates preferred$q$,$q$Strong written communication skills$q$,$q$Native English speaker only$q$,$q$Young and energetic graduate$q$],1),
+($q$PTA$q$,$q$w5-2$q$,4,$q$A job ad differs from a job description because it:$q$,array[$q$Is only for internal use$q$,$q$Is shorter and written to attract the right applicants$q$,$q$Includes confidential salary bands for all staff$q$,$q$Has no requirements$q$],1),
+($q$PTA$q$,$q$w5-2$q$,5,$q$Why avoid a very long list of requirements in a job ad?$q$,array[$q$It increases applications from everyone$q$,$q$It is required by law$q$,$q$Good candidates may not apply if they don't meet every point$q$,$q$It makes the ad look professional$q$],2),
+($q$PTA$q$,$q$w5-2$q$,6,$q$A clear job title helps because:$q$,array[$q$It can be as creative as possible$q$,$q$It replaces the job description$q$,$q$It hides the role from competitors$q$,$q$Candidates search by common titles and understand the level$q$],3),
+($q$PTA$q$,$q$w5-2$q$,7,$q$The best way to describe responsibilities is:$q$,array[$q$Single words like Admin$q$,$q$Vague phrases like Other duties$q$,$q$Short action statements, e.g. Schedule interviews for 5 hiring managers$q$,$q$Long paragraphs of company history$q$],2),
+($q$PTA$q$,$q$w5-2$q$,8,$q$Including the work location and arrangement (on-site, hybrid, remote) is important because:$q$,array[$q$It is never relevant$q$,$q$It reduces applications from good candidates$q$,$q$Only managers need to know$q$,$q$Candidates can decide if the role is practical for them$q$],3),
+($q$PTA$q$,$q$w5-2$q$,9,$q$A job ad should end with:$q$,array[$q$Nothing$q$,$q$How to apply and the closing date$q$,$q$The manager's phone number$q$,$q$A list of rejected candidates$q$],1),
+($q$PTA$q$,$q$w5-2$q$,10,$q$Before publishing a job description, you should:$q$,array[$q$Post it immediately without checking$q$,$q$Send it to all current staff for votes$q$,$q$Have the hiring manager review and approve it$q$,$q$Copy a competitor's ad word for word$q$],2),
+($q$PTA$q$,$q$w6-2$q$,1,$q$Sourcing means:$q$,array[$q$Deciding the salary$q$,$q$Running background checks$q$,$q$Actively searching for and approaching potential candidates$q$,$q$Waiting for applications only$q$],2),
+($q$PTA$q$,$q$w6-2$q$,2,$q$In a Boolean search, AND is used to:$q$,array[$q$Exclude a term$q$,$q$Find profiles with any one of the terms$q$,$q$Find profiles that include all the terms$q$,$q$Search an exact phrase$q$],2),
+($q$PTA$q$,$q$w6-2$q$,3,$q$In a Boolean search, OR is used to:$q$,array[$q$Exclude unwanted words$q$,$q$Require every term$q$,$q$Include alternatives, e.g. recruiter OR talent acquisition$q$,$q$Search only job titles$q$],2),
+($q$PTA$q$,$q$w6-2$q$,4,$q$Quote marks in a search, e.g. "customer service", tell the search to:$q$,array[$q$Search only in Nigeria$q$,$q$Match the exact phrase$q$,$q$Ignore the words$q$,$q$Exclude the phrase$q$],1),
+($q$PTA$q$,$q$w6-2$q$,5,$q$NOT in a Boolean search is used to:$q$,array[$q$Match exact phrases$q$,$q$Include synonyms$q$,$q$Search by location$q$,$q$Exclude a term, e.g. NOT intern$q$],3),
+($q$PTA$q$,$q$w6-2$q$,6,$q$A good outreach message to a passive candidate is:$q$,array[$q$A copy of the full job description$q$,$q$The same generic message sent to hundreds$q$,$q$Short, personal, mentions why they fit and asks a simple question$q$,$q$A request for their salary first$q$],2),
+($q$PTA$q$,$q$w6-2$q$,7,$q$Employee referrals are valuable because:$q$,array[$q$They are always the cheapest option$q$,$q$Referred candidates are often a good fit and stay longer$q$,$q$They avoid any interview$q$,$q$They replace the job description$q$],1),
+($q$PTA$q$,$q$w6-2$q$,8,$q$A sourcing tracker should record:$q$,array[$q$Personal social media photos$q$,$q$Name, profile link, source, status and next follow-up date$q$,$q$Candidates' private phone numbers from unknown sources$q$,$q$Only names$q$],1),
+($q$PTA$q$,$q$w6-2$q$,9,$q$Which is an appropriate place to source candidates?$q$,array[$q$Hacked databases$q$,$q$Private contact lists shared without consent$q$,$q$Random phone numbers$q$,$q$Professional networks, job boards and relevant online communities$q$],3),
+($q$PTA$q$,$q$w6-2$q$,10,$q$A candidate doesn't reply to your first message. A good next step is:$q$,array[$q$Call their current employer$q$,$q$Message them every day$q$,$q$Post about them online$q$,$q$Send one polite follow-up a few days later$q$],3),
+($q$PTA$q$,$q$w7-2$q$,1,$q$When screening CVs, you should compare each one against:$q$,array[$q$The candidate's photo$q$,$q$Where they went on holiday$q$,$q$Your personal preferences$q$,$q$The must-have requirements agreed with the hiring manager$q$],3),
+($q$PTA$q$,$q$w7-2$q$,2,$q$A screening scorecard helps because:$q$,array[$q$It lets you skip reading CVs$q$,$q$Every candidate is assessed on the same criteria, which is fairer$q$,$q$It makes the process slower$q$,$q$It decides the salary$q$],1),
+($q$PTA$q$,$q$w7-2$q$,3,$q$Which is a fair screening question?$q$,array[$q$Can you tell me about your experience handling customer complaints?$q$,$q$How old are you?$q$,$q$Which tribe are you from?$q$,$q$Are you planning to have children soon?$q$],0),
+($q$PTA$q$,$q$w7-2$q$,4,$q$A phone screen is mainly used to:$q$,array[$q$Negotiate a contract$q$,$q$Make the final offer$q$,$q$Train the candidate$q$,$q$Check key requirements, interest and availability before full interviews$q$],3),
+($q$PTA$q$,$q$w7-2$q$,5,$q$A shortlist summary for the hiring manager should include:$q$,array[$q$Personal gossip$q$,$q$Each candidate's strengths, gaps and score against the criteria$q$,$q$Every CV received$q$,$q$Only the candidates' names$q$],1),
+($q$PTA$q$,$q$w7-2$q$,6,$q$A gap of a year on a CV should be:$q$,array[$q$Mentioned to other candidates$q$,$q$Ignored completely without context$q$,$q$Treated as an automatic rejection$q$,$q$Asked about neutrally, without assuming the reason$q$],3),
+($q$PTA$q$,$q$w7-2$q$,7,$q$Why take notes during a phone screen?$q$,array[$q$So decisions are based on what was said and can be explained$q$,$q$Because candidates expect it$q$,$q$To share with friends$q$,$q$It isn't useful$q$],0),
+($q$PTA$q$,$q$w7-2$q$,8,$q$Knockout questions are:$q$,array[$q$Questions about hobbies$q$,$q$Questions for the final interview only$q$,$q$Questions on essential requirements, e.g. Are you able to work in Lagos?$q$,$q$Trick questions to confuse candidates$q$],2),
+($q$PTA$q$,$q$w7-2$q$,9,$q$Unconscious bias in screening can be reduced by:$q$,array[$q$Screening CVs very quickly$q$,$q$Using clear criteria and a structured scorecard$q$,$q$Only looking at the candidate's name$q$,$q$Going with your gut feeling$q$],1),
+($q$PTA$q$,$q$w7-2$q$,10,$q$After shortlisting, candidates who were not selected should:$q$,array[$q$Be asked to apply again tomorrow$q$,$q$Never hear back$q$,$q$Be told the names of the shortlisted candidates$q$,$q$Receive a polite, timely message$q$],3),
+($q$PTA$q$,$q$w8-2$q$,1,$q$When scheduling a panel interview, you should first:$q$,array[$q$Book the room and hope everyone comes$q$,$q$Ask the candidate to choose any time$q$,$q$Check each interviewer's availability and the candidate's$q$,$q$Send invites without times$q$],2),
+($q$PTA$q$,$q$w8-2$q$,2,$q$An applicant tracking system (ATS) helps to:$q$,array[$q$Replace interviews completely$q$,$q$Pay new hires$q$,$q$Write the company's accounts$q$,$q$Track every candidate's stage and keep communication in one place$q$],3),
+($q$PTA$q$,$q$w8-2$q$,3,$q$A good interview invitation includes:$q$,array[$q$Only the word Interview$q$,$q$Date, time, format or location, interviewers and what to prepare$q$,$q$The salary of every interviewer$q$,$q$No time zone or link$q$],1),
+($q$PTA$q$,$q$w8-2$q$,4,$q$A structured interview means:$q$,array[$q$There is no scoring$q$,$q$Questions change for every candidate at random$q$,$q$Every candidate is asked the same core questions and scored the same way$q$,$q$Only one interviewer is allowed$q$],2),
+($q$PTA$q$,$q$w8-2$q$,5,$q$An interview pack for interviewers should include:$q$,array[$q$Nothing$q$,$q$The job description, the candidate's CV, questions and a scoring sheet$q$,$q$Last year's accounts$q$,$q$The candidate's personal social media$q$],1),
+($q$PTA$q$,$q$w8-2$q$,6,$q$A candidate asks to reschedule because of an emergency. You should:$q$,array[$q$Remove them from the process$q$,$q$Ignore the message$q$,$q$Tell them it reflects badly on them$q$,$q$Respond kindly and offer new times quickly$q$],3),
+($q$PTA$q$,$q$w8-2$q$,7,$q$Candidates who are rejected after interview should:$q$,array[$q$Receive a generic message months later$q$,$q$Be told about other candidates' scores$q$,$q$Never be contacted again$q$,$q$Hear back promptly and politely, with brief feedback where possible$q$],3),
+($q$PTA$q$,$q$w8-2$q$,8,$q$Why send a reminder the day before an interview?$q$,array[$q$It replaces the invitation$q$,$q$It reduces no-shows and helps candidates prepare$q$,$q$It annoys candidates$q$,$q$It is required by law$q$],1),
+($q$PTA$q$,$q$w8-2$q$,9,$q$After each interview, interviewers should:$q$,array[$q$Submit their scores and notes quickly, before discussing with others$q$,$q$Decide by vote without notes$q$,$q$Share notes with the candidate$q$,$q$Wait a week before writing anything$q$],0),
+($q$PTA$q$,$q$w8-2$q$,10,$q$A virtual interview link should be:$q$,array[$q$Tested beforehand and sent with clear joining instructions$q$,$q$Shared publicly on social media$q$,$q$Different for each interviewer without telling them$q$,$q$Sent five minutes before the start$q$],0),
+($q$PTA$q$,$q$w9-2$q$,1,$q$An offer letter usually includes:$q$,array[$q$The interviewer's notes$q$,$q$Other candidates' names$q$,$q$Company bank passwords$q$,$q$Job title, start date, salary, key terms and how to accept$q$],3),
+($q$PTA$q$,$q$w9-2$q$,2,$q$Good onboarding starts:$q$,array[$q$Before the first day, with equipment, accounts and a welcome plan ready$q$,$q$On their last day$q$,$q$Only if the new hire asks$q$,$q$Three months after they start$q$],0),
+($q$PTA$q$,$q$w9-2$q$,3,$q$An onboarding checklist helps to:$q$,array[$q$Make sure nothing is missed in the new hire's first weeks$q$,$q$Track their social life$q$,$q$Avoid giving them work$q$,$q$Replace their manager$q$],0),
+($q$PTA$q$,$q$w9-2$q$,4,$q$Employee records should be:$q$,array[$q$Printed and left on desks$q$,$q$Accurate, up to date and stored securely with restricted access$q$,$q$Kept in a shared folder anyone can open$q$,$q$Deleted after onboarding$q$],1),
+($q$PTA$q$,$q$w9-2$q$,5,$q$A probation review is:$q$,array[$q$A weekly team lunch$q$,$q$The first interview$q$,$q$A check at the end of an agreed period to confirm the hire is meeting expectations$q$,$q$A salary increase for everyone$q$],2),
+($q$PTA$q$,$q$w9-2$q$,6,$q$Which document is usually needed to set up a new hire on payroll?$q$,array[$q$A list of their friends$q$,$q$Their school report card$q$,$q$Bank details and tax identification details$q$,$q$Their social media passwords$q$],2),
+($q$PTA$q$,$q$w9-2$q$,7,$q$A buddy in onboarding is:$q$,array[$q$A colleague who helps the new hire settle in and answers everyday questions$q$,$q$An external recruiter$q$,$q$The company's lawyer$q$,$q$Their line manager$q$],0),
+($q$PTA$q$,$q$w9-2$q$,8,$q$Why set probation reminders in a calendar or HR system?$q$,array[$q$Because new hires request them$q$,$q$To delay the review$q$,$q$So reviews happen on time and nobody is forgotten$q$,$q$They aren't needed$q$],2),
+($q$PTA$q$,$q$w9-2$q$,9,$q$A new hire's first week should include:$q$,array[$q$No contact with their manager$q$,$q$Working alone without guidance$q$,$q$Only reading the full policy handbook$q$,$q$Introductions, tools access, key policies and clear first tasks$q$],3),
+($q$PTA$q$,$q$w9-2$q$,10,$q$When a new hire's details change, e.g. a new address, you should:$q$,array[$q$Write it on a sticky note$q$,$q$Ignore it$q$,$q$Post it in the team chat$q$,$q$Update their record promptly and keep the change secure$q$],3),
+($q$PTA$q$,$q$w10-2$q$,1,$q$A leave policy explains:$q$,array[$q$How to apply for a job$q$,$q$How to use the photocopier$q$,$q$What leave staff are entitled to and how to request it$q$,$q$The company's sales targets$q$],2),
+($q$PTA$q$,$q$w10-2$q$,2,$q$A grievance procedure is used when:$q$,array[$q$An employee wants to raise a formal concern or complaint$q$,$q$Ordering office supplies$q$,$q$Planning the company party$q$,$q$Hiring a new manager$q$],0),
+($q$PTA$q$,$q$w10-2$q$,3,$q$An employee asks a detailed legal question about their contract. An HR assistant should:$q$,array[$q$Ignore the question$q$,$q$Give a definite legal answer from memory$q$,$q$Pass it to the HR lead, who can check the details or take advice$q$,$q$Post it on social media for opinions$q$],2),
+($q$PTA$q$,$q$w10-2$q$,4,$q$A written employment contract helps because:$q$,array[$q$It replaces the job description$q$,$q$It can be changed by anyone at any time$q$,$q$It is only for senior staff$q$,$q$Both sides know the agreed terms, such as role, pay and notice$q$],3),
+($q$PTA$q$,$q$w10-2$q$,5,$q$Employee personal data, such as medical notes, should be:$q$,array[$q$Kept confidential and shared only with people who need it$q$,$q$Discussed openly in team meetings$q$,$q$Shared with other employers$q$,$q$Stored on a personal phone$q$],0),
+($q$PTA$q$,$q$w10-2$q$,6,$q$Under Nigeria's data protection law (NDPA), organisations should:$q$,array[$q$Collect only the personal data they need and keep it secure$q$,$q$Keep all data forever$q$,$q$Sell employee data to partners$q$,$q$Collect as much data as possible$q$],0),
+($q$PTA$q$,$q$w10-2$q$,7,$q$A code of conduct sets out:$q$,array[$q$The behaviour expected of everyone in the organisation$q$,$q$How to apply for leave$q$,$q$Only the dress code for visitors$q$,$q$The annual budget$q$],0),
+($q$PTA$q$,$q$w10-2$q$,8,$q$You accidentally email a salary spreadsheet to the wrong person. You should:$q$,array[$q$Ask the person to keep it secret and move on$q$,$q$Hope nobody notices$q$,$q$Delete your sent folder$q$,$q$Report it to your manager immediately so it can be handled$q$],3),
+($q$PTA$q$,$q$w10-2$q$,9,$q$Why should HR policies be easy to find for all staff?$q$,array[$q$Because managers don't need them$q$,$q$To make the intranet look full$q$,$q$So people know their rights and responsibilities$q$,$q$So they can be ignored$q$],2),
+($q$PTA$q$,$q$w10-2$q$,10,$q$Confidentiality in HR means:$q$,array[$q$Never writing anything down$q$,$q$Not sharing personal or sensitive information beyond those who need to know$q$,$q$Sharing information if it seems interesting$q$,$q$Telling only close friends$q$],1),
+($q$PTA$q$,$q$w11-2$q$,1,$q$Cost per hire is:$q$,array[$q$The new hire's monthly salary$q$,$q$Total recruitment costs divided by the number of hires$q$,$q$The interviewer's hourly rate$q$,$q$The cost of one job ad$q$],1),
+($q$PTA$q$,$q$w11-2$q$,2,$q$Offer acceptance rate is:$q$,array[$q$Applications divided by hires$q$,$q$Staff leaving per year$q$,$q$Interviews per week$q$,$q$Offers accepted divided by offers made$q$],3),
+($q$PTA$q$,$q$w11-2$q$,3,$q$You made 8 offers and 6 were accepted. The offer acceptance rate is:$q$,array[$q$48%$q$,$q$60%$q$,$q$75%$q$,$q$80%$q$],2),
+($q$PTA$q$,$q$w11-2$q$,4,$q$Source of hire shows:$q$,array[$q$Which interviewer was best$q$,$q$The new hire's home town$q$,$q$Where the office is located$q$,$q$Which channels, such as referrals or job boards, your hires came from$q$],3),
+($q$PTA$q$,$q$w11-2$q$,5,$q$Early turnover usually means:$q$,array[$q$New hires leaving within their first months$q$,$q$Staff changing desks$q$,$q$Retiring staff$q$,$q$Promotions after 5 years$q$],0),
+($q$PTA$q$,$q$w11-2$q$,6,$q$Time to fill is measured from:$q$,array[$q$The end of probation to promotion$q$,$q$When the job is opened to when an offer is accepted$q$,$q$An employee's first day to their last$q$,$q$The interview to the first payslip$q$],1),
+($q$PTA$q$,$q$w11-2$q$,7,$q$A good monthly recruitment report:$q$,array[$q$Lists every email sent$q$,$q$Has no charts or numbers$q$,$q$Shows a few key metrics, trends and what action is needed$q$,$q$Includes candidates' personal data$q$],2),
+($q$PTA$q$,$q$w11-2$q$,8,$q$If time to hire is rising every month, a useful first step is to:$q$,array[$q$Look at which stage is taking longest$q$,$q$Hire faster without checks$q$,$q$Stop tracking it$q$,$q$Blame candidates$q$],0),
+($q$PTA$q$,$q$w11-2$q$,9,$q$Why report source of hire to the team?$q$,array[$q$To spend more effort and budget on the channels that work$q$,$q$Because it's required by banks$q$,$q$It isn't useful$q$,$q$To rank candidates by home town$q$],0),
+($q$PTA$q$,$q$w11-2$q$,10,$q$Which chart best shows hires per month over a year?$q$,array[$q$A line or column chart over the months$q$,$q$A pie chart with 12 slices$q$,$q$A photo of the team$q$,$q$A table of names$q$],0),
+($q$PTA$q$,$q$exam-fund$q$,1,$q$A good email subject line should:$q$,array[$q$State the ask or topic clearly, e.g. “Approval needed: Q3 budget by Friday”$q$,$q$Be one word, like “Hello”$q$,$q$Be left empty so people open the email$q$,$q$Repeat the sender's name$q$],0),
+($q$PTA$q$,$q$exam-fund$q$,2,$q$You need two separate decisions from your manager. Best practice is to:$q$,array[$q$Send two short emails, one topic each, with a clear next step$q$,$q$Ask on WhatsApp late at night$q$,$q$Put both in one long email with no headings$q$,$q$Wait for your weekly meeting$q$],0),
+($q$PTA$q$,$q$exam-fund$q$,3,$q$A client emails a question you can't answer today. What should you do?$q$,array[$q$Acknowledge it within one working day and say when you'll reply$q$,$q$Reply “ok” and nothing else$q$,$q$Ignore it until you have the full answer$q$,$q$Forward it to a colleague without comment$q$],0),
+($q$PTA$q$,$q$exam-fund$q$,4,$q$Which channel suits an urgent, informal question to a teammate?$q$,array[$q$An email to the whole company$q$,$q$A work chat tool such as Slack or Teams$q$,$q$A post on your public social media$q$,$q$A formal letter$q$],1),
+($q$PTA$q$,$q$exam-fund$q$,5,$q$In a remote team meeting where you are not presenting, you should:$q$,array[$q$Leave your camera on and walk away$q$,$q$Keep your mic on so people know you're there$q$,$q$Type every comment in capital letters$q$,$q$Mute and use raise-hand when you want to speak$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,6,$q$Your team agreed cameras on for team meetings. Today your internet is poor. You should:$q$,array[$q$Keep the camera on even if the call keeps dropping$q$,$q$Tell the host briefly and turn the camera off to save data$q$,$q$Skip the meeting$q$,$q$Join late without saying anything$q$],1),
+($q$PTA$q$,$q$exam-fund$q$,7,$q$You're stuck on a task working from home. The best move is to:$q$,array[$q$Say nothing and hope it resolves$q$,$q$Wait until the deadline, then explain$q$,$q$Quietly hand it to a colleague$q$,$q$Tell your lead early, say what you've tried, and ask a specific question$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,8,$q$You'll be away from your desk for two hours during work time. You should:$q$,array[$q$Log out of everything so nobody can reach you$q$,$q$Update your status or tell the team when you'll be back$q$,$q$Change your profile picture$q$,$q$Leave without telling anyone$q$],1),
+($q$PTA$q$,$q$exam-fund$q$,9,$q$Which file name follows good practice?$q$,array[$q$final final.docx$q$,$q$report-new(2).docx$q$,$q$Untitled document$q$,$q$2026-11-04_AcmeCo_Onboarding-Guide_v2.docx$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,10,$q$A sensible top-level folder structure for your work is:$q$,array[$q$One folder per day$q$,$q$Everything in Downloads$q$,$q$Files only on your desktop$q$,$q$One folder per client or project, with clear subfolders$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,11,$q$You need a colleague to comment on a document but not change it. Share it with:$q$,array[$q$Owner access$q$,$q$No access, and email a screenshot$q$,$q$Editor access for everyone with the link$q$,$q$Commenter access$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,12,$q$Why should work files not live only on your laptop desktop?$q$,array[$q$They can be lost and your team can't find or open them$q$,$q$Laptops can't open shared files$q$,$q$Desktops are slower to load$q$,$q$It uses too much battery$q$],0),
+($q$PTA$q$,$q$exam-fund$q$,13,$q$In the Eisenhower matrix, a task that is important but not urgent should be:$q$,array[$q$Deleted$q$,$q$Done immediately$q$,$q$Delegated$q$,$q$Scheduled$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,14,$q$Time-blocking means:$q$,array[$q$Doing every task as it arrives$q$,$q$Working without breaks$q$,$q$Blocking colleagues' calendars$q$,$q$Reserving set times in your calendar for focused work$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,15,$q$You estimated a task at 2 hours and it took 5. What's the most useful next step?$q$,array[$q$Note the difference and use it to estimate similar tasks better$q$,$q$Stop estimating tasks$q$,$q$Ignore it$q$,$q$Blame the tools$q$],0),
+($q$PTA$q$,$q$exam-fund$q$,16,$q$A daily shutdown routine helps you:$q$,array[$q$Work later every night$q$,$q$Skip planning$q$,$q$Avoid checking any messages$q$,$q$Review what's done, plan tomorrow and switch off$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,17,$q$A simple task board usually has columns like:$q$,array[$q$Easy, Medium, Hard, Impossible$q$,$q$Monday to Friday only$q$,$q$To do, Doing, Review, Done$q$,$q$Mine and Not mine$q$],2),
+($q$PTA$q$,$q$exam-fund$q$,18,$q$A Trello or Notion card for a deliverable should always have:$q$,array[$q$A colourful cover image$q$,$q$At least ten checklist items$q$,$q$No description$q$,$q$A due date and a clear owner$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,19,$q$Why use a checklist for repeatable work?$q$,array[$q$Because managers like long lists$q$,$q$So nobody needs to think$q$,$q$To make the task take longer$q$,$q$So steps aren't missed and quality stays consistent$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,20,$q$A weekly review of your task board is for:$q$,array[$q$Showing off to colleagues$q$,$q$Changing the board's colours$q$,$q$Clearing finished cards, updating dates and planning next week$q$,$q$Deleting tasks you don't like$q$],2),
+($q$PTA$q$,$q$exam-fund$q$,21,$q$Three urgent requests arrive at once. A good first step is to:$q$,array[$q$Start all three at the same time$q$,$q$Wait for someone to follow up$q$,$q$Check priorities and deadlines, then confirm the order with your manager if unsure$q$,$q$Do the easiest one and ignore the rest$q$],2),
+($q$PTA$q$,$q$exam-fund$q$,22,$q$You realise you will miss a deadline. When should you tell your manager?$q$,array[$q$As soon as you know, with a new date and what you need$q$,$q$After the deadline has passed$q$,$q$Never, just submit it late$q$,$q$Only if they ask$q$],0),
+($q$PTA$q$,$q$exam-fund$q$,23,$q$Which habit best shows you are workplace-ready?$q$,array[$q$Replying only when it suits you$q$,$q$Working only on tasks you enjoy$q$,$q$Arriving on time and keeping people updated on your progress$q$,$q$Avoiding questions so you look confident$q$],2),
+($q$PTA$q$,$q$exam-fund$q$,24,$q$When you finish a task, a good habit is to:$q$,array[$q$Check your work, share it, and update your task board$q$,$q$Move on without telling anyone$q$,$q$Wait for someone to discover it$q$,$q$Delete your notes$q$],0),
+($q$PTA$q$,$q$exam-fund$q$,25,$q$Which email subject line is clearest?$q$,array[$q$Question$q$,$q$Hi$q$,$q$Urgent!!!$q$,$q$Approval needed: venue booking by Thursday$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,26,$q$You need to share a large file with a client. Best practice is to:$q$,array[$q$Print and post it$q$,$q$Attach it in pieces across ten emails$q$,$q$Share a link with the right permission level$q$,$q$Send it on WhatsApp to their personal number$q$],2),
+($q$PTA$q$,$q$exam-fund$q$,27,$q$During a video call your connection keeps dropping. You should:$q$,array[$q$Tell the host briefly, turn off your camera and stay on audio$q$,$q$Leave without saying anything$q$,$q$Keep rejoining without explanation$q$,$q$Blame the host's connection$q$],0),
+($q$PTA$q$,$q$exam-fund$q$,28,$q$A colleague asks for an update you can't give yet. You should:$q$,array[$q$Guess an answer$q$,$q$Say when you'll have it and follow up by then$q$,$q$Ignore the message$q$,$q$Tell them to ask someone else$q$],1),
+($q$PTA$q$,$q$exam-fund$q$,29,$q$Which file name will be easiest to find later?$q$,array[$q$new doc (3).docx$q$,$q$final FINAL.docx$q$,$q$2026-12-01_Jobnest_Report_v1.docx$q$,$q$Untitled$q$],2),
+($q$PTA$q$,$q$exam-fund$q$,30,$q$Writing in all capital letters in a work message usually comes across as:$q$,array[$q$Professional$q$,$q$Shouting$q$,$q$Friendly$q$,$q$Neutral$q$],1),
+($q$PTA$q$,$q$exam-fund$q$,31,$q$When you finish a task someone is waiting on, you should:$q$,array[$q$Move straight to the next task$q$,$q$Tell them it's done and where to find it$q$,$q$Mention it next week$q$,$q$Wait for them to notice$q$],1),
+($q$PTA$q$,$q$exam-fund$q$,32,$q$The Eisenhower matrix sorts tasks by:$q$,array[$q$Cost and size$q$,$q$Who asked first$q$,$q$Colour and shape$q$,$q$Urgency and importance$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,33,$q$A task that is urgent but not important should usually be:$q$,array[$q$Delegated where possible$q$,$q$Done before everything else$q$,$q$Ignored$q$,$q$Deleted$q$],0),
+($q$PTA$q$,$q$exam-fund$q$,34,$q$Time-blocking works best when you:$q$,array[$q$Never plan ahead$q$,$q$Work only when you feel like it$q$,$q$Book every minute with meetings$q$,$q$Reserve focused time for important work and protect it$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,35,$q$On a task board, a card in the Review column means:$q$,array[$q$It is overdue$q$,$q$Nobody has started it$q$,$q$The work is done and waiting to be checked$q$,$q$It is cancelled$q$],2),
+($q$PTA$q$,$q$exam-fund$q$,36,$q$You have more work than you can finish this week. The best step is to:$q$,array[$q$Wait until deadlines pass$q$,$q$Quietly drop tasks$q$,$q$Tell your manager early and agree priorities$q$,$q$Work through the night every night$q$],2),
+($q$PTA$q$,$q$exam-fund$q$,37,$q$Which is the best channel for a formal request to a client?$q$,array[$q$A comment on their social media$q$,$q$A voice note at midnight$q$,$q$A message through a friend$q$,$q$A clear, polite email$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,38,$q$Professional tone in a written reply means:$q$,array[$q$Long and full of jargon$q$,$q$Polite, clear and focused on the next step$q$,$q$Very casual with lots of slang$q$,$q$Short and rude$q$],1),
+($q$PTA$q$,$q$exam-fund$q$,39,$q$Why update your status when you step away from work online?$q$,array[$q$So colleagues know when to expect a reply$q$,$q$Because it's fun$q$,$q$To look busy$q$,$q$It has no purpose$q$],0),
+($q$PTA$q$,$q$exam-fund$q$,40,$q$A shared drive folder should be organised:$q$,array[$q$By file size$q$,$q$By client or project with clear subfolders$q$,$q$By the date you joined$q$,$q$In one big folder$q$],1),
+($q$PTA$q$,$q$exam-fund$q$,41,$q$Giving someone Viewer access to a document means they can:$q$,array[$q$Share it as the owner$q$,$q$Nothing at all$q$,$q$Read it but not change it$q$,$q$Edit and delete it$q$],2),
+($q$PTA$q$,$q$exam-fund$q$,42,$q$Before you send an important email, you should:$q$,array[$q$Send it as fast as possible$q$,$q$Remove the subject line$q$,$q$Copy in everyone you know$q$,$q$Check the recipient, attachment, spelling and the ask$q$],3),
+($q$PTA$q$,$q$exam-fund$q$,43,$q$A workplace-ready professional handles feedback by:$q$,array[$q$Arguing straight away$q$,$q$Listening, asking questions and acting on it$q$,$q$Ignoring it$q$,$q$Complaining to colleagues$q$],1),
+($q$PTA$q$,$q$exam-fund$q$,44,$q$Meeting notes are most useful when they record:$q$,array[$q$Only who was late$q$,$q$Decisions, actions, owners and due dates$q$,$q$Personal opinions$q$,$q$Every word that was said$q$],1),
+($q$PTA$q$,$q$exam-fund$q$,45,$q$A daily shutdown routine ends your day by:$q$,array[$q$Checking social media$q$,$q$Deleting your to-do list$q$,$q$Leaving all tabs open$q$,$q$Reviewing what's done and planning tomorrow$q$],3),
+($q$PTA$q$,$q$exam-core$q$,1,$q$Which comes first in a typical hiring process?$q$,array[$q$Running interviews$q$,$q$Confirming the hiring need and writing the job description$q$,$q$Onboarding the new hire$q$,$q$Making an offer$q$],1),
+($q$PTA$q$,$q$exam-core$q$,2,$q$A recruitment coordinator usually owns:$q$,array[$q$Scheduling, candidate communication and keeping the process on track$q$,$q$Deciding the final salary alone$q$,$q$Writing company accounts$q$,$q$Firing staff$q$],0),
+($q$PTA$q$,$q$exam-core$q$,3,$q$The hiring manager is usually:$q$,array[$q$The company's accountant$q$,$q$The person the new hire will report to, who makes the final hiring decision$q$,$q$The newest employee$q$,$q$An external customer$q$],1),
+($q$PTA$q$,$q$exam-core$q$,4,$q$Candidate experience matters because:$q$,array[$q$It only matters for senior roles$q$,$q$Candidates share their experience and it affects your employer brand$q$,$q$It has no effect on hiring$q$,$q$Only hired candidates count$q$],1),
+($q$PTA$q$,$q$exam-core$q$,5,$q$Time to hire is measured from:$q$,array[$q$When a candidate applies or is approached to when they accept the offer$q$,$q$The interview to the first payslip$q$,$q$The job ad going live to the end of probation$q$,$q$The hire's first day to their last day$q$],0),
+($q$PTA$q$,$q$exam-core$q$,6,$q$A talent pipeline is:$q$,array[$q$The office internet connection$q$,$q$A group of suitable candidates you keep in touch with for future roles$q$,$q$A training course$q$,$q$A list of current staff salaries$q$],1),
+($q$PTA$q$,$q$exam-core$q$,7,$q$The offer stage usually includes:$q$,array[$q$Screening CVs$q$,$q$Sourcing candidates$q$,$q$Posting the job ad$q$,$q$Agreeing terms and sending a written offer letter$q$],3),
+($q$PTA$q$,$q$exam-core$q$,8,$q$Why agree a hiring timeline with the hiring manager at the start?$q$,array[$q$To delay the process$q$,$q$It isn't necessary$q$,$q$So everyone knows the target dates and can plan interviews$q$,$q$Because candidates set the timeline$q$],2),
+($q$PTA$q$,$q$exam-core$q$,9,$q$Internal recruitment means:$q$,array[$q$Recruiting only from abroad$q$,$q$Hiring only through agencies$q$,$q$Hiring friends of the CEO$q$,$q$Filling a role with someone already working in the organisation$q$],3),
+($q$PTA$q$,$q$exam-core$q$,10,$q$Which stage comes straight after interviews in most processes?$q$,array[$q$Sourcing$q$,$q$Decision and reference checks$q$,$q$Onboarding$q$,$q$Writing the job description$q$],1),
+($q$PTA$q$,$q$exam-core$q$,11,$q$A job description should include:$q$,array[$q$Purpose of the role, responsibilities, requirements and reporting line$q$,$q$Only the salary$q$,$q$A list of company parties$q$,$q$The interviewer's personal opinions$q$],0),
+($q$PTA$q$,$q$exam-core$q$,12,$q$Must-have requirements are:$q$,array[$q$Skills or qualifications a candidate cannot do the job without$q$,$q$Optional training courses$q$,$q$Nice extras that would help$q$,$q$The manager's hobbies$q$],0),
+($q$PTA$q$,$q$exam-core$q$,13,$q$Which wording is most inclusive?$q$,array[$q$Young and energetic graduate$q$,$q$Native English speaker only$q$,$q$Strong written communication skills$q$,$q$Male candidates preferred$q$],2),
+($q$PTA$q$,$q$exam-core$q$,14,$q$A job ad differs from a job description because it:$q$,array[$q$Has no requirements$q$,$q$Is shorter and written to attract the right applicants$q$,$q$Includes confidential salary bands for all staff$q$,$q$Is only for internal use$q$],1),
+($q$PTA$q$,$q$exam-core$q$,15,$q$Why avoid a very long list of requirements in a job ad?$q$,array[$q$Good candidates may not apply if they don't meet every point$q$,$q$It is required by law$q$,$q$It makes the ad look professional$q$,$q$It increases applications from everyone$q$],0),
+($q$PTA$q$,$q$exam-core$q$,16,$q$A clear job title helps because:$q$,array[$q$It hides the role from competitors$q$,$q$It can be as creative as possible$q$,$q$Candidates search by common titles and understand the level$q$,$q$It replaces the job description$q$],2),
+($q$PTA$q$,$q$exam-core$q$,17,$q$The best way to describe responsibilities is:$q$,array[$q$Short action statements, e.g. Schedule interviews for 5 hiring managers$q$,$q$Single words like Admin$q$,$q$Vague phrases like Other duties$q$,$q$Long paragraphs of company history$q$],0),
+($q$PTA$q$,$q$exam-core$q$,18,$q$Including the work location and arrangement (on-site, hybrid, remote) is important because:$q$,array[$q$Candidates can decide if the role is practical for them$q$,$q$It reduces applications from good candidates$q$,$q$It is never relevant$q$,$q$Only managers need to know$q$],0),
+($q$PTA$q$,$q$exam-core$q$,19,$q$A job ad should end with:$q$,array[$q$Nothing$q$,$q$The manager's phone number$q$,$q$How to apply and the closing date$q$,$q$A list of rejected candidates$q$],2),
+($q$PTA$q$,$q$exam-core$q$,20,$q$Before publishing a job description, you should:$q$,array[$q$Have the hiring manager review and approve it$q$,$q$Copy a competitor's ad word for word$q$,$q$Post it immediately without checking$q$,$q$Send it to all current staff for votes$q$],0),
+($q$PTA$q$,$q$exam-core$q$,21,$q$Sourcing means:$q$,array[$q$Deciding the salary$q$,$q$Waiting for applications only$q$,$q$Running background checks$q$,$q$Actively searching for and approaching potential candidates$q$],3),
+($q$PTA$q$,$q$exam-core$q$,22,$q$In a Boolean search, AND is used to:$q$,array[$q$Find profiles that include all the terms$q$,$q$Find profiles with any one of the terms$q$,$q$Exclude a term$q$,$q$Search an exact phrase$q$],0),
+($q$PTA$q$,$q$exam-core$q$,23,$q$In a Boolean search, OR is used to:$q$,array[$q$Include alternatives, e.g. recruiter OR talent acquisition$q$,$q$Search only job titles$q$,$q$Exclude unwanted words$q$,$q$Require every term$q$],0),
+($q$PTA$q$,$q$exam-core$q$,24,$q$Quote marks in a search, e.g. "customer service", tell the search to:$q$,array[$q$Match the exact phrase$q$,$q$Exclude the phrase$q$,$q$Search only in Nigeria$q$,$q$Ignore the words$q$],0),
+($q$PTA$q$,$q$exam-core$q$,25,$q$NOT in a Boolean search is used to:$q$,array[$q$Include synonyms$q$,$q$Search by location$q$,$q$Match exact phrases$q$,$q$Exclude a term, e.g. NOT intern$q$],3),
+($q$PTA$q$,$q$exam-core$q$,26,$q$A good outreach message to a passive candidate is:$q$,array[$q$Short, personal, mentions why they fit and asks a simple question$q$,$q$A copy of the full job description$q$,$q$The same generic message sent to hundreds$q$,$q$A request for their salary first$q$],0),
+($q$PTA$q$,$q$exam-core$q$,27,$q$Employee referrals are valuable because:$q$,array[$q$They are always the cheapest option$q$,$q$They replace the job description$q$,$q$They avoid any interview$q$,$q$Referred candidates are often a good fit and stay longer$q$],3),
+($q$PTA$q$,$q$exam-core$q$,28,$q$A sourcing tracker should record:$q$,array[$q$Only names$q$,$q$Name, profile link, source, status and next follow-up date$q$,$q$Personal social media photos$q$,$q$Candidates' private phone numbers from unknown sources$q$],1),
+($q$PTA$q$,$q$exam-core$q$,29,$q$Which is an appropriate place to source candidates?$q$,array[$q$Hacked databases$q$,$q$Professional networks, job boards and relevant online communities$q$,$q$Private contact lists shared without consent$q$,$q$Random phone numbers$q$],1),
+($q$PTA$q$,$q$exam-core$q$,30,$q$A candidate doesn't reply to your first message. A good next step is:$q$,array[$q$Call their current employer$q$,$q$Message them every day$q$,$q$Send one polite follow-up a few days later$q$,$q$Post about them online$q$],2),
+($q$PTA$q$,$q$exam-core$q$,31,$q$When screening CVs, you should compare each one against:$q$,array[$q$The must-have requirements agreed with the hiring manager$q$,$q$Your personal preferences$q$,$q$The candidate's photo$q$,$q$Where they went on holiday$q$],0),
+($q$PTA$q$,$q$exam-core$q$,32,$q$A screening scorecard helps because:$q$,array[$q$It lets you skip reading CVs$q$,$q$It decides the salary$q$,$q$It makes the process slower$q$,$q$Every candidate is assessed on the same criteria, which is fairer$q$],3),
+($q$PTA$q$,$q$exam-core$q$,33,$q$Which is a fair screening question?$q$,array[$q$Which tribe are you from?$q$,$q$Can you tell me about your experience handling customer complaints?$q$,$q$Are you planning to have children soon?$q$,$q$How old are you?$q$],1),
+($q$PTA$q$,$q$exam-core$q$,34,$q$A phone screen is mainly used to:$q$,array[$q$Train the candidate$q$,$q$Negotiate a contract$q$,$q$Check key requirements, interest and availability before full interviews$q$,$q$Make the final offer$q$],2),
+($q$PTA$q$,$q$exam-core$q$,35,$q$A shortlist summary for the hiring manager should include:$q$,array[$q$Every CV received$q$,$q$Personal gossip$q$,$q$Only the candidates' names$q$,$q$Each candidate's strengths, gaps and score against the criteria$q$],3),
+($q$PTA$q$,$q$exam-core$q$,36,$q$A gap of a year on a CV should be:$q$,array[$q$Mentioned to other candidates$q$,$q$Ignored completely without context$q$,$q$Treated as an automatic rejection$q$,$q$Asked about neutrally, without assuming the reason$q$],3),
+($q$PTA$q$,$q$exam-core$q$,37,$q$Why take notes during a phone screen?$q$,array[$q$Because candidates expect it$q$,$q$It isn't useful$q$,$q$So decisions are based on what was said and can be explained$q$,$q$To share with friends$q$],2),
+($q$PTA$q$,$q$exam-core$q$,38,$q$Knockout questions are:$q$,array[$q$Questions for the final interview only$q$,$q$Trick questions to confuse candidates$q$,$q$Questions about hobbies$q$,$q$Questions on essential requirements, e.g. Are you able to work in Lagos?$q$],3),
+($q$PTA$q$,$q$exam-core$q$,39,$q$Unconscious bias in screening can be reduced by:$q$,array[$q$Going with your gut feeling$q$,$q$Screening CVs very quickly$q$,$q$Using clear criteria and a structured scorecard$q$,$q$Only looking at the candidate's name$q$],2),
+($q$PTA$q$,$q$exam-core$q$,40,$q$After shortlisting, candidates who were not selected should:$q$,array[$q$Be asked to apply again tomorrow$q$,$q$Receive a polite, timely message$q$,$q$Be told the names of the shortlisted candidates$q$,$q$Never hear back$q$],1),
+($q$PTA$q$,$q$exam-core$q$,41,$q$When scheduling a panel interview, you should first:$q$,array[$q$Ask the candidate to choose any time$q$,$q$Book the room and hope everyone comes$q$,$q$Send invites without times$q$,$q$Check each interviewer's availability and the candidate's$q$],3),
+($q$PTA$q$,$q$exam-core$q$,42,$q$An applicant tracking system (ATS) helps to:$q$,array[$q$Write the company's accounts$q$,$q$Replace interviews completely$q$,$q$Pay new hires$q$,$q$Track every candidate's stage and keep communication in one place$q$],3),
+($q$PTA$q$,$q$exam-core$q$,43,$q$A good interview invitation includes:$q$,array[$q$Only the word Interview$q$,$q$The salary of every interviewer$q$,$q$No time zone or link$q$,$q$Date, time, format or location, interviewers and what to prepare$q$],3),
+($q$PTA$q$,$q$exam-core$q$,44,$q$A structured interview means:$q$,array[$q$Questions change for every candidate at random$q$,$q$Only one interviewer is allowed$q$,$q$Every candidate is asked the same core questions and scored the same way$q$,$q$There is no scoring$q$],2),
+($q$PTA$q$,$q$exam-core$q$,45,$q$An interview pack for interviewers should include:$q$,array[$q$The candidate's personal social media$q$,$q$The job description, the candidate's CV, questions and a scoring sheet$q$,$q$Last year's accounts$q$,$q$Nothing$q$],1),
+($q$PTA$q$,$q$exam-core$q$,46,$q$A candidate asks to reschedule because of an emergency. You should:$q$,array[$q$Remove them from the process$q$,$q$Tell them it reflects badly on them$q$,$q$Ignore the message$q$,$q$Respond kindly and offer new times quickly$q$],3),
+($q$PTA$q$,$q$exam-core$q$,47,$q$Candidates who are rejected after interview should:$q$,array[$q$Receive a generic message months later$q$,$q$Never be contacted again$q$,$q$Be told about other candidates' scores$q$,$q$Hear back promptly and politely, with brief feedback where possible$q$],3),
+($q$PTA$q$,$q$exam-core$q$,48,$q$Why send a reminder the day before an interview?$q$,array[$q$It annoys candidates$q$,$q$It is required by law$q$,$q$It reduces no-shows and helps candidates prepare$q$,$q$It replaces the invitation$q$],2),
+($q$PTA$q$,$q$exam-core$q$,49,$q$After each interview, interviewers should:$q$,array[$q$Share notes with the candidate$q$,$q$Submit their scores and notes quickly, before discussing with others$q$,$q$Decide by vote without notes$q$,$q$Wait a week before writing anything$q$],1),
+($q$PTA$q$,$q$exam-core$q$,50,$q$A virtual interview link should be:$q$,array[$q$Different for each interviewer without telling them$q$,$q$Tested beforehand and sent with clear joining instructions$q$,$q$Shared publicly on social media$q$,$q$Sent five minutes before the start$q$],1),
+($q$PTA$q$,$q$exam-core$q$,51,$q$An offer letter usually includes:$q$,array[$q$Other candidates' names$q$,$q$The interviewer's notes$q$,$q$Job title, start date, salary, key terms and how to accept$q$,$q$Company bank passwords$q$],2),
+($q$PTA$q$,$q$exam-core$q$,52,$q$Good onboarding starts:$q$,array[$q$Three months after they start$q$,$q$Only if the new hire asks$q$,$q$Before the first day, with equipment, accounts and a welcome plan ready$q$,$q$On their last day$q$],2),
+($q$PTA$q$,$q$exam-core$q$,53,$q$An onboarding checklist helps to:$q$,array[$q$Track their social life$q$,$q$Replace their manager$q$,$q$Avoid giving them work$q$,$q$Make sure nothing is missed in the new hire's first weeks$q$],3),
+($q$PTA$q$,$q$exam-core$q$,54,$q$Employee records should be:$q$,array[$q$Printed and left on desks$q$,$q$Deleted after onboarding$q$,$q$Kept in a shared folder anyone can open$q$,$q$Accurate, up to date and stored securely with restricted access$q$],3),
+($q$PTA$q$,$q$exam-core$q$,55,$q$A probation review is:$q$,array[$q$A weekly team lunch$q$,$q$A check at the end of an agreed period to confirm the hire is meeting expectations$q$,$q$A salary increase for everyone$q$,$q$The first interview$q$],1),
+($q$PTA$q$,$q$exam-core$q$,56,$q$Which document is usually needed to set up a new hire on payroll?$q$,array[$q$Bank details and tax identification details$q$,$q$A list of their friends$q$,$q$Their school report card$q$,$q$Their social media passwords$q$],0),
+($q$PTA$q$,$q$exam-core$q$,57,$q$A buddy in onboarding is:$q$,array[$q$An external recruiter$q$,$q$A colleague who helps the new hire settle in and answers everyday questions$q$,$q$Their line manager$q$,$q$The company's lawyer$q$],1),
+($q$PTA$q$,$q$exam-core$q$,58,$q$Why set probation reminders in a calendar or HR system?$q$,array[$q$To delay the review$q$,$q$They aren't needed$q$,$q$So reviews happen on time and nobody is forgotten$q$,$q$Because new hires request them$q$],2),
+($q$PTA$q$,$q$exam-core$q$,59,$q$A new hire's first week should include:$q$,array[$q$No contact with their manager$q$,$q$Only reading the full policy handbook$q$,$q$Working alone without guidance$q$,$q$Introductions, tools access, key policies and clear first tasks$q$],3),
+($q$PTA$q$,$q$exam-core$q$,60,$q$When a new hire's details change, e.g. a new address, you should:$q$,array[$q$Post it in the team chat$q$,$q$Ignore it$q$,$q$Write it on a sticky note$q$,$q$Update their record promptly and keep the change secure$q$],3),
+($q$PTA$q$,$q$exam-core$q$,61,$q$A leave policy explains:$q$,array[$q$The company's sales targets$q$,$q$How to use the photocopier$q$,$q$What leave staff are entitled to and how to request it$q$,$q$How to apply for a job$q$],2),
+($q$PTA$q$,$q$exam-core$q$,62,$q$A grievance procedure is used when:$q$,array[$q$Ordering office supplies$q$,$q$An employee wants to raise a formal concern or complaint$q$,$q$Hiring a new manager$q$,$q$Planning the company party$q$],1),
+($q$PTA$q$,$q$exam-core$q$,63,$q$An employee asks a detailed legal question about their contract. An HR assistant should:$q$,array[$q$Give a definite legal answer from memory$q$,$q$Post it on social media for opinions$q$,$q$Pass it to the HR lead, who can check the details or take advice$q$,$q$Ignore the question$q$],2),
+($q$PTA$q$,$q$exam-core$q$,64,$q$A written employment contract helps because:$q$,array[$q$Both sides know the agreed terms, such as role, pay and notice$q$,$q$It can be changed by anyone at any time$q$,$q$It is only for senior staff$q$,$q$It replaces the job description$q$],0),
+($q$PTA$q$,$q$exam-core$q$,65,$q$Employee personal data, such as medical notes, should be:$q$,array[$q$Shared with other employers$q$,$q$Discussed openly in team meetings$q$,$q$Stored on a personal phone$q$,$q$Kept confidential and shared only with people who need it$q$],3),
+($q$PTA$q$,$q$exam-core$q$,66,$q$Under Nigeria's data protection law (NDPA), organisations should:$q$,array[$q$Collect as much data as possible$q$,$q$Keep all data forever$q$,$q$Sell employee data to partners$q$,$q$Collect only the personal data they need and keep it secure$q$],3),
+($q$PTA$q$,$q$exam-core$q$,67,$q$A code of conduct sets out:$q$,array[$q$The annual budget$q$,$q$Only the dress code for visitors$q$,$q$How to apply for leave$q$,$q$The behaviour expected of everyone in the organisation$q$],3),
+($q$PTA$q$,$q$exam-core$q$,68,$q$You accidentally email a salary spreadsheet to the wrong person. You should:$q$,array[$q$Delete your sent folder$q$,$q$Hope nobody notices$q$,$q$Ask the person to keep it secret and move on$q$,$q$Report it to your manager immediately so it can be handled$q$],3),
+($q$PTA$q$,$q$exam-core$q$,69,$q$Why should HR policies be easy to find for all staff?$q$,array[$q$So people know their rights and responsibilities$q$,$q$To make the intranet look full$q$,$q$Because managers don't need them$q$,$q$So they can be ignored$q$],0),
+($q$PTA$q$,$q$exam-core$q$,70,$q$Confidentiality in HR means:$q$,array[$q$Sharing information if it seems interesting$q$,$q$Never writing anything down$q$,$q$Not sharing personal or sensitive information beyond those who need to know$q$,$q$Telling only close friends$q$],2),
+($q$PTA$q$,$q$exam-core$q$,71,$q$Cost per hire is:$q$,array[$q$The new hire's monthly salary$q$,$q$Total recruitment costs divided by the number of hires$q$,$q$The interviewer's hourly rate$q$,$q$The cost of one job ad$q$],1),
+($q$PTA$q$,$q$exam-core$q$,72,$q$Offer acceptance rate is:$q$,array[$q$Offers accepted divided by offers made$q$,$q$Staff leaving per year$q$,$q$Interviews per week$q$,$q$Applications divided by hires$q$],0),
+($q$PTA$q$,$q$exam-core$q$,73,$q$You made 8 offers and 6 were accepted. The offer acceptance rate is:$q$,array[$q$48%$q$,$q$75%$q$,$q$60%$q$,$q$80%$q$],1),
+($q$PTA$q$,$q$exam-core$q$,74,$q$Source of hire shows:$q$,array[$q$Which interviewer was best$q$,$q$Where the office is located$q$,$q$The new hire's home town$q$,$q$Which channels, such as referrals or job boards, your hires came from$q$],3),
+($q$PTA$q$,$q$exam-core$q$,75,$q$Early turnover usually means:$q$,array[$q$Promotions after 5 years$q$,$q$Retiring staff$q$,$q$New hires leaving within their first months$q$,$q$Staff changing desks$q$],2),
+($q$PTA$q$,$q$exam-core$q$,76,$q$Time to fill is measured from:$q$,array[$q$The interview to the first payslip$q$,$q$When the job is opened to when an offer is accepted$q$,$q$An employee's first day to their last$q$,$q$The end of probation to promotion$q$],1),
+($q$PTA$q$,$q$exam-core$q$,77,$q$A good monthly recruitment report:$q$,array[$q$Lists every email sent$q$,$q$Includes candidates' personal data$q$,$q$Has no charts or numbers$q$,$q$Shows a few key metrics, trends and what action is needed$q$],3),
+($q$PTA$q$,$q$exam-core$q$,78,$q$If time to hire is rising every month, a useful first step is to:$q$,array[$q$Look at which stage is taking longest$q$,$q$Blame candidates$q$,$q$Hire faster without checks$q$,$q$Stop tracking it$q$],0),
+($q$PTA$q$,$q$exam-core$q$,79,$q$Why report source of hire to the team?$q$,array[$q$To spend more effort and budget on the channels that work$q$,$q$It isn't useful$q$,$q$Because it's required by banks$q$,$q$To rank candidates by home town$q$],0),
+($q$PTA$q$,$q$exam-core$q$,80,$q$Which chart best shows hires per month over a year?$q$,array[$q$A pie chart with 12 slices$q$,$q$A photo of the team$q$,$q$A table of names$q$,$q$A line or column chart over the months$q$],3),
+($q$PTA$q$,$q$exam-core$q$,81,$q$A hiring manager wants to hire in two weeks but hasn't approved the job description. You should:$q$,array[$q$Explain the timeline risk and get the job description approved first$q$,$q$Write the job description without them$q$,$q$Cancel the role$q$,$q$Post the ad anyway$q$],0),
+($q$PTA$q$,$q$exam-core$q$,82,$q$You receive 300 applications for one role. The most efficient fair approach is to:$q$,array[$q$Choose by name$q$,$q$Screen against agreed must-haves with a scorecard$q$,$q$Pick the first 10$q$,$q$Reject all and repost$q$],1),
+($q$PTA$q$,$q$exam-core$q$,83,$q$A strong candidate is about to accept another offer. You should:$q$,array[$q$Tell the hiring manager quickly so they can decide whether to speed up$q$,$q$Do nothing$q$,$q$Share the other company's offer with your team$q$,$q$Pressure the candidate$q$],0),
+($q$PTA$q$,$q$exam-core$q$,84,$q$A candidate complains they never heard back after an interview. You should:$q$,array[$q$Tell them to apply elsewhere$q$,$q$Blame the hiring manager publicly$q$,$q$Ignore them$q$,$q$Apologise, update them and fix the communication gap$q$],3),
+($q$PTA$q$,$q$exam-core$q$,85,$q$Which Boolean string finds HR assistants in Lagos, excluding interns?$q$,array[$q$("HR assistant" OR "human resources assistant") AND Lagos NOT intern$q$,$q$"HR assistant Lagos intern"$q$,$q$HR assistant intern Lagos$q$,$q$HR OR Lagos OR intern$q$],0),
+($q$PTA$q$,$q$exam-core$q$,86,$q$An interviewer asks a candidate about their religion. As coordinator you should:$q$,array[$q$Raise it with HR leadership so interviewers are reminded what not to ask$q$,$q$Ignore it$q$,$q$Note it in the candidate's file$q$,$q$Ask the same question to all candidates$q$],0),
+($q$PTA$q$,$q$exam-core$q$,87,$q$Before a new hire's first day, the most important thing to confirm is:$q$,array[$q$Their previous salary history$q$,$q$Their equipment, accounts and first-week plan are ready$q$,$q$Their favourite food$q$,$q$Their social media handles$q$],1),
+($q$PTA$q$,$q$exam-core$q$,88,$q$Your recruitment report shows most hires come from referrals. A sensible action is to:$q$,array[$q$Hide the data$q$,$q$Stop tracking source of hire$q$,$q$Encourage and reward referrals while keeping other channels open$q$,$q$Stop all other recruitment channels at once$q$],2),
+($q$PTA$q$,$q$exam-core$q$,89,$q$A manager asks you to share a candidate's CV with a friend at another company. You should:$q$,array[$q$Share it without the name$q$,$q$Post it online$q$,$q$Decline, because candidate data is for this recruitment only$q$,$q$Share it quickly$q$],2),
+($q$PTA$q$,$q$exam-core$q$,90,$q$You need to schedule interviews for 6 candidates with a 3-person panel. The best tool is:$q$,array[$q$Guessing times$q$,$q$A single group chat with no times$q$,$q$Separate phone calls to each person$q$,$q$A shared calendar or scheduling tool that shows everyone's availability$q$],3),
+($q$PTA$q$,$q$exam-core$q$,91,$q$A new hire seems lost in their second week. A good HR assistant would:$q$,array[$q$Tell them to read the handbook again$q$,$q$Check in, connect them with their buddy and flag it to their manager$q$,$q$Ignore it$q$,$q$Wait for probation to end$q$],1),
+($q$PTA$q$,$q$exam-core$q$,92,$q$Which metric best shows whether your hiring process is slow?$q$,array[$q$Training hours$q$,$q$Number of job ads$q$,$q$Time to hire$q$,$q$Office headcount$q$],2),
+($q$PTA$q$,$q$exam-core$q$,93,$q$An employee asks HR to keep a complaint about their manager confidential. You should:$q$,array[$q$Explain how confidentiality works in the grievance process and pass it to the right person$q$,$q$Promise total secrecy no matter what$q$,$q$Discuss it with colleagues$q$,$q$Tell the manager directly$q$],0),
+($q$PTA$q$,$q$exam-core$q$,94,$q$A job ad has had very few applicants after two weeks. You should first:$q$,array[$q$Double the requirements$q$,$q$Close the role$q$,$q$Review the title, requirements and where it's posted$q$,$q$Wait another two months$q$],2),
+($q$PTA$q$,$q$exam-core$q$,95,$q$At the end of a hiring process, candidate records should be:$q$,array[$q$Printed and filed on a desk$q$,$q$Emailed to all staff$q$,$q$Kept only as long as needed and stored securely, then deleted$q$,$q$Kept forever in a shared folder$q$],2),
+($q$CSG$q$,$q$w2-4$q$,1,$q$A good email subject line should:$q$,array[$q$Repeat the sender's name$q$,$q$Be left empty so people open the email$q$,$q$Be one word, like “Hello”$q$,$q$State the ask or topic clearly, e.g. “Approval needed: Q3 budget by Friday”$q$],3),
+($q$CSG$q$,$q$w2-4$q$,2,$q$You need two separate decisions from your manager. Best practice is to:$q$,array[$q$Wait for your weekly meeting$q$,$q$Ask on WhatsApp late at night$q$,$q$Put both in one long email with no headings$q$,$q$Send two short emails, one topic each, with a clear next step$q$],3),
+($q$CSG$q$,$q$w2-4$q$,3,$q$A client emails a question you can't answer today. What should you do?$q$,array[$q$Ignore it until you have the full answer$q$,$q$Acknowledge it within one working day and say when you'll reply$q$,$q$Forward it to a colleague without comment$q$,$q$Reply “ok” and nothing else$q$],1),
+($q$CSG$q$,$q$w2-4$q$,4,$q$Which channel suits an urgent, informal question to a teammate?$q$,array[$q$A formal letter$q$,$q$A post on your public social media$q$,$q$An email to the whole company$q$,$q$A work chat tool such as Slack or Teams$q$],3),
+($q$CSG$q$,$q$w2-4$q$,5,$q$In a remote team meeting where you are not presenting, you should:$q$,array[$q$Keep your mic on so people know you're there$q$,$q$Type every comment in capital letters$q$,$q$Mute and use raise-hand when you want to speak$q$,$q$Leave your camera on and walk away$q$],2),
+($q$CSG$q$,$q$w2-4$q$,6,$q$Your team agreed cameras on for team meetings. Today your internet is poor. You should:$q$,array[$q$Skip the meeting$q$,$q$Tell the host briefly and turn the camera off to save data$q$,$q$Join late without saying anything$q$,$q$Keep the camera on even if the call keeps dropping$q$],1),
+($q$CSG$q$,$q$w2-4$q$,7,$q$You're stuck on a task working from home. The best move is to:$q$,array[$q$Say nothing and hope it resolves$q$,$q$Quietly hand it to a colleague$q$,$q$Wait until the deadline, then explain$q$,$q$Tell your lead early, say what you've tried, and ask a specific question$q$],3),
+($q$CSG$q$,$q$w2-4$q$,8,$q$You'll be away from your desk for two hours during work time. You should:$q$,array[$q$Change your profile picture$q$,$q$Log out of everything so nobody can reach you$q$,$q$Update your status or tell the team when you'll be back$q$,$q$Leave without telling anyone$q$],2),
+($q$CSG$q$,$q$w2-4$q$,9,$q$Which file name follows good practice?$q$,array[$q$final final.docx$q$,$q$2026-11-04_AcmeCo_Onboarding-Guide_v2.docx$q$,$q$report-new(2).docx$q$,$q$Untitled document$q$],1),
+($q$CSG$q$,$q$w2-4$q$,10,$q$A sensible top-level folder structure for your work is:$q$,array[$q$Files only on your desktop$q$,$q$Everything in Downloads$q$,$q$One folder per client or project, with clear subfolders$q$,$q$One folder per day$q$],2),
+($q$CSG$q$,$q$w2-4$q$,11,$q$You need a colleague to comment on a document but not change it. Share it with:$q$,array[$q$No access, and email a screenshot$q$,$q$Owner access$q$,$q$Commenter access$q$,$q$Editor access for everyone with the link$q$],2),
+($q$CSG$q$,$q$w2-4$q$,12,$q$Why should work files not live only on your laptop desktop?$q$,array[$q$It uses too much battery$q$,$q$They can be lost and your team can't find or open them$q$,$q$Laptops can't open shared files$q$,$q$Desktops are slower to load$q$],1),
+($q$CSG$q$,$q$w3-3$q$,1,$q$In the Eisenhower matrix, a task that is important but not urgent should be:$q$,array[$q$Done immediately$q$,$q$Delegated$q$,$q$Deleted$q$,$q$Scheduled$q$],3),
+($q$CSG$q$,$q$w3-3$q$,2,$q$Time-blocking means:$q$,array[$q$Reserving set times in your calendar for focused work$q$,$q$Doing every task as it arrives$q$,$q$Working without breaks$q$,$q$Blocking colleagues' calendars$q$],0),
+($q$CSG$q$,$q$w3-3$q$,3,$q$You estimated a task at 2 hours and it took 5. What's the most useful next step?$q$,array[$q$Ignore it$q$,$q$Blame the tools$q$,$q$Note the difference and use it to estimate similar tasks better$q$,$q$Stop estimating tasks$q$],2),
+($q$CSG$q$,$q$w3-3$q$,4,$q$A daily shutdown routine helps you:$q$,array[$q$Avoid checking any messages$q$,$q$Work later every night$q$,$q$Skip planning$q$,$q$Review what's done, plan tomorrow and switch off$q$],3),
+($q$CSG$q$,$q$w3-3$q$,5,$q$A simple task board usually has columns like:$q$,array[$q$To do, Doing, Review, Done$q$,$q$Monday to Friday only$q$,$q$Easy, Medium, Hard, Impossible$q$,$q$Mine and Not mine$q$],0),
+($q$CSG$q$,$q$w3-3$q$,6,$q$A Trello or Notion card for a deliverable should always have:$q$,array[$q$A colourful cover image$q$,$q$A due date and a clear owner$q$,$q$No description$q$,$q$At least ten checklist items$q$],1),
+($q$CSG$q$,$q$w3-3$q$,7,$q$Why use a checklist for repeatable work?$q$,array[$q$To make the task take longer$q$,$q$Because managers like long lists$q$,$q$So nobody needs to think$q$,$q$So steps aren't missed and quality stays consistent$q$],3),
+($q$CSG$q$,$q$w3-3$q$,8,$q$A weekly review of your task board is for:$q$,array[$q$Clearing finished cards, updating dates and planning next week$q$,$q$Showing off to colleagues$q$,$q$Changing the board's colours$q$,$q$Deleting tasks you don't like$q$],0),
+($q$CSG$q$,$q$w3-3$q$,9,$q$Three urgent requests arrive at once. A good first step is to:$q$,array[$q$Wait for someone to follow up$q$,$q$Do the easiest one and ignore the rest$q$,$q$Start all three at the same time$q$,$q$Check priorities and deadlines, then confirm the order with your manager if unsure$q$],3),
+($q$CSG$q$,$q$w3-3$q$,10,$q$You realise you will miss a deadline. When should you tell your manager?$q$,array[$q$After the deadline has passed$q$,$q$As soon as you know, with a new date and what you need$q$,$q$Never, just submit it late$q$,$q$Only if they ask$q$],1),
+($q$CSG$q$,$q$w3-3$q$,11,$q$Which habit best shows you are workplace-ready?$q$,array[$q$Avoiding questions so you look confident$q$,$q$Replying only when it suits you$q$,$q$Working only on tasks you enjoy$q$,$q$Arriving on time and keeping people updated on your progress$q$],3),
+($q$CSG$q$,$q$w3-3$q$,12,$q$When you finish a task, a good habit is to:$q$,array[$q$Check your work, share it, and update your task board$q$,$q$Delete your notes$q$,$q$Wait for someone to discover it$q$,$q$Move on without telling anyone$q$],0),
+($q$CSG$q$,$q$w4-2$q$,1,$q$Tier 1 support usually:$q$,array[$q$Handles common questions and escalates complex issues$q$,$q$Writes the company's code$q$,$q$Only handles refunds over ₦1m$q$,$q$Never talks to customers$q$],0),
+($q$CSG$q$,$q$w4-2$q$,2,$q$You should escalate a ticket when:$q$,array[$q$The customer is polite$q$,$q$It needs skills or permissions you don't have$q$,$q$It's Friday$q$,$q$You don't feel like answering$q$],1),
+($q$CSG$q$,$q$w4-2$q$,3,$q$Showing empathy without over-apologising sounds like:$q$,array[$q$“That's not my problem.”$q$,$q$“Calm down.”$q$,$q$“I understand how frustrating that is. Here's what I'll do now.”$q$,$q$“Sorry sorry sorry, so sorry.”$q$],2),
+($q$CSG$q$,$q$w4-2$q$,4,$q$First-contact resolution means:$q$,array[$q$Answering the first ticket of the day$q$,$q$Solving the customer's issue in the first interaction$q$,$q$Closing tickets without replying$q$,$q$Contacting the customer first$q$],1),
+($q$CSG$q$,$q$w4-2$q$,5,$q$Before replying to a customer, you should:$q$,array[$q$Reply with a template without reading$q$,$q$Ask them to repeat everything$q$,$q$Close the ticket$q$,$q$Read the whole message and check their history$q$],3),
+($q$CSG$q$,$q$w4-2$q$,6,$q$A customer's problem is caused by a known bug. You should:$q$,array[$q$Ignore the ticket$q$,$q$Explain clearly, share any workaround and say when you'll update them$q$,$q$Promise a fix today without checking$q$,$q$Pretend it's their fault$q$],1),
+($q$CSG$q$,$q$w4-2$q$,7,$q$Good support writing is:$q$,array[$q$Clear, friendly and step-by-step$q$,$q$Full of technical jargon$q$,$q$In capital letters$q$,$q$As short as “ok”$q$],0),
+($q$CSG$q$,$q$w4-2$q$,8,$q$When escalating, you should include:$q$,array[$q$A summary, what you've tried, and the customer's details$q$,$q$Only “please help”$q$,$q$Nothing, the next tier will ask$q$,$q$Your opinion of the customer$q$],0),
+($q$CSG$q$,$q$w4-2$q$,9,$q$A customer asks for something against policy. The best response:$q$,array[$q$Say yes anyway$q$,$q$Tell them they're wrong$q$,$q$Ignore the request$q$,$q$Explain the policy kindly and offer what you can do$q$],3),
+($q$CSG$q$,$q$w4-2$q$,10,$q$Why log every customer interaction?$q$,array[$q$To count how many emails you sent$q$,$q$To avoid replying$q$,$q$So anyone can see the full history and help quickly$q$,$q$It isn't necessary$q$],2),
+($q$CSG$q$,$q$w4-2$q$,11,$q$Personalising a reply means:$q$,array[$q$Using the customer's name and responding to their exact situation$q$,$q$Writing a long story about yourself$q$,$q$Sharing your personal phone number$q$,$q$Adding emojis everywhere$q$],0),
+($q$CSG$q$,$q$w4-2$q$,12,$q$After solving an issue, a good final step is to:$q$,array[$q$Confirm it's fixed and ask if they need anything else$q$,$q$Send the same message twice$q$,$q$Ask for a 5-star review immediately$q$,$q$Close the ticket without saying anything$q$],0),
+($q$CSG$q$,$q$w5-2$q$,1,$q$A ticket marked “Pending” usually means:$q$,array[$q$It is solved$q$,$q$It has been deleted$q$,$q$You're waiting for the customer to reply$q$,$q$It is spam$q$],2),
+($q$CSG$q$,$q$w5-2$q$,2,$q$Tags on tickets help you:$q$,array[$q$Hide tickets from managers$q$,$q$Group and report on issues, e.g. “refund” or “login”$q$,$q$Delete tickets$q$,$q$Make tickets colourful$q$],1),
+($q$CSG$q$,$q$w5-2$q$,3,$q$Ticket priority should be based on:$q$,array[$q$Impact and urgency for the customer and business$q$,$q$Who shouted loudest$q$,$q$Alphabetical order$q$,$q$The time you feel like it$q$],0),
+($q$CSG$q$,$q$w5-2$q$,4,$q$A macro (saved reply) is best used to:$q$,array[$q$Answer common questions quickly, then personalise it$q$,$q$Close every ticket$q$,$q$Send the same reply to everyone at once$q$,$q$Reply without reading$q$],0),
+($q$CSG$q$,$q$w5-2$q$,5,$q$Why personalise a macro before sending?$q$,array[$q$It isn't needed$q$,$q$Because macros are illegal$q$,$q$So the reply fits the customer's actual question$q$,$q$To make it longer$q$],2),
+($q$CSG$q$,$q$w5-2$q$,6,$q$An SLA timer shows:$q$,array[$q$How long you have left to respond or resolve under the agreed target$q$,$q$How long you've been logged in$q$,$q$Lunch break length$q$,$q$The customer's local time$q$],0),
+($q$CSG$q$,$q$w5-2$q$,7,$q$A ticket is close to breaching its SLA. You should:$q$,array[$q$Close it unsolved$q$,$q$Prioritise it or flag it to your lead$q$,$q$Change the timer$q$,$q$Ignore the timer$q$],1),
+($q$CSG$q$,$q$w5-2$q$,8,$q$Internal notes in a ticket are for:$q$,array[$q$Information for your team that the customer won't see$q$,$q$Messages to the customer$q$,$q$Personal reminders unrelated to work$q$,$q$Jokes$q$],0),
+($q$CSG$q$,$q$w5-2$q$,9,$q$Merging tickets is useful when:$q$,array[$q$Two different customers complain$q$,$q$Never$q$,$q$The same customer opened several tickets about one issue$q$,$q$You want fewer tickets on your report$q$],2),
+($q$CSG$q$,$q$w5-2$q$,10,$q$Before marking a ticket “Solved”, make sure:$q$,array[$q$It's the end of your shift$q$,$q$The ticket is old$q$,$q$The customer's issue is actually resolved$q$,$q$You've used a macro$q$],2),
+($q$CSG$q$,$q$w5-2$q$,11,$q$Assigning a ticket to the right group helps:$q$,array[$q$Nothing$q$,$q$It disappear$q$,$q$Lower your workload unfairly$q$,$q$It reach the person who can solve it fastest$q$],3),
+($q$CSG$q$,$q$w5-2$q$,12,$q$Help desk tools such as Zendesk and Freshdesk are used to:$q$,array[$q$Design websites$q$,$q$Edit videos$q$,$q$Manage, track and report on customer requests in one place$q$,$q$Pay salaries$q$],2),
+($q$CSG$q$,$q$w6-2$q$,1,$q$When handling several chats at once, you should:$q$,array[$q$Keep each customer updated and use saved replies wisely$q$,$q$Close chats randomly$q$,$q$Copy one answer into every chat$q$,$q$Stop replying to the oldest chat$q$],0),
+($q$CSG$q$,$q$w6-2$q$,2,$q$A good first response time in live chat is:$q$,array[$q$Within a minute or so$q$,$q$The next day$q$,$q$After an hour$q$,$q$Whenever you're free$q$],0),
+($q$CSG$q$,$q$w6-2$q$,3,$q$An angry customer writes in capital letters. Your first step:$q$,array[$q$End the chat$q$,$q$Stay calm, acknowledge their frustration and focus on the problem$q$,$q$Reply in capitals too$q$,$q$Tell them to be polite first$q$],1),
+($q$CSG$q$,$q$w6-2$q$,4,$q$De-escalating a conversation includes:$q$,array[$q$Listening, empathising and offering clear next steps$q$,$q$Ignoring their messages$q$,$q$Arguing about who is right$q$,$q$Blaming another department$q$],0),
+($q$CSG$q$,$q$w6-2$q$,5,$q$If you need time to check something in chat, you should:$q$,array[$q$Close the chat$q$,$q$Tell the customer you're checking and roughly how long it will take$q$,$q$Go silent$q$,$q$Send random messages$q$],1),
+($q$CSG$q$,$q$w6-2$q$,6,$q$A good support email:$q$,array[$q$Is one long paragraph$q$,$q$Has no greeting$q$,$q$Uses lots of jargon$q$,$q$Has a clear subject, short paragraphs and next steps$q$],3),
+($q$CSG$q$,$q$w6-2$q$,7,$q$Closing a chat cleanly means:$q$,array[$q$Sending a link without explanation$q$,$q$Asking for money$q$,$q$Leaving without a goodbye$q$,$q$Summarising the solution and asking if there's anything else$q$],3),
+($q$CSG$q$,$q$w6-2$q$,8,$q$Which phrase sounds professional?$q$,array[$q$“Whatever.”$q$,$q$“You should have read the FAQ.”$q$,$q$“Not my department, bye.”$q$,$q$“Thanks for your patience. I've fixed that for you.”$q$],3),
+($q$CSG$q$,$q$w6-2$q$,9,$q$A customer becomes abusive. You should:$q$,array[$q$Share their details online$q$,$q$Keep arguing$q$,$q$Insult them back$q$,$q$Follow your company's policy, stay professional and escalate if needed$q$],3),
+($q$CSG$q$,$q$w6-2$q$,10,$q$Using the customer's name in chat:$q$,array[$q$Wastes time$q$,$q$Is against the rules$q$,$q$Makes the conversation more personal$q$,$q$Is rude$q$],2),
+($q$CSG$q$,$q$w6-2$q$,11,$q$Canned responses in chat should:$q$,array[$q$Be sent unchanged every time$q$,$q$Be adapted to sound natural and fit the question$q$,$q$Replace reading the message$q$,$q$Be very long$q$],1),
+($q$CSG$q$,$q$w6-2$q$,12,$q$After a difficult chat, it's good practice to:$q$,array[$q$Delete the conversation$q$,$q$Add notes to the ticket so the next agent has context$q$,$q$Close all your other chats$q$,$q$Complain on social media$q$],1),
+($q$CSG$q$,$q$w7-2$q$,1,$q$CSAT measures:$q$,array[$q$Revenue per customer$q$,$q$How many agents are online$q$,$q$How satisfied customers are with an interaction$q$,$q$How fast you type$q$],2),
+($q$CSG$q$,$q$w7-2$q$,2,$q$FRT stands for:$q$,array[$q$First Response Time$q$,$q$Final Resolution Ticket$q$,$q$Frequent Return Total$q$,$q$Fast Reply Template$q$],0),
+($q$CSG$q$,$q$w7-2$q$,3,$q$NPS asks customers:$q$,array[$q$Their age$q$,$q$Their favourite agent$q$,$q$How likely they are to recommend the company, from 0 to 10$q$,$q$How many products they own$q$],2),
+($q$CSG$q$,$q$w7-2$q$,4,$q$In NPS, customers who score 9 or 10 are called:$q$,array[$q$Detractors$q$,$q$Agents$q$,$q$Passives$q$,$q$Promoters$q$],3),
+($q$CSG$q$,$q$w7-2$q$,5,$q$A lower First Response Time is usually:$q$,array[$q$Worse$q$,$q$Only for email$q$,$q$Better, because customers hear back faster$q$,$q$Not important$q$],2),
+($q$CSG$q$,$q$w7-2$q$,6,$q$Agents are often scored on:$q$,array[$q$Number of emojis used$q$,$q$CSAT, response times, resolution rate and quality reviews$q$,$q$How many breaks they take$q$,$q$Their handwriting$q$],1),
+($q$CSG$q$,$q$w7-2$q$,7,$q$Your CSAT dropped this week. A good first step is to:$q$,array[$q$Ask friends to rate you$q$,$q$Read the low-rated tickets to find patterns$q$,$q$Ignore it$q$,$q$Close tickets faster without solving them$q$],1),
+($q$CSG$q$,$q$w7-2$q$,8,$q$Resolution rate means:$q$,array[$q$Your screen resolution$q$,$q$The share of tickets that were actually solved$q$,$q$The number of customers$q$,$q$How many tickets you opened$q$],1),
+($q$CSG$q$,$q$w7-2$q$,9,$q$A weekly support report usually shows:$q$,array[$q$Volume, response times, satisfaction and top issues$q$,$q$Only the number of agents$q$,$q$Staff birthdays$q$,$q$Social media likes$q$],0),
+($q$CSG$q$,$q$w7-2$q$,10,$q$Ticket volume spiking on one topic suggests:$q$,array[$q$Customers are bored$q$,$q$A product issue worth flagging to the team$q$,$q$Nothing important$q$,$q$Agents are slow$q$],1),
+($q$CSG$q$,$q$w7-2$q$,11,$q$Why balance speed with quality?$q$,array[$q$Fast but wrong answers lead to repeat contacts and unhappy customers$q$,$q$Speed is all that matters$q$,$q$Customers prefer slow answers$q$,$q$Quality doesn't affect CSAT$q$],0),
+($q$CSG$q$,$q$w7-2$q$,12,$q$Detractors in NPS are customers who score:$q$,array[$q$Exactly 5$q$,$q$7 to 8$q$,$q$9 to 10$q$,$q$0 to 6$q$],3),
+($q$CSG$q$,$q$w8-2$q$,1,$q$The main difference between support and customer success is:$q$,array[$q$Support reacts to problems, customer success proactively helps customers reach their goals$q$,$q$Support only works with new customers$q$,$q$Customer success only handles refunds$q$,$q$They are exactly the same$q$],0),
+($q$CSG$q$,$q$w8-2$q$,2,$q$A good onboarding plan for a new customer starts with:$q$,array[$q$Waiting for them to ask for help$q$,$q$Sending an invoice$q$,$q$Understanding what success looks like for them$q$,$q$A long product feature list$q$],2),
+($q$CSG$q$,$q$w8-2$q$,3,$q$A customer health score helps you:$q$,array[$q$Spot customers at risk before they leave$q$,$q$Decide office opening hours$q$,$q$Write job adverts$q$,$q$Calculate staff salaries$q$],0),
+($q$CSG$q$,$q$w8-2$q$,4,$q$Which is a warning sign that a customer may churn?$q$,array[$q$They attended your training session$q$,$q$Their product usage has dropped sharply$q$,$q$They renewed early$q$,$q$They referred a friend$q$],1),
+($q$CSG$q$,$q$w8-2$q$,5,$q$Time to value means:$q$,array[$q$How long a support call lasts$q$,$q$How long it takes a customer to get their first real benefit from the product$q$,$q$How many staff a customer has$q$,$q$The price of the product$q$],1),
+($q$CSG$q$,$q$w8-2$q$,6,$q$A quarterly business review (QBR) with a customer is for:$q$,array[$q$Complaining about late payments$q$,$q$Introducing new staff only$q$,$q$Selling as much as possible in one call$q$,$q$Reviewing results against their goals and planning next steps$q$],3),
+($q$CSG$q$,$q$w8-2$q$,7,$q$During onboarding, a customer goes quiet for two weeks. You should:$q$,array[$q$Close their account$q$,$q$Wait for them to complain$q$,$q$Assume everything is fine$q$,$q$Reach out with a helpful check-in and offer support$q$],3),
+($q$CSG$q$,$q$w8-2$q$,8,$q$Which onboarding step usually comes first?$q$,array[$q$A welcome and kickoff call to agree goals and next steps$q$,$q$A satisfaction survey$q$,$q$An upsell offer$q$,$q$A renewal discussion$q$],0),
+($q$CSG$q$,$q$w8-2$q$,9,$q$Success plans should be:$q$,array[$q$The same for every customer$q$,$q$Only in your head$q$,$q$Written down and shared with the customer, with clear milestones$q$,$q$Kept secret from the customer$q$],2),
+($q$CSG$q$,$q$w8-2$q$,10,$q$A customer success team is often measured by:$q$,array[$q$Retention, renewals and customer health$q$,$q$Number of emails sent$q$,$q$Hours spent in meetings$q$,$q$Office attendance$q$],0),
+($q$CSG$q$,$q$w9-2$q$,1,$q$A CRM is mainly used to:$q$,array[$q$Pay staff salaries$q$,$q$Design websites$q$,$q$Keep a shared record of customers, deals and every interaction$q$,$q$Edit photos$q$],2),
+($q$CSG$q$,$q$w9-2$q$,2,$q$In a CRM, a deal stage shows:$q$,array[$q$The office location$q$,$q$The product's colour$q$,$q$How far a sale has progressed in the pipeline$q$,$q$The customer's birthday$q$],2),
+($q$CSG$q$,$q$w9-2$q$,3,$q$You find the same company entered three times in the CRM. You should:$q$,array[$q$Merge the duplicates, keeping the most complete details$q$,$q$Create a fourth record$q$,$q$Delete all three$q$,$q$Leave them, duplicates don't matter$q$],0),
+($q$CSG$q$,$q$w9-2$q$,4,$q$Why log every call and email against a contact?$q$,array[$q$It isn't useful$q$,$q$It is required by the phone company$q$,$q$So anyone on the team can see the full history before contacting them$q$,$q$To make the CRM look busy$q$],2),
+($q$CSG$q$,$q$w9-2$q$,5,$q$Required fields in a CRM help to:$q$,array[$q$Hide records from managers$q$,$q$Make sure key information is always captured$q$,$q$Delete old deals$q$,$q$Slow people down$q$],1),
+($q$CSG$q$,$q$w9-2$q$,6,$q$A sales pipeline report shows:$q$,array[$q$Staff holiday dates$q$,$q$Office supply levels$q$,$q$Website colours$q$,$q$How many deals are at each stage and their total value$q$],3),
+($q$CSG$q$,$q$w9-2$q$,7,$q$Which is the cleanest way to store a Nigerian phone number?$q$,array[$q$Whatever format each person likes$q$,$q$One agreed format for everyone, e.g. +234 803 123 4567$q$,$q$Inside the notes field as free text$q$,$q$Only the last four digits$q$],1),
+($q$CSG$q$,$q$w9-2$q$,8,$q$Before importing a spreadsheet of contacts into a CRM, you should:$q$,array[$q$Email it to all contacts$q$,$q$Clean it, match the columns to CRM fields and remove duplicates$q$,$q$Import it as it is$q$,$q$Delete the column headers$q$],1),
+($q$CSG$q$,$q$w9-2$q$,9,$q$A CRM task such as Follow up on proposal is useful because:$q$,array[$q$It replaces talking to customers$q$,$q$It closes the deal automatically$q$,$q$It is only for managers$q$,$q$It reminds the owner what to do and when$q$],3),
+($q$CSG$q$,$q$w9-2$q$,10,$q$Data protection in a CRM means:$q$,array[$q$Customer data can be shared on social media$q$,$q$Passwords are shared across the team$q$,$q$Anyone can export the whole database$q$,$q$Only authorised people can see customer data, and it is used for agreed purposes$q$],3),
+($q$CSG$q$,$q$w10-2$q$,1,$q$An ideal customer profile (ICP) describes:$q$,array[$q$Your sales targets$q$,$q$Your favourite customer's personal details$q$,$q$The price list$q$,$q$The type of company most likely to buy and succeed with your product$q$],3),
+($q$CSG$q$,$q$w10-2$q$,2,$q$The main goal of a sales development rep is usually to:$q$,array[$q$Manage the company accounts$q$,$q$Write product code$q$,$q$Close every deal alone$q$,$q$Find and qualify prospects and book meetings for the sales team$q$],3),
+($q$CSG$q$,$q$w10-2$q$,3,$q$A strong cold email:$q$,array[$q$Is a long list of every product feature$q$,$q$Has no subject line$q$,$q$Is the same message sent to everyone without changes$q$,$q$Is short, personal and ends with one clear next step$q$],3),
+($q$CSG$q$,$q$w10-2$q$,4,$q$A prospect says Send me some information. A good reply is:$q$,array[$q$Stop contacting them$q$,$q$Argue that they should buy now$q$,$q$Send a 40-page brochure and never follow up$q$,$q$Agree, and ask one question to understand what would be most useful$q$],3),
+($q$CSG$q$,$q$w10-2$q$,5,$q$Qualifying a lead means checking:$q$,array[$q$How many followers they have$q$,$q$Whether they have the need, budget, authority and timing to buy$q$,$q$Only their job title$q$,$q$Their favourite football club$q$],1),
+($q$CSG$q$,$q$w10-2$q$,6,$q$A sequence in sales prospecting is:$q$,array[$q$A meeting agenda$q$,$q$A planned series of follow-up messages over days or weeks$q$,$q$The order of products in a catalogue$q$,$q$A single phone call$q$],1),
+($q$CSG$q$,$q$w10-2$q$,7,$q$A prospect says We already use a competitor. A good response is:$q$,array[$q$End the call immediately$q$,$q$Acknowledge it and ask what's working well and what could be better$q$,$q$Criticise the competitor harshly$q$,$q$Lower your price without asking anything$q$],1),
+($q$CSG$q$,$q$w10-2$q$,8,$q$Which is the best source for building a B2B prospect list?$q$,array[$q$Any list bought without consent$q$,$q$Company websites, LinkedIn and industry directories that fit your ICP$q$,$q$Personal contacts' private data$q$,$q$Random phone numbers$q$],1),
+($q$CSG$q$,$q$w10-2$q$,9,$q$Why log every prospecting activity in the CRM?$q$,array[$q$To avoid talking to prospects$q$,$q$It has no benefit$q$,$q$To track follow-ups and see which messages work$q$,$q$Because it replaces the sales team$q$],2),
+($q$CSG$q$,$q$w10-2$q$,10,$q$A good opening line in a cold call:$q$,array[$q$Avoids saying your name$q$,$q$Asks them to buy immediately$q$,$q$Says who you are, why you're calling and asks for a moment of their time$q$,$q$Starts with a long product demo$q$],2),
+($q$CSG$q$,$q$w11-2$q$,1,$q$Customer churn rate is:$q$,array[$q$The number of new customers$q$,$q$The share of customers who stop buying in a period$q$,$q$The price increase this year$q$,$q$The number of support tickets$q$],1),
+($q$CSG$q$,$q$w11-2$q$,2,$q$You start the month with 200 customers and 10 cancel. Churn for the month is:$q$,array[$q$10%$q$,$q$20%$q$,$q$5%$q$,$q$2%$q$],2),
+($q$CSG$q$,$q$w11-2$q$,3,$q$An upsell is when a customer:$q$,array[$q$Cancels their subscription$q$,$q$Moves to a higher plan or buys more of what they already use$q$,$q$Files a complaint$q$,$q$Asks for a refund$q$],1),
+($q$CSG$q$,$q$w11-2$q$,4,$q$Which is a good upsell signal?$q$,array[$q$The customer regularly hits the limits of their current plan$q$,$q$The customer hasn't logged in for months$q$,$q$The customer asked to cancel$q$,$q$The customer just complained about billing$q$],0),
+($q$CSG$q$,$q$w11-2$q$,5,$q$Net revenue retention above 100% means:$q$,array[$q$Prices were cut in half$q$,$q$You lost all your customers$q$,$q$Revenue from existing customers grew, even after churn$q$,$q$Only new customers paid$q$],2),
+($q$CSG$q$,$q$w11-2$q$,6,$q$The best time to start a renewal conversation is:$q$,array[$q$Never, renewals happen on their own$q$,$q$Well before the renewal date, with the value they've received$q$,$q$The day after it expires$q$,$q$Only if they complain$q$],1),
+($q$CSG$q$,$q$w11-2$q$,7,$q$Customer feedback from surveys should be:$q$,array[$q$Kept private from the product team$q$,$q$Ignored if it's negative$q$,$q$Deleted after reading$q$,$q$Grouped into themes and turned into actions, then shared back with customers$q$],3),
+($q$CSG$q$,$q$w11-2$q$,8,$q$A monthly growth report for the team should include:$q$,array[$q$Churn, retention, expansion revenue and the main reasons behind changes$q$,$q$Only good news$q$,$q$Every customer's personal details$q$,$q$Staff lunch orders$q$],0),
+($q$CSG$q$,$q$w11-2$q$,9,$q$An at-risk customer is best handled by:$q$,array[$q$Contacting them quickly to understand the problem and agree a fix$q$,$q$Offering a discount without asking anything$q$,$q$Waiting for their contract to end$q$,$q$Removing them from the CRM$q$],0),
+($q$CSG$q$,$q$w11-2$q$,10,$q$Retention matters because:$q$,array[$q$It reduces the need for support$q$,$q$It is only an accounting term$q$,$q$Keeping customers usually costs less than winning new ones$q$,$q$New customers are never valuable$q$],2),
+($q$CSG$q$,$q$exam-fund$q$,1,$q$A good email subject line should:$q$,array[$q$State the ask or topic clearly, e.g. “Approval needed: Q3 budget by Friday”$q$,$q$Be one word, like “Hello”$q$,$q$Be left empty so people open the email$q$,$q$Repeat the sender's name$q$],0),
+($q$CSG$q$,$q$exam-fund$q$,2,$q$You need two separate decisions from your manager. Best practice is to:$q$,array[$q$Send two short emails, one topic each, with a clear next step$q$,$q$Ask on WhatsApp late at night$q$,$q$Put both in one long email with no headings$q$,$q$Wait for your weekly meeting$q$],0),
+($q$CSG$q$,$q$exam-fund$q$,3,$q$A client emails a question you can't answer today. What should you do?$q$,array[$q$Reply “ok” and nothing else$q$,$q$Acknowledge it within one working day and say when you'll reply$q$,$q$Forward it to a colleague without comment$q$,$q$Ignore it until you have the full answer$q$],1),
+($q$CSG$q$,$q$exam-fund$q$,4,$q$Which channel suits an urgent, informal question to a teammate?$q$,array[$q$A work chat tool such as Slack or Teams$q$,$q$A formal letter$q$,$q$An email to the whole company$q$,$q$A post on your public social media$q$],0),
+($q$CSG$q$,$q$exam-fund$q$,5,$q$In a remote team meeting where you are not presenting, you should:$q$,array[$q$Mute and use raise-hand when you want to speak$q$,$q$Keep your mic on so people know you're there$q$,$q$Leave your camera on and walk away$q$,$q$Type every comment in capital letters$q$],0),
+($q$CSG$q$,$q$exam-fund$q$,6,$q$Your team agreed cameras on for team meetings. Today your internet is poor. You should:$q$,array[$q$Skip the meeting$q$,$q$Keep the camera on even if the call keeps dropping$q$,$q$Tell the host briefly and turn the camera off to save data$q$,$q$Join late without saying anything$q$],2),
+($q$CSG$q$,$q$exam-fund$q$,7,$q$You're stuck on a task working from home. The best move is to:$q$,array[$q$Quietly hand it to a colleague$q$,$q$Say nothing and hope it resolves$q$,$q$Wait until the deadline, then explain$q$,$q$Tell your lead early, say what you've tried, and ask a specific question$q$],3),
+($q$CSG$q$,$q$exam-fund$q$,8,$q$You'll be away from your desk for two hours during work time. You should:$q$,array[$q$Leave without telling anyone$q$,$q$Log out of everything so nobody can reach you$q$,$q$Update your status or tell the team when you'll be back$q$,$q$Change your profile picture$q$],2),
+($q$CSG$q$,$q$exam-fund$q$,9,$q$Which file name follows good practice?$q$,array[$q$Untitled document$q$,$q$2026-11-04_AcmeCo_Onboarding-Guide_v2.docx$q$,$q$report-new(2).docx$q$,$q$final final.docx$q$],1),
+($q$CSG$q$,$q$exam-fund$q$,10,$q$A sensible top-level folder structure for your work is:$q$,array[$q$Everything in Downloads$q$,$q$One folder per day$q$,$q$One folder per client or project, with clear subfolders$q$,$q$Files only on your desktop$q$],2),
+($q$CSG$q$,$q$exam-fund$q$,11,$q$You need a colleague to comment on a document but not change it. Share it with:$q$,array[$q$No access, and email a screenshot$q$,$q$Owner access$q$,$q$Editor access for everyone with the link$q$,$q$Commenter access$q$],3),
+($q$CSG$q$,$q$exam-fund$q$,12,$q$Why should work files not live only on your laptop desktop?$q$,array[$q$It uses too much battery$q$,$q$Desktops are slower to load$q$,$q$Laptops can't open shared files$q$,$q$They can be lost and your team can't find or open them$q$],3),
+($q$CSG$q$,$q$exam-fund$q$,13,$q$In the Eisenhower matrix, a task that is important but not urgent should be:$q$,array[$q$Delegated$q$,$q$Done immediately$q$,$q$Deleted$q$,$q$Scheduled$q$],3),
+($q$CSG$q$,$q$exam-fund$q$,14,$q$Time-blocking means:$q$,array[$q$Working without breaks$q$,$q$Blocking colleagues' calendars$q$,$q$Reserving set times in your calendar for focused work$q$,$q$Doing every task as it arrives$q$],2),
+($q$CSG$q$,$q$exam-fund$q$,15,$q$You estimated a task at 2 hours and it took 5. What's the most useful next step?$q$,array[$q$Blame the tools$q$,$q$Stop estimating tasks$q$,$q$Ignore it$q$,$q$Note the difference and use it to estimate similar tasks better$q$],3),
+($q$CSG$q$,$q$exam-fund$q$,16,$q$A daily shutdown routine helps you:$q$,array[$q$Work later every night$q$,$q$Review what's done, plan tomorrow and switch off$q$,$q$Skip planning$q$,$q$Avoid checking any messages$q$],1),
+($q$CSG$q$,$q$exam-fund$q$,17,$q$A simple task board usually has columns like:$q$,array[$q$Monday to Friday only$q$,$q$Easy, Medium, Hard, Impossible$q$,$q$Mine and Not mine$q$,$q$To do, Doing, Review, Done$q$],3),
+($q$CSG$q$,$q$exam-fund$q$,18,$q$A Trello or Notion card for a deliverable should always have:$q$,array[$q$At least ten checklist items$q$,$q$A due date and a clear owner$q$,$q$A colourful cover image$q$,$q$No description$q$],1),
+($q$CSG$q$,$q$exam-fund$q$,19,$q$Why use a checklist for repeatable work?$q$,array[$q$Because managers like long lists$q$,$q$To make the task take longer$q$,$q$So steps aren't missed and quality stays consistent$q$,$q$So nobody needs to think$q$],2),
+($q$CSG$q$,$q$exam-fund$q$,20,$q$A weekly review of your task board is for:$q$,array[$q$Clearing finished cards, updating dates and planning next week$q$,$q$Deleting tasks you don't like$q$,$q$Showing off to colleagues$q$,$q$Changing the board's colours$q$],0),
+($q$CSG$q$,$q$exam-fund$q$,21,$q$Three urgent requests arrive at once. A good first step is to:$q$,array[$q$Wait for someone to follow up$q$,$q$Start all three at the same time$q$,$q$Check priorities and deadlines, then confirm the order with your manager if unsure$q$,$q$Do the easiest one and ignore the rest$q$],2),
+($q$CSG$q$,$q$exam-fund$q$,22,$q$You realise you will miss a deadline. When should you tell your manager?$q$,array[$q$Only if they ask$q$,$q$As soon as you know, with a new date and what you need$q$,$q$Never, just submit it late$q$,$q$After the deadline has passed$q$],1),
+($q$CSG$q$,$q$exam-fund$q$,23,$q$Which habit best shows you are workplace-ready?$q$,array[$q$Replying only when it suits you$q$,$q$Avoiding questions so you look confident$q$,$q$Working only on tasks you enjoy$q$,$q$Arriving on time and keeping people updated on your progress$q$],3),
+($q$CSG$q$,$q$exam-fund$q$,24,$q$When you finish a task, a good habit is to:$q$,array[$q$Move on without telling anyone$q$,$q$Check your work, share it, and update your task board$q$,$q$Wait for someone to discover it$q$,$q$Delete your notes$q$],1),
+($q$CSG$q$,$q$exam-fund$q$,25,$q$Which email subject line is clearest?$q$,array[$q$Hi$q$,$q$Approval needed: venue booking by Thursday$q$,$q$Question$q$,$q$Urgent!!!$q$],1),
+($q$CSG$q$,$q$exam-fund$q$,26,$q$You need to share a large file with a client. Best practice is to:$q$,array[$q$Print and post it$q$,$q$Send it on WhatsApp to their personal number$q$,$q$Share a link with the right permission level$q$,$q$Attach it in pieces across ten emails$q$],2),
+($q$CSG$q$,$q$exam-fund$q$,27,$q$During a video call your connection keeps dropping. You should:$q$,array[$q$Keep rejoining without explanation$q$,$q$Tell the host briefly, turn off your camera and stay on audio$q$,$q$Blame the host's connection$q$,$q$Leave without saying anything$q$],1),
+($q$CSG$q$,$q$exam-fund$q$,28,$q$A colleague asks for an update you can't give yet. You should:$q$,array[$q$Tell them to ask someone else$q$,$q$Say when you'll have it and follow up by then$q$,$q$Guess an answer$q$,$q$Ignore the message$q$],1),
+($q$CSG$q$,$q$exam-fund$q$,29,$q$Which file name will be easiest to find later?$q$,array[$q$Untitled$q$,$q$new doc (3).docx$q$,$q$final FINAL.docx$q$,$q$2026-12-01_Jobnest_Report_v1.docx$q$],3),
+($q$CSG$q$,$q$exam-fund$q$,30,$q$Writing in all capital letters in a work message usually comes across as:$q$,array[$q$Neutral$q$,$q$Friendly$q$,$q$Professional$q$,$q$Shouting$q$],3),
+($q$CSG$q$,$q$exam-fund$q$,31,$q$When you finish a task someone is waiting on, you should:$q$,array[$q$Mention it next week$q$,$q$Wait for them to notice$q$,$q$Tell them it's done and where to find it$q$,$q$Move straight to the next task$q$],2),
+($q$CSG$q$,$q$exam-fund$q$,32,$q$The Eisenhower matrix sorts tasks by:$q$,array[$q$Urgency and importance$q$,$q$Who asked first$q$,$q$Cost and size$q$,$q$Colour and shape$q$],0),
+($q$CSG$q$,$q$exam-fund$q$,33,$q$A task that is urgent but not important should usually be:$q$,array[$q$Done before everything else$q$,$q$Deleted$q$,$q$Delegated where possible$q$,$q$Ignored$q$],2),
+($q$CSG$q$,$q$exam-fund$q$,34,$q$Time-blocking works best when you:$q$,array[$q$Book every minute with meetings$q$,$q$Work only when you feel like it$q$,$q$Reserve focused time for important work and protect it$q$,$q$Never plan ahead$q$],2),
+($q$CSG$q$,$q$exam-fund$q$,35,$q$On a task board, a card in the Review column means:$q$,array[$q$Nobody has started it$q$,$q$The work is done and waiting to be checked$q$,$q$It is overdue$q$,$q$It is cancelled$q$],1),
+($q$CSG$q$,$q$exam-fund$q$,36,$q$You have more work than you can finish this week. The best step is to:$q$,array[$q$Work through the night every night$q$,$q$Wait until deadlines pass$q$,$q$Quietly drop tasks$q$,$q$Tell your manager early and agree priorities$q$],3),
+($q$CSG$q$,$q$exam-fund$q$,37,$q$Which is the best channel for a formal request to a client?$q$,array[$q$A clear, polite email$q$,$q$A message through a friend$q$,$q$A comment on their social media$q$,$q$A voice note at midnight$q$],0),
+($q$CSG$q$,$q$exam-fund$q$,38,$q$Professional tone in a written reply means:$q$,array[$q$Polite, clear and focused on the next step$q$,$q$Very casual with lots of slang$q$,$q$Long and full of jargon$q$,$q$Short and rude$q$],0),
+($q$CSG$q$,$q$exam-fund$q$,39,$q$Why update your status when you step away from work online?$q$,array[$q$Because it's fun$q$,$q$So colleagues know when to expect a reply$q$,$q$To look busy$q$,$q$It has no purpose$q$],1),
+($q$CSG$q$,$q$exam-fund$q$,40,$q$A shared drive folder should be organised:$q$,array[$q$By client or project with clear subfolders$q$,$q$By the date you joined$q$,$q$By file size$q$,$q$In one big folder$q$],0),
+($q$CSG$q$,$q$exam-fund$q$,41,$q$Giving someone Viewer access to a document means they can:$q$,array[$q$Share it as the owner$q$,$q$Read it but not change it$q$,$q$Nothing at all$q$,$q$Edit and delete it$q$],1),
+($q$CSG$q$,$q$exam-fund$q$,42,$q$Before you send an important email, you should:$q$,array[$q$Check the recipient, attachment, spelling and the ask$q$,$q$Copy in everyone you know$q$,$q$Send it as fast as possible$q$,$q$Remove the subject line$q$],0),
+($q$CSG$q$,$q$exam-fund$q$,43,$q$A workplace-ready professional handles feedback by:$q$,array[$q$Listening, asking questions and acting on it$q$,$q$Complaining to colleagues$q$,$q$Ignoring it$q$,$q$Arguing straight away$q$],0),
+($q$CSG$q$,$q$exam-fund$q$,44,$q$Meeting notes are most useful when they record:$q$,array[$q$Every word that was said$q$,$q$Decisions, actions, owners and due dates$q$,$q$Personal opinions$q$,$q$Only who was late$q$],1),
+($q$CSG$q$,$q$exam-fund$q$,45,$q$A daily shutdown routine ends your day by:$q$,array[$q$Reviewing what's done and planning tomorrow$q$,$q$Leaving all tabs open$q$,$q$Checking social media$q$,$q$Deleting your to-do list$q$],0),
+($q$CSG$q$,$q$exam-core$q$,1,$q$Tier 1 support usually:$q$,array[$q$Only handles refunds over ₦1m$q$,$q$Never talks to customers$q$,$q$Handles common questions and escalates complex issues$q$,$q$Writes the company's code$q$],2),
+($q$CSG$q$,$q$exam-core$q$,2,$q$You should escalate a ticket when:$q$,array[$q$You don't feel like answering$q$,$q$It needs skills or permissions you don't have$q$,$q$The customer is polite$q$,$q$It's Friday$q$],1),
+($q$CSG$q$,$q$exam-core$q$,3,$q$Showing empathy without over-apologising sounds like:$q$,array[$q$“That's not my problem.”$q$,$q$“Sorry sorry sorry, so sorry.”$q$,$q$“Calm down.”$q$,$q$“I understand how frustrating that is. Here's what I'll do now.”$q$],3),
+($q$CSG$q$,$q$exam-core$q$,4,$q$First-contact resolution means:$q$,array[$q$Contacting the customer first$q$,$q$Solving the customer's issue in the first interaction$q$,$q$Answering the first ticket of the day$q$,$q$Closing tickets without replying$q$],1),
+($q$CSG$q$,$q$exam-core$q$,5,$q$Before replying to a customer, you should:$q$,array[$q$Close the ticket$q$,$q$Reply with a template without reading$q$,$q$Read the whole message and check their history$q$,$q$Ask them to repeat everything$q$],2),
+($q$CSG$q$,$q$exam-core$q$,6,$q$A customer's problem is caused by a known bug. You should:$q$,array[$q$Ignore the ticket$q$,$q$Pretend it's their fault$q$,$q$Explain clearly, share any workaround and say when you'll update them$q$,$q$Promise a fix today without checking$q$],2),
+($q$CSG$q$,$q$exam-core$q$,7,$q$Good support writing is:$q$,array[$q$Clear, friendly and step-by-step$q$,$q$In capital letters$q$,$q$As short as “ok”$q$,$q$Full of technical jargon$q$],0),
+($q$CSG$q$,$q$exam-core$q$,8,$q$When escalating, you should include:$q$,array[$q$Nothing, the next tier will ask$q$,$q$Only “please help”$q$,$q$Your opinion of the customer$q$,$q$A summary, what you've tried, and the customer's details$q$],3),
+($q$CSG$q$,$q$exam-core$q$,9,$q$A customer asks for something against policy. The best response:$q$,array[$q$Explain the policy kindly and offer what you can do$q$,$q$Ignore the request$q$,$q$Tell them they're wrong$q$,$q$Say yes anyway$q$],0),
+($q$CSG$q$,$q$exam-core$q$,10,$q$Why log every customer interaction?$q$,array[$q$To avoid replying$q$,$q$To count how many emails you sent$q$,$q$So anyone can see the full history and help quickly$q$,$q$It isn't necessary$q$],2),
+($q$CSG$q$,$q$exam-core$q$,11,$q$Personalising a reply means:$q$,array[$q$Writing a long story about yourself$q$,$q$Sharing your personal phone number$q$,$q$Adding emojis everywhere$q$,$q$Using the customer's name and responding to their exact situation$q$],3),
+($q$CSG$q$,$q$exam-core$q$,12,$q$After solving an issue, a good final step is to:$q$,array[$q$Send the same message twice$q$,$q$Close the ticket without saying anything$q$,$q$Confirm it's fixed and ask if they need anything else$q$,$q$Ask for a 5-star review immediately$q$],2),
+($q$CSG$q$,$q$exam-core$q$,13,$q$A ticket marked “Pending” usually means:$q$,array[$q$It is solved$q$,$q$You're waiting for the customer to reply$q$,$q$It is spam$q$,$q$It has been deleted$q$],1),
+($q$CSG$q$,$q$exam-core$q$,14,$q$Tags on tickets help you:$q$,array[$q$Hide tickets from managers$q$,$q$Delete tickets$q$,$q$Group and report on issues, e.g. “refund” or “login”$q$,$q$Make tickets colourful$q$],2),
+($q$CSG$q$,$q$exam-core$q$,15,$q$Ticket priority should be based on:$q$,array[$q$Who shouted loudest$q$,$q$Impact and urgency for the customer and business$q$,$q$Alphabetical order$q$,$q$The time you feel like it$q$],1),
+($q$CSG$q$,$q$exam-core$q$,16,$q$A macro (saved reply) is best used to:$q$,array[$q$Reply without reading$q$,$q$Answer common questions quickly, then personalise it$q$,$q$Send the same reply to everyone at once$q$,$q$Close every ticket$q$],1),
+($q$CSG$q$,$q$exam-core$q$,17,$q$Why personalise a macro before sending?$q$,array[$q$So the reply fits the customer's actual question$q$,$q$It isn't needed$q$,$q$To make it longer$q$,$q$Because macros are illegal$q$],0),
+($q$CSG$q$,$q$exam-core$q$,18,$q$An SLA timer shows:$q$,array[$q$The customer's local time$q$,$q$Lunch break length$q$,$q$How long you've been logged in$q$,$q$How long you have left to respond or resolve under the agreed target$q$],3),
+($q$CSG$q$,$q$exam-core$q$,19,$q$A ticket is close to breaching its SLA. You should:$q$,array[$q$Change the timer$q$,$q$Prioritise it or flag it to your lead$q$,$q$Ignore the timer$q$,$q$Close it unsolved$q$],1),
+($q$CSG$q$,$q$exam-core$q$,20,$q$Internal notes in a ticket are for:$q$,array[$q$Jokes$q$,$q$Messages to the customer$q$,$q$Personal reminders unrelated to work$q$,$q$Information for your team that the customer won't see$q$],3),
+($q$CSG$q$,$q$exam-core$q$,21,$q$Merging tickets is useful when:$q$,array[$q$You want fewer tickets on your report$q$,$q$Never$q$,$q$Two different customers complain$q$,$q$The same customer opened several tickets about one issue$q$],3),
+($q$CSG$q$,$q$exam-core$q$,22,$q$Before marking a ticket “Solved”, make sure:$q$,array[$q$It's the end of your shift$q$,$q$The customer's issue is actually resolved$q$,$q$You've used a macro$q$,$q$The ticket is old$q$],1),
+($q$CSG$q$,$q$exam-core$q$,23,$q$Assigning a ticket to the right group helps:$q$,array[$q$Lower your workload unfairly$q$,$q$It disappear$q$,$q$It reach the person who can solve it fastest$q$,$q$Nothing$q$],2),
+($q$CSG$q$,$q$exam-core$q$,24,$q$Help desk tools such as Zendesk and Freshdesk are used to:$q$,array[$q$Design websites$q$,$q$Manage, track and report on customer requests in one place$q$,$q$Pay salaries$q$,$q$Edit videos$q$],1),
+($q$CSG$q$,$q$exam-core$q$,25,$q$When handling several chats at once, you should:$q$,array[$q$Stop replying to the oldest chat$q$,$q$Keep each customer updated and use saved replies wisely$q$,$q$Close chats randomly$q$,$q$Copy one answer into every chat$q$],1),
+($q$CSG$q$,$q$exam-core$q$,26,$q$A good first response time in live chat is:$q$,array[$q$Whenever you're free$q$,$q$Within a minute or so$q$,$q$After an hour$q$,$q$The next day$q$],1),
+($q$CSG$q$,$q$exam-core$q$,27,$q$An angry customer writes in capital letters. Your first step:$q$,array[$q$End the chat$q$,$q$Reply in capitals too$q$,$q$Tell them to be polite first$q$,$q$Stay calm, acknowledge their frustration and focus on the problem$q$],3),
+($q$CSG$q$,$q$exam-core$q$,28,$q$De-escalating a conversation includes:$q$,array[$q$Ignoring their messages$q$,$q$Arguing about who is right$q$,$q$Blaming another department$q$,$q$Listening, empathising and offering clear next steps$q$],3),
+($q$CSG$q$,$q$exam-core$q$,29,$q$If you need time to check something in chat, you should:$q$,array[$q$Tell the customer you're checking and roughly how long it will take$q$,$q$Close the chat$q$,$q$Send random messages$q$,$q$Go silent$q$],0),
+($q$CSG$q$,$q$exam-core$q$,30,$q$A good support email:$q$,array[$q$Has no greeting$q$,$q$Uses lots of jargon$q$,$q$Is one long paragraph$q$,$q$Has a clear subject, short paragraphs and next steps$q$],3),
+($q$CSG$q$,$q$exam-core$q$,31,$q$Closing a chat cleanly means:$q$,array[$q$Leaving without a goodbye$q$,$q$Sending a link without explanation$q$,$q$Summarising the solution and asking if there's anything else$q$,$q$Asking for money$q$],2),
+($q$CSG$q$,$q$exam-core$q$,32,$q$Which phrase sounds professional?$q$,array[$q$“Whatever.”$q$,$q$“You should have read the FAQ.”$q$,$q$“Not my department, bye.”$q$,$q$“Thanks for your patience. I've fixed that for you.”$q$],3),
+($q$CSG$q$,$q$exam-core$q$,33,$q$A customer becomes abusive. You should:$q$,array[$q$Share their details online$q$,$q$Follow your company's policy, stay professional and escalate if needed$q$,$q$Insult them back$q$,$q$Keep arguing$q$],1),
+($q$CSG$q$,$q$exam-core$q$,34,$q$Using the customer's name in chat:$q$,array[$q$Wastes time$q$,$q$Is against the rules$q$,$q$Is rude$q$,$q$Makes the conversation more personal$q$],3),
+($q$CSG$q$,$q$exam-core$q$,35,$q$Canned responses in chat should:$q$,array[$q$Replace reading the message$q$,$q$Be adapted to sound natural and fit the question$q$,$q$Be sent unchanged every time$q$,$q$Be very long$q$],1),
+($q$CSG$q$,$q$exam-core$q$,36,$q$After a difficult chat, it's good practice to:$q$,array[$q$Complain on social media$q$,$q$Add notes to the ticket so the next agent has context$q$,$q$Close all your other chats$q$,$q$Delete the conversation$q$],1),
+($q$CSG$q$,$q$exam-core$q$,37,$q$CSAT measures:$q$,array[$q$How satisfied customers are with an interaction$q$,$q$How many agents are online$q$,$q$Revenue per customer$q$,$q$How fast you type$q$],0),
+($q$CSG$q$,$q$exam-core$q$,38,$q$FRT stands for:$q$,array[$q$Final Resolution Ticket$q$,$q$First Response Time$q$,$q$Frequent Return Total$q$,$q$Fast Reply Template$q$],1),
+($q$CSG$q$,$q$exam-core$q$,39,$q$NPS asks customers:$q$,array[$q$How likely they are to recommend the company, from 0 to 10$q$,$q$Their age$q$,$q$How many products they own$q$,$q$Their favourite agent$q$],0),
+($q$CSG$q$,$q$exam-core$q$,40,$q$In NPS, customers who score 9 or 10 are called:$q$,array[$q$Passives$q$,$q$Detractors$q$,$q$Promoters$q$,$q$Agents$q$],2),
+($q$CSG$q$,$q$exam-core$q$,41,$q$A lower First Response Time is usually:$q$,array[$q$Better, because customers hear back faster$q$,$q$Not important$q$,$q$Worse$q$,$q$Only for email$q$],0),
+($q$CSG$q$,$q$exam-core$q$,42,$q$Agents are often scored on:$q$,array[$q$CSAT, response times, resolution rate and quality reviews$q$,$q$Their handwriting$q$,$q$How many breaks they take$q$,$q$Number of emojis used$q$],0),
+($q$CSG$q$,$q$exam-core$q$,43,$q$Your CSAT dropped this week. A good first step is to:$q$,array[$q$Close tickets faster without solving them$q$,$q$Ignore it$q$,$q$Read the low-rated tickets to find patterns$q$,$q$Ask friends to rate you$q$],2),
+($q$CSG$q$,$q$exam-core$q$,44,$q$Resolution rate means:$q$,array[$q$The number of customers$q$,$q$Your screen resolution$q$,$q$How many tickets you opened$q$,$q$The share of tickets that were actually solved$q$],3),
+($q$CSG$q$,$q$exam-core$q$,45,$q$A weekly support report usually shows:$q$,array[$q$Staff birthdays$q$,$q$Only the number of agents$q$,$q$Volume, response times, satisfaction and top issues$q$,$q$Social media likes$q$],2),
+($q$CSG$q$,$q$exam-core$q$,46,$q$Ticket volume spiking on one topic suggests:$q$,array[$q$Customers are bored$q$,$q$Nothing important$q$,$q$A product issue worth flagging to the team$q$,$q$Agents are slow$q$],2),
+($q$CSG$q$,$q$exam-core$q$,47,$q$Why balance speed with quality?$q$,array[$q$Customers prefer slow answers$q$,$q$Fast but wrong answers lead to repeat contacts and unhappy customers$q$,$q$Quality doesn't affect CSAT$q$,$q$Speed is all that matters$q$],1),
+($q$CSG$q$,$q$exam-core$q$,48,$q$Detractors in NPS are customers who score:$q$,array[$q$7 to 8$q$,$q$9 to 10$q$,$q$Exactly 5$q$,$q$0 to 6$q$],3),
+($q$CSG$q$,$q$exam-core$q$,49,$q$The main difference between support and customer success is:$q$,array[$q$Support reacts to problems, customer success proactively helps customers reach their goals$q$,$q$They are exactly the same$q$,$q$Support only works with new customers$q$,$q$Customer success only handles refunds$q$],0),
+($q$CSG$q$,$q$exam-core$q$,50,$q$A good onboarding plan for a new customer starts with:$q$,array[$q$A long product feature list$q$,$q$Understanding what success looks like for them$q$,$q$Sending an invoice$q$,$q$Waiting for them to ask for help$q$],1),
+($q$CSG$q$,$q$exam-core$q$,51,$q$A customer health score helps you:$q$,array[$q$Spot customers at risk before they leave$q$,$q$Decide office opening hours$q$,$q$Calculate staff salaries$q$,$q$Write job adverts$q$],0),
+($q$CSG$q$,$q$exam-core$q$,52,$q$Which is a warning sign that a customer may churn?$q$,array[$q$Their product usage has dropped sharply$q$,$q$They referred a friend$q$,$q$They renewed early$q$,$q$They attended your training session$q$],0),
+($q$CSG$q$,$q$exam-core$q$,53,$q$Time to value means:$q$,array[$q$How long it takes a customer to get their first real benefit from the product$q$,$q$How long a support call lasts$q$,$q$The price of the product$q$,$q$How many staff a customer has$q$],0),
+($q$CSG$q$,$q$exam-core$q$,54,$q$A quarterly business review (QBR) with a customer is for:$q$,array[$q$Reviewing results against their goals and planning next steps$q$,$q$Introducing new staff only$q$,$q$Complaining about late payments$q$,$q$Selling as much as possible in one call$q$],0),
+($q$CSG$q$,$q$exam-core$q$,55,$q$During onboarding, a customer goes quiet for two weeks. You should:$q$,array[$q$Assume everything is fine$q$,$q$Wait for them to complain$q$,$q$Reach out with a helpful check-in and offer support$q$,$q$Close their account$q$],2),
+($q$CSG$q$,$q$exam-core$q$,56,$q$Which onboarding step usually comes first?$q$,array[$q$An upsell offer$q$,$q$A satisfaction survey$q$,$q$A welcome and kickoff call to agree goals and next steps$q$,$q$A renewal discussion$q$],2),
+($q$CSG$q$,$q$exam-core$q$,57,$q$Success plans should be:$q$,array[$q$Kept secret from the customer$q$,$q$Written down and shared with the customer, with clear milestones$q$,$q$The same for every customer$q$,$q$Only in your head$q$],1),
+($q$CSG$q$,$q$exam-core$q$,58,$q$A customer success team is often measured by:$q$,array[$q$Office attendance$q$,$q$Number of emails sent$q$,$q$Hours spent in meetings$q$,$q$Retention, renewals and customer health$q$],3),
+($q$CSG$q$,$q$exam-core$q$,59,$q$A CRM is mainly used to:$q$,array[$q$Keep a shared record of customers, deals and every interaction$q$,$q$Edit photos$q$,$q$Pay staff salaries$q$,$q$Design websites$q$],0),
+($q$CSG$q$,$q$exam-core$q$,60,$q$In a CRM, a deal stage shows:$q$,array[$q$The office location$q$,$q$The customer's birthday$q$,$q$The product's colour$q$,$q$How far a sale has progressed in the pipeline$q$],3),
+($q$CSG$q$,$q$exam-core$q$,61,$q$You find the same company entered three times in the CRM. You should:$q$,array[$q$Delete all three$q$,$q$Create a fourth record$q$,$q$Merge the duplicates, keeping the most complete details$q$,$q$Leave them, duplicates don't matter$q$],2),
+($q$CSG$q$,$q$exam-core$q$,62,$q$Why log every call and email against a contact?$q$,array[$q$So anyone on the team can see the full history before contacting them$q$,$q$It isn't useful$q$,$q$It is required by the phone company$q$,$q$To make the CRM look busy$q$],0),
+($q$CSG$q$,$q$exam-core$q$,63,$q$Required fields in a CRM help to:$q$,array[$q$Slow people down$q$,$q$Hide records from managers$q$,$q$Make sure key information is always captured$q$,$q$Delete old deals$q$],2),
+($q$CSG$q$,$q$exam-core$q$,64,$q$A sales pipeline report shows:$q$,array[$q$Office supply levels$q$,$q$Staff holiday dates$q$,$q$How many deals are at each stage and their total value$q$,$q$Website colours$q$],2),
+($q$CSG$q$,$q$exam-core$q$,65,$q$Which is the cleanest way to store a Nigerian phone number?$q$,array[$q$Only the last four digits$q$,$q$Inside the notes field as free text$q$,$q$Whatever format each person likes$q$,$q$One agreed format for everyone, e.g. +234 803 123 4567$q$],3),
+($q$CSG$q$,$q$exam-core$q$,66,$q$Before importing a spreadsheet of contacts into a CRM, you should:$q$,array[$q$Delete the column headers$q$,$q$Clean it, match the columns to CRM fields and remove duplicates$q$,$q$Import it as it is$q$,$q$Email it to all contacts$q$],1),
+($q$CSG$q$,$q$exam-core$q$,67,$q$A CRM task such as Follow up on proposal is useful because:$q$,array[$q$It closes the deal automatically$q$,$q$It reminds the owner what to do and when$q$,$q$It is only for managers$q$,$q$It replaces talking to customers$q$],1),
+($q$CSG$q$,$q$exam-core$q$,68,$q$Data protection in a CRM means:$q$,array[$q$Passwords are shared across the team$q$,$q$Anyone can export the whole database$q$,$q$Only authorised people can see customer data, and it is used for agreed purposes$q$,$q$Customer data can be shared on social media$q$],2),
+($q$CSG$q$,$q$exam-core$q$,69,$q$An ideal customer profile (ICP) describes:$q$,array[$q$Your sales targets$q$,$q$The type of company most likely to buy and succeed with your product$q$,$q$Your favourite customer's personal details$q$,$q$The price list$q$],1),
+($q$CSG$q$,$q$exam-core$q$,70,$q$The main goal of a sales development rep is usually to:$q$,array[$q$Write product code$q$,$q$Find and qualify prospects and book meetings for the sales team$q$,$q$Close every deal alone$q$,$q$Manage the company accounts$q$],1),
+($q$CSG$q$,$q$exam-core$q$,71,$q$A strong cold email:$q$,array[$q$Is short, personal and ends with one clear next step$q$,$q$Has no subject line$q$,$q$Is a long list of every product feature$q$,$q$Is the same message sent to everyone without changes$q$],0),
+($q$CSG$q$,$q$exam-core$q$,72,$q$A prospect says Send me some information. A good reply is:$q$,array[$q$Agree, and ask one question to understand what would be most useful$q$,$q$Stop contacting them$q$,$q$Send a 40-page brochure and never follow up$q$,$q$Argue that they should buy now$q$],0),
+($q$CSG$q$,$q$exam-core$q$,73,$q$Qualifying a lead means checking:$q$,array[$q$How many followers they have$q$,$q$Only their job title$q$,$q$Their favourite football club$q$,$q$Whether they have the need, budget, authority and timing to buy$q$],3),
+($q$CSG$q$,$q$exam-core$q$,74,$q$A sequence in sales prospecting is:$q$,array[$q$A planned series of follow-up messages over days or weeks$q$,$q$A single phone call$q$,$q$A meeting agenda$q$,$q$The order of products in a catalogue$q$],0),
+($q$CSG$q$,$q$exam-core$q$,75,$q$A prospect says We already use a competitor. A good response is:$q$,array[$q$Acknowledge it and ask what's working well and what could be better$q$,$q$Lower your price without asking anything$q$,$q$End the call immediately$q$,$q$Criticise the competitor harshly$q$],0),
+($q$CSG$q$,$q$exam-core$q$,76,$q$Which is the best source for building a B2B prospect list?$q$,array[$q$Personal contacts' private data$q$,$q$Any list bought without consent$q$,$q$Random phone numbers$q$,$q$Company websites, LinkedIn and industry directories that fit your ICP$q$],3),
+($q$CSG$q$,$q$exam-core$q$,77,$q$Why log every prospecting activity in the CRM?$q$,array[$q$Because it replaces the sales team$q$,$q$It has no benefit$q$,$q$To avoid talking to prospects$q$,$q$To track follow-ups and see which messages work$q$],3),
+($q$CSG$q$,$q$exam-core$q$,78,$q$A good opening line in a cold call:$q$,array[$q$Avoids saying your name$q$,$q$Asks them to buy immediately$q$,$q$Starts with a long product demo$q$,$q$Says who you are, why you're calling and asks for a moment of their time$q$],3),
+($q$CSG$q$,$q$exam-core$q$,79,$q$Customer churn rate is:$q$,array[$q$The price increase this year$q$,$q$The number of new customers$q$,$q$The share of customers who stop buying in a period$q$,$q$The number of support tickets$q$],2),
+($q$CSG$q$,$q$exam-core$q$,80,$q$You start the month with 200 customers and 10 cancel. Churn for the month is:$q$,array[$q$10%$q$,$q$5%$q$,$q$2%$q$,$q$20%$q$],1),
+($q$CSG$q$,$q$exam-core$q$,81,$q$An upsell is when a customer:$q$,array[$q$Cancels their subscription$q$,$q$Moves to a higher plan or buys more of what they already use$q$,$q$Asks for a refund$q$,$q$Files a complaint$q$],1),
+($q$CSG$q$,$q$exam-core$q$,82,$q$Which is a good upsell signal?$q$,array[$q$The customer regularly hits the limits of their current plan$q$,$q$The customer just complained about billing$q$,$q$The customer hasn't logged in for months$q$,$q$The customer asked to cancel$q$],0),
+($q$CSG$q$,$q$exam-core$q$,83,$q$Net revenue retention above 100% means:$q$,array[$q$Only new customers paid$q$,$q$Revenue from existing customers grew, even after churn$q$,$q$Prices were cut in half$q$,$q$You lost all your customers$q$],1),
+($q$CSG$q$,$q$exam-core$q$,84,$q$The best time to start a renewal conversation is:$q$,array[$q$Never, renewals happen on their own$q$,$q$The day after it expires$q$,$q$Well before the renewal date, with the value they've received$q$,$q$Only if they complain$q$],2),
+($q$CSG$q$,$q$exam-core$q$,85,$q$Customer feedback from surveys should be:$q$,array[$q$Deleted after reading$q$,$q$Ignored if it's negative$q$,$q$Kept private from the product team$q$,$q$Grouped into themes and turned into actions, then shared back with customers$q$],3),
+($q$CSG$q$,$q$exam-core$q$,86,$q$A monthly growth report for the team should include:$q$,array[$q$Only good news$q$,$q$Staff lunch orders$q$,$q$Churn, retention, expansion revenue and the main reasons behind changes$q$,$q$Every customer's personal details$q$],2),
+($q$CSG$q$,$q$exam-core$q$,87,$q$An at-risk customer is best handled by:$q$,array[$q$Removing them from the CRM$q$,$q$Contacting them quickly to understand the problem and agree a fix$q$,$q$Offering a discount without asking anything$q$,$q$Waiting for their contract to end$q$],1),
+($q$CSG$q$,$q$exam-core$q$,88,$q$Retention matters because:$q$,array[$q$New customers are never valuable$q$,$q$It is only an accounting term$q$,$q$It reduces the need for support$q$,$q$Keeping customers usually costs less than winning new ones$q$],3),
+($q$CSG$q$,$q$exam-core$q$,89,$q$A customer has emailed three times about the same unresolved issue. You should:$q$,array[$q$Close the ticket$q$,$q$Send the same template again$q$,$q$Pass it on with no note$q$,$q$Own it, apologise, give a clear fix or timeline and follow up$q$],3),
+($q$CSG$q$,$q$exam-core$q$,90,$q$Your CSAT dropped this week. The most useful first step is to:$q$,array[$q$Ignore it$q$,$q$Blame the customers$q$,$q$Stop sending surveys$q$,$q$Read the low-score comments and look for common causes$q$],3),
+($q$CSG$q$,$q$exam-core$q$,91,$q$A high-value customer's usage has dropped by half. You should:$q$,array[$q$Send a discount code with no message$q$,$q$Reach out to understand why and agree a plan$q$,$q$Wait for renewal$q$,$q$Remove them from the CRM$q$],1),
+($q$CSG$q$,$q$exam-core$q$,92,$q$A prospect replies Not now, maybe next quarter. You should:$q$,array[$q$Thank them, ask a brief question and set a follow-up task for next quarter$q$,$q$Delete them from the list$q$,$q$Call again tomorrow$q$,$q$Send the same email daily$q$],0),
+($q$CSG$q$,$q$exam-core$q$,93,$q$You find two CRM records for the same customer with different phone numbers. You should:$q$,array[$q$Confirm the correct details and merge the records$q$,$q$Guess which is right$q$,$q$Delete both$q$,$q$Keep both$q$],0),
+($q$CSG$q$,$q$exam-core$q$,94,$q$An angry customer on live chat uses rude language. You should:$q$,array[$q$Stay calm and professional, acknowledge the issue and follow the abuse policy if needed$q$,$q$Ignore their messages$q$,$q$Reply in the same tone$q$,$q$End the chat immediately without a word$q$],0),
+($q$CSG$q$,$q$exam-core$q$,95,$q$Which is the best measure of how quickly your team first responds?$q$,array[$q$Churn rate$q$,$q$First response time (FRT)$q$,$q$Net Promoter Score$q$,$q$Average deal size$q$],1),
+($q$CSG$q$,$q$exam-core$q$,96,$q$A customer asks for a feature you don't have. A good reply is:$q$,array[$q$Tell them it's a bad idea$q$,$q$Promise it will be built next week$q$,$q$Thank them, explain the current options and log the request for the product team$q$,$q$Ignore the request$q$],2),
+($q$CSG$q$,$q$exam-core$q$,97,$q$Before a renewal call, you should prepare:$q$,array[$q$A list of competitors$q$,$q$Nothing$q$,$q$Their usage, results achieved, open issues and goals for next year$q$,$q$A new price only$q$],2),
+($q$CSG$q$,$q$exam-core$q$,98,$q$A customer is ready to upgrade but has an open billing complaint. You should:$q$,array[$q$Push the upgrade and ignore the complaint$q$,$q$Resolve the complaint first, then discuss the upgrade$q$,$q$Cancel the account$q$,$q$Offer a free upgrade without fixing anything$q$],1),
+($q$CSG$q$,$q$exam-core$q$,99,$q$Your ticket queue is full and an SLA is about to be breached. You should:$q$,array[$q$Prioritise by urgency and SLA, and tell your team lead early$q$,$q$Close old tickets without replying$q$,$q$Answer the easiest tickets first$q$,$q$Wait for the queue to clear itself$q$],0),
+($q$CSG$q$,$q$exam-core$q$,100,$q$A good cold email subject line is:$q$,array[$q$Short and relevant to the prospect, e.g. Faster deliveries for Ikeja stores$q$,$q$Hello$q$,$q$Very long and full of product names$q$,$q$FREE OFFER!!!$q$],0),
+($q$CSG$q$,$q$exam-core$q$,101,$q$You notice many tickets ask the same question. The best long-term fix is to:$q$,array[$q$Close those tickets$q$,$q$Write a help article and a macro, and share the trend with the product team$q$,$q$Ignore the pattern$q$,$q$Keep answering one by one$q$],1),
+($q$CSG$q$,$q$exam-core$q$,102,$q$A new customer hasn't completed setup after 10 days. You should:$q$,array[$q$Wait until they cancel$q$,$q$Send an invoice reminder only$q$,$q$Mark them as churned$q$,$q$Offer a short call or guide to help them finish setup$q$],3),
+($q$CSG$q$,$q$exam-core$q$,103,$q$Which report would best show your team whether customers are staying?$q$,array[$q$Website traffic only$q$,$q$A list of staff holidays$q$,$q$A monthly retention and churn report with reasons$q$,$q$The number of emails sent$q$],2);
+select count(*) || ' questions in the bank' as done from quiz_bank;

@@ -32,7 +32,7 @@ echo "admitted email: $($P -c "select subject || ' | ' || replace(body, E'\n', '
 # second applicant: manual payment, extend, expiry, reminders, decline
 for E in ben cyn dan; do
   R=$(anon "select submit_application('{\"first_name\":\"$E\",\"surname\":\"Test\",\"email\":\"$E@test.ng\",\"phone\":\"0803\",\"city\":\"Lagos\",\"edu\":\"HND\",\"nysc\":\"Completed\",\"situation\":\"x\",\"hours\":\"Yes\",\"laptop\":\"Yes\",\"internet\":\"Yes\",\"motivation\":\"x\"}')" | tail -1)
-  $P -c "update applications set status='Offer sent', track_code='DAT', decision='offer', decided_at=now()-interval '3 days', offer_deadline=now()+interval '1 day' where email='$E@test.ng'"
+  $P -c "update applications set status='Offer sent', track_code='BOP', decision='offer', decided_at=now()-interval '3 days', offer_deadline=now()+interval '1 day' where email='$E@test.ng'"
 done
 BID=$($P -c "select id from applications where email='ben@test.ng'")
 echo "manual too small: $(as bayo@test.ng "select admin_record_payment('$BID',1000,'transfer')" 2>&1 | tail -1)"

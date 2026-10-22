@@ -627,3 +627,17 @@ tr.off td{opacity:.55}
 .ap-tk{border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
 .ap-tk span{font-size:.95rem}.ap-tk small{color:var(--muted);font-size:.85rem}
 @media(max-width:600px){.ap-dr{padding:20px 16px}.ap-track{padding:14px}}
+
+/* Programme & Grading Policy: examinations, results, project rubric */
+.sp-h{margin:1.4rem 0 .6rem;font-size:1.05rem}
+.cert-class{margin-top:8px;font-family:'Playfair Display',serif;font-style:italic;font-size:26px;color:#0F7B6C}
+.res-strip{grid-template-columns:repeat(3,1fr);margin-bottom:1rem}
+.res-final{margin:0 0 1rem}.res-final.ok{border-left:4px solid var(--ok)}
+.res-big{display:flex;align-items:baseline;flex-wrap:wrap;gap:.4rem 1rem;margin-top:.4rem}.res-big>b{font-size:2.6rem;line-height:1}.res-big small{font-size:1rem;color:var(--muted)}
+.res-big>span{display:flex;flex-direction:column}.res-big>span>b{font-size:1.4rem}
+.res-tbl td,.res-tbl th{vertical-align:top}
+.exam-card .actions{margin-top:.8rem}.exam-card .notice{margin:.4rem 0 .6rem}
+.exam-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.4rem 1rem;margin-bottom:.6rem}
+.filters{display:flex;flex-wrap:wrap;gap:.6rem;margin-bottom:.8rem}.filters select,.filters input{flex:1 1 160px;min-width:0}
+@media (max-width:640px){.res-strip{grid-template-columns:1fr}}
+.wk-body>p:first-child{margin-top:1rem}

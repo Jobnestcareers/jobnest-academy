@@ -80,6 +80,22 @@ Existing databases need `supabase/06_portal.sql` and then `supabase/07_timer_tou
 The readiness assessment is timed (10 minutes by default, changeable in Settings): answers save as the
 applicant goes, and the every-minute job submits any assessment left open after time runs out.
 
+## Programme, examinations and grading (update 28)
+The programme follows the Programme & Grading Policy: 20 weeks in 8 stages and three tracks
+(Business Operations, People & Talent, Customer Success & Growth).
+
+- **Weekly assessments:** 10 (Weeks 2–11), 5 questions each, one attempt, no resits. Each correct answer is 0.8 marks (max 40). They close when the examination week starts.
+- **Examinations (Week 12):** Fundamental, 30 questions in 30 minutes, on Monday or Tuesday. Core Skill Learning, 40 questions for the learner's track in 45 minutes, on Wednesday (Business Operations), Thursday or Friday. Questions are drawn at random per candidate. Score = correct ÷ 70 × 60. Staff can authorise a resit per candidate; it replaces the earlier score.
+- **Practical project (Weeks 13–14):** the final project is graded out of 100 with the project rubric.
+- **Final score** = (assessments + examinations + project) ÷ 2, truncated to one decimal (never rounded up). Distinction 80–100, Merit 60–79, Pass 50–59, Fail below 50.
+- A result stays **Pending** while any score is missing, unless the Programme Director approves an exception. Learners see their final score only after the Programme Director publishes results. Every correction needs a reason and is logged.
+- Staff pages: **Results** (table, export, publish, per-student corrections, resits, exceptions) and **Examinations** (timetable, time limits, start window, publish).
+
+Existing databases run, in order: `supabase/28_programme_v2.sql`, `supabase/28b_course_v2.sql`, `supabase/28c_question_banks.sql`.
+Course content lives in `dev/course_v2/content.mjs` (run `node dev/course_v2/build.mjs`) and questions in
+`dev/quiz_bank_v2.py` (run `python3 dev/quiz_bank_v2.py`). Then `python3 dev/build_sql.py` rebuilds `setup.sql`.
+Test with `bash dev/test_grading.sh` after the other SQL tests.
+
 ## Testing locally
 Needs Postgres 16 and Python 3 with Playwright.
 ```
@@ -90,6 +106,7 @@ bash dev/test_sql.sh            # database-level checks
 bash dev/test_pay.sh            # payments, matric numbers, expiry and reminders
 bash dev/test_portal.sh         # student portal, grading, attendance and track permissions
 bash dev/test_timer.sh          # timed assessment: saving, time-outs and auto-submit
+bash dev/test_grading.sh        # assessments, examinations, project, final grade, publishing
 python3 dev/e2e.py 1280         # full journey in a browser, including paying (use 390 for phone)
 ```
 

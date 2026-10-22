@@ -14,10 +14,10 @@ CITIES = ["Ikeja", "Yaba", "Surulere", "Lekki", "Ibadan", "Abeokuta", "Enugu", "
 c = sql("select id from cohorts where is_current order by id desc limit 1")
 start = (dt.date.today() - dt.timedelta(days=37))
 sql(f"update cohorts set start_date = '{start}' where id = {c}")
-tracks = ["DAT", "CSP", "DMK", "ADM"]
+tracks = ["BOP", "PTA", "CSG"]
 items = {t: json.loads(sql(f"select coalesce(json_agg(json_build_object('k',key,'w',week,'t',type,'p',proj,'o',opt) order by week, key),'[]') from course_items where track_code='{t}'")) for t in tracks}
 
-staff = [("tunde@test.ng", "Tunde Adewale", "facilitator", "DAT"), ("ngozi.f@test.ng", "Ngozi Eze", "facilitator", "CSP"), ("chidi@test.ng", "Chidi Uche", "facilitator", "DMK"),
+staff = [("tunde@test.ng", "Tunde Adewale", "facilitator", "BOP"), ("ngozi.f@test.ng", "Ngozi Eze", "facilitator", "CSG"), ("chidi@test.ng", "Chidi Uche", "facilitator", "PTA"),
          ("aisha@test.ng", "Aisha Lawal", "coach", None), ("ifeoma@test.ng", "Ifeoma Nnaji", "cohort_manager", None), ("folake@test.ng", "Folake Adeyemi", "director", None),
          ("sola@test.ng", "Sola Ibe", "academy_admin", None)]
 for e, n, r, t in staff:
@@ -27,7 +27,7 @@ now = dt.datetime.now(dt.timezone.utc)
 cur_cal = 6
 n = 0
 for t in tracks:
-    for i in range({"DAT": 18, "CSP": 16, "DMK": 14, "ADM": 12}[t]):
+    for i in range({"BOP": 18, "PTA": 16, "CSG": 14}[t]):
         n += 1
         fn, ln = random.choice(FIRST), random.choice(LAST)
         matric = f"GEP/27A/{100 + n:03d}"
