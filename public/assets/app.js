@@ -147,7 +147,7 @@ function pagePrograms() {
 }
 
 function pageHome() {
-  const p = prog(), c = INFO.cohort || {}, open = appsOpen(), weeks = p.weeks || 17, mins = c.assess_minutes || 5;
+  const p = prog(), c = INFO.cohort || {}, open = appsOpen(), weeks = p.weeks || 20, mins = c.assess_minutes || 5;
   const start = c.start_date ? fmt(c.start_date + "T12:00:00Z", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "";
   const mine = myApp();
   app.innerHTML = `<header class="nl-top"><div class="wrap"><a class="logo" href="#/" style="text-decoration:none;color:inherit">${LOGO}Jobnest Academy</a>
