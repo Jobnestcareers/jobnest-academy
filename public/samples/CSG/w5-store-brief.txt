@@ -1,0 +1,13 @@
+SAMPLE FILE · Jobnest Academy · fictional people and companies, for practice only.
+
+
+WEEK 5 TASK: SET UP A HELP DESK
+
+Store: Kora Home, a fictional online homeware store in Lagos (about 400 orders a week).
+Most common contacts last month: where is my order (41%), returns and refunds (22%), wrong or damaged item (14%), payment problems (11%), product questions (8%), other (4%).
+Promise to customers: first reply within 4 working hours on email, 2 minutes on chat.
+
+YOUR TASK
+1. Ticket categories and tags.
+2. 5 macros (saved replies) for the most common contacts.
+3. A priority guide (what is urgent, high, normal, low) with target response times. Share a link or screenshots.

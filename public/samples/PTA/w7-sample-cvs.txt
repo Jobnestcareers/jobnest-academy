@@ -1,0 +1,68 @@
+SAMPLE FILE · Jobnest Academy · fictional people and companies, for practice only.
+
+WEEK 7 TASK: SCREEN THESE 8 CVs
+
+Role: Junior Accountant, Okoye & Partners (Ikeja, on-site).
+Must-haves: accounting degree or HND, at least 1 year of accounts or audit work, good Excel, based in or able to work in Lagos.
+Nice to have: ICAN or ACCA progress, QuickBooks or Sage.
+
+CV 1: Chiamaka Obi
+- Education: B.Sc Accounting, UNN (2:1)
+- Professional exams: ICAN student (Skills level)
+- Experience: 2 yrs Accounts Assistant, a Lagos FMCG distributor: bank reconciliations, payables, month-end support
+- Tools: Excel (pivot tables, VLOOKUP), QuickBooks
+- Location: Lagos
+
+CV 2: Ibrahim Danladi
+- Education: HND Accountancy, Kaduna Polytechnic
+- Professional exams: None yet
+- Experience: 1 yr NYSC at a state ministry: filing vouchers, data entry
+- Tools: Excel (basic)
+- Location: Abuja, open to relocate
+
+CV 3: Funmilayo Ajayi
+- Education: B.Sc Economics, UNILAG (2:1)
+- Professional exams: ACCA (3 papers passed)
+- Experience: 18 months Finance Intern then Junior Analyst at a fintech: reconciliations, reporting
+- Tools: Excel (advanced), Power BI
+- Location: Lagos
+
+CV 4: Peter Eze
+- Education: B.Sc Accounting, UNIBEN (3rd class)
+- Professional exams: ICAN (Professional level)
+- Experience: 4 yrs Accountant at a hotel: full bookkeeping, payroll, tax filings
+- Tools: Sage, Excel
+- Location: Lagos
+
+CV 5: Aisha Bello
+- Education: B.Sc Business Admin, BUK (2:2)
+- Professional exams: None
+- Experience: 2 yrs Customer Service at a bank
+- Tools: Excel (basic), CRM
+- Location: Kano
+
+CV 6: Tunde Fasanmi
+- Education: B.Sc Accounting, OAU (2:1)
+- Professional exams: ICAN student
+- Experience: 1 yr Audit Trainee at a mid-size audit firm: vouching, working papers
+- Tools: Excel, CaseWare
+- Location: Lagos
+
+CV 7: Ngozi Nnamdi
+- Education: B.Sc Accounting, ABSU (2:1)
+- Professional exams: None
+- Experience: Career break 2023-2024 (caring for a family member). Before that 1 yr Accounts Clerk at a school
+- Tools: Excel, QuickBooks
+- Location: Lagos
+
+CV 8: David Okon
+- Education: M.Sc Finance, UK university
+- Professional exams: CFA Level 1
+- Experience: 3 yrs Investment Analyst; wants a career change
+- Tools: Excel, Bloomberg
+- Location: Lagos
+
+YOUR TASK
+1. Build a scorecard from the must-haves and nice-to-haves and score every CV.
+2. Write a shortlist summary of your top 3 for the hiring manager (strengths, gaps, questions to ask).
+3. Note anything you would ask about neutrally, without assuming (e.g. a career break). Share a link.

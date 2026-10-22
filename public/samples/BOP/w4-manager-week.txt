@@ -1,0 +1,31 @@
+SAMPLE FILE · Jobnest Academy · fictional people and companies, for practice only.
+
+
+WEEK 4 TASK: ORGANISE A MANAGER'S INBOX AND WEEK
+
+Your manager: Mr Kunle Bakare, Head of Partnerships, Brightpath Logistics Ltd (Lagos).
+Works 08:30-17:30 WAT. Wants 2 hours of focus time every morning before 11:00.
+Travels to Abuja next Thursday (flight 07:15, back Friday evening).
+
+THIS WEEK'S EMAILS (15)
+1. Finance: Q3 budget review, needs his approval by Wednesday
+2. Client (Harbour Foods): asks to move Tuesday's call to Wednesday 14:00
+3. Newsletter: Logistics Weekly
+4. HR: reminder to complete his team's appraisals by Friday
+5. Partner (Swift Freight, London): proposes a call Monday 10:00 London time
+6. IT: password expires in 3 days
+7. CEO: wants a 30-minute update on the Harbour Foods deal this week
+8. Receipt: airline e-ticket for Abuja trip
+9. Vendor: invoice #4471 for warehouse shelving, ₦1,250,000
+10. Team member (Bisi): asks for a 1:1 to discuss workload
+11. Conference: invitation to speak at a logistics summit in November
+12. Newsletter: Business Day morning brief
+13. Client (Kano Agro): complaint about a late delivery, wants a call today
+14. Admin: office closed Monday for maintenance (work from home)
+15. Finance: expense report for last trip is missing two receipts
+
+YOUR TASK
+1. Create labels (e.g. To reply, Waiting on, Receipts, Read later) and say which email goes where.
+2. Write two filters that would sort future emails automatically.
+3. Build his week in a calendar: meetings, focus time, travel, and replies to the meeting requests above (watch the London time difference).
+4. Share screenshots or a document showing your labels, filters and calendar.

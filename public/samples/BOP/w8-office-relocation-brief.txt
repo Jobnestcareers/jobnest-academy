@@ -1,0 +1,16 @@
+SAMPLE FILE · Jobnest Academy · fictional people and companies, for practice only.
+
+
+WEEK 8 TASK: PLAN AN OFFICE RELOCATION
+
+Brightpath Logistics is moving its Lagos head office (35 staff) from Yaba to Lekki Phase 1 in 6 weeks.
+Must happen: new lease signed (done), internet installed at the new office, furniture moved, IT equipment moved and tested,
+staff informed, clients told about the new address, old office cleaned and handed back. Move weekend: Saturday-Sunday of week 5.
+Budget owner: Mrs Adaeze Nwosu. IT lead: Emeka. Facilities: Bisi. HR: Fatima.
+Risk: the internet provider says installation can take "2 to 4 weeks".
+
+YOUR TASK
+1. A task plan with owners and due dates, and a simple timeline (Trello, Asana or a sheet).
+2. A RACI for the 5 biggest tasks.
+3. A one-paragraph status report for the end of week 2 that flags the internet risk.
+Share a link.

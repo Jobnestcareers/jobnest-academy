@@ -1,0 +1,25 @@
+Requisition,Role,Department,Opened,Source of hire,Days to fill,Cost (NGN),Offer accepted,Left within 90 days
+REQ-101,HR Assistant,HR,2026-10-15,Careers page,50,10000,Yes,No
+REQ-102,Driver,Operations,2026-07-15,LinkedIn,37,108000,Yes,No
+REQ-103,Junior Accountant,Finance,2026-10-15,Careers page,59,10000,Yes,No
+REQ-104,Junior Accountant,Finance,2026-07-07,Job board,33,31000,Yes,No
+REQ-105,Customer Service Officer,Customer Experience,2026-08-21,Careers page,36,10000,Yes,No
+REQ-106,Driver,Operations,2026-09-11,Job board,66,62000,No,
+REQ-107,Driver,Operations,2026-10-04,Job board,36,34000,Yes,Yes
+REQ-108,Customer Service Officer,Customer Experience,2026-10-13,Job board,63,56000,Yes,No
+REQ-109,Data Analyst,Finance,2026-09-03,Referral,37,50000,Yes,Yes
+REQ-110,Customer Service Officer,Customer Experience,2026-07-02,Job board,47,41000,No,
+REQ-111,Driver,Operations,2026-08-14,LinkedIn,59,90000,Yes,No
+REQ-112,Sales Executive,Sales,2026-09-01,Careers page,31,10000,Yes,Yes
+REQ-113,Customer Service Officer,Customer Experience,2026-10-09,LinkedIn,18,82000,Yes,No
+REQ-114,Junior Accountant,Finance,2026-08-19,Job board,58,30000,Yes,No
+REQ-115,Customer Service Officer,Customer Experience,2026-10-27,Careers page,54,10000,Yes,No
+REQ-116,Customer Service Officer,Customer Experience,2026-08-24,Careers page,30,10000,Yes,No
+REQ-117,HR Assistant,HR,2026-07-14,Agency,21,276000,Yes,No
+REQ-118,Data Analyst,Finance,2026-09-14,Agency,70,402000,Yes,No
+REQ-119,Junior Accountant,Finance,2026-08-16,LinkedIn,53,118000,No,
+REQ-120,Customer Service Officer,Customer Experience,2026-07-03,LinkedIn,35,71000,No,
+REQ-121,Customer Service Officer,Customer Experience,2026-09-17,Referral,54,50000,No,
+REQ-122,HR Assistant,HR,2026-08-19,Referral,20,50000,Yes,No
+REQ-123,Junior Accountant,Finance,2026-07-16,Careers page,22,10000,No,
+REQ-124,Junior Accountant,Finance,2026-10-18,Job board,41,32000,Yes,No

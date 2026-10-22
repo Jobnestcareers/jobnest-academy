@@ -1,0 +1,8 @@
+Day,Tickets received,Tickets solved,First response time (mins),CSAT (%),Reopened tickets,Top reason
+Mon,182,160,38,86,6,Where is my order
+Tue,175,171,31,88,4,Where is my order
+Wed,240,190,95,71,15,Payment failed
+Thu,228,205,82,74,12,Payment failed
+Fri,196,199,40,85,5,Returns
+Sat,98,90,52,83,3,Where is my order
+Sun,61,40,140,69,2,Where is my order

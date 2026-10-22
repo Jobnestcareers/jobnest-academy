@@ -4,6 +4,8 @@ P="psql -h /var/tmp/jnpg -p 5433 -U postgres -d jn -v ON_ERROR_STOP=1 -qAt"
 anon() { $P -c "set role anon; select set_config('request.jwt.claims','{}',false);" -c "$1"; }
 srv() { $P -c "set role service_role;" -c "$1"; }
 as() { $P -c "set role authenticated; select set_config('request.jwt.claims','{\"email\":\"$1\",\"sub\":\"00000000-0000-0000-0000-000000000001\"}',false);" -c "$2"; }
+# The amounts below assume the earlier fee (₦85,000, or ₦90,000 in two parts), so set it for this test.
+$P -c "update programmes set fee = 85000, inst_pct = 6 where code = 'GEP'"
 REF=$($P -c "select ref from applications where email='ada@test.ng'"); TOK=$($P -c "select token from applications where email='ada@test.ng'")
 echo "anon cannot prepare: $(anon "select pay_prepare('$REF','$TOK','full')" 2>&1 | tail -1)"
 echo "anon cannot fake result: $(anon "select pay_result('x','success',99999999)" 2>&1 | tail -1)"

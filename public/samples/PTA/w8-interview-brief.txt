@@ -1,0 +1,12 @@
+SAMPLE FILE · Jobnest Academy · fictional people and companies, for practice only.
+
+
+WEEK 8 TASK: SCHEDULE INTERVIEWS
+
+Each candidate has one 45-minute panel interview with all 3 interviewers, in person at the Ikeja office, this week.
+Use w8-interview-availability.csv.
+
+YOUR TASK
+1. An interview schedule that works for everyone (leave 15 minutes between interviews).
+2. An invitation email for one candidate (date, time, place, panel, what to bring).
+3. A kind, clear rejection email for a candidate who wasn't selected after interview. Share a link.

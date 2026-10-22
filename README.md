@@ -94,6 +94,7 @@ The programme follows the Programme & Grading Policy: 20 weeks in 8 stages and t
 Existing databases run, in order: `supabase/28_programme_v2.sql`, `supabase/28b_course_v2.sql`, `supabase/28c_question_banks.sql`.
 Course content lives in `dev/course_v2/content.mjs` (run `node dev/course_v2/build.mjs`) and questions in
 `dev/quiz_bank_v2.py` (run `python3 dev/quiz_bank_v2.py`). Then `python3 dev/build_sql.py` rebuilds `setup.sql`.
+Sample files for the week tasks live in `public/samples/` (made by `python3 dev/course_v2/samples.py`; all people and companies are fictional). Any file named `w<week>-*.txt` or `.csv` in `public/samples/<track>/` or `common/` appears in that week's Resources after `node dev/course_v2/build.mjs`.
 Test with `bash dev/test_grading.sh` after the other SQL tests.
 
 ## Testing locally

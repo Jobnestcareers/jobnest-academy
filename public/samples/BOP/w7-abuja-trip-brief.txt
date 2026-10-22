@@ -1,0 +1,17 @@
+SAMPLE FILE · Jobnest Academy · fictional people and companies, for practice only.
+
+
+WEEK 7 TASK: PLAN A 2-DAY ABUJA TRIP
+
+Traveller: Mr Kunle Bakare, Head of Partnerships.
+Dates: Thursday and Friday next week. Budget: ₦650,000 all in.
+Thursday: 11:00 meeting at the client's office in Wuse 2, 15:00 meeting in Maitama. Friday: 09:30 breakfast meeting at the hotel, free afternoon, fly back after 16:00.
+Preferences: aisle seat, hotel within 15 minutes of Wuse 2, airport pick-up, receipts for every expense.
+
+Use the hotel quotes in w7-hotel-quotes.csv.
+
+YOUR TASK
+1. An itinerary (times, places, transport, contacts).
+2. An estimated budget table (flights, hotel, transport, meals, contingency).
+3. A comparison of the three hotels with your recommendation and why.
+Share a link to your work.

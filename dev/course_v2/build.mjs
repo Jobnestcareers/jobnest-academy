@@ -8,8 +8,13 @@ const STAFF = ["Supervisor grading", "Supervisor performance evaluation"];
 const out = { stages: STAGES, tracks: {} }, rows = [], titles = [];
 const q = (s) => "$q$" + String(s) + "$q$";
 
+// Sample files in public/samples/<track or common>/w<week>-*.{txt,csv} are added to that week's resources with a link.
+const SAMPLES = new URL("public/samples/", root);
+const sampleFiles = (t, week) => ["common", t].flatMap((d) => { try { return fs.readdirSync(new URL(d + "/", SAMPLES)).filter((f) => f.startsWith(`w${week}-`)).sort().map((f) => [d, f]); } catch { return []; } })
+  .map(([d, f]) => [`Sample: ${f.replace(/^w\d+-/, "").replace(/\.[a-z]+$/, "").replace(/-/g, " ").replace(/^sample /, "")}`, f.split(".").pop().toUpperCase(), `/samples/${d}/${f}`]);
 for (const t of Object.keys(TRACKS)) {
   out.tracks[t] = buildWeeks(t).map((w, wi) => {
+    const smp = sampleFiles(t, wi + 1); if (smp.length) w.resources = [...smp, ...(w.resources || [])];
     titles.push(`(${q(t)}, ${wi + 1}, ${q(w.title)})`);
     return {
       week: wi + 1, stage: w.stage, title: w.title, objectives: w.objectives || null, resources: w.resources || null,

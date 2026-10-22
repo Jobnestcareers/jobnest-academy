@@ -1,0 +1,14 @@
+SAMPLE FILE · Jobnest Academy · fictional people and companies, for practice only.
+
+
+WEEK 4 TASK: REWRITE THESE 3 REPLIES
+
+1. Customer: "I ordered a blender 9 days ago, you said 3-5 days. Where is it??? Worst service ever."
+   Agent reply: "Dear customer, delays happen. Please be patient. Regards."
+2. Customer: "You charged my card twice for the same order. I want my money back today."
+   Agent reply: "We are very very sorry!!! So sorry for this. We apologise. Please send your account number, BVN and card PIN so we can check."
+3. Customer: "The shoes I got are the wrong size. Your return page doesn't load."
+   Agent reply: "Return policy is on the website."
+
+YOUR TASK
+Rewrite each reply so it is empathetic (without over-apologising), clear, safe (never ask for a PIN), and gives the next step with a timeline. Share a link.

@@ -6813,7 +6813,9 @@ end $$;
 update host_orgs set tracks = replace(replace(tracks, 'ADM', 'BOP'), 'CSP', 'CSG') where tracks is not null;
 delete from tracks where code in ('ADM', 'CSP', 'DAT', 'DMK');
 
-update programmes set weeks = 20,
+-- Fee for the 20-week programme: ₦180,000 in full, or ₦190,000 in two parts (₦95,000 + ₦95,000).
+-- 6% extra gives ₦190,800, which update 27 rounds to the nearest ₦5,000: ₦190,000. Staff can still change both in Settings.
+update programmes set weeks = 20, fee = 180000, inst_pct = 6,
   tagline = 'From graduate to work-ready in 20 weeks: core skills, examinations, a practical project, an internship and job-search coaching.'
 where code = 'GEP';
 

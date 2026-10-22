@@ -1795,7 +1795,7 @@ function lsWeekView(wi) {
       ${sess ? `<h3>Live session</h3><ul class="sess-list">${sessionRow(sess)}</ul>` : ""}
       <h3>About Stage ${wk.stage + 1}: ${esc(st.title)}</h3><p>${esc(st.objective || "")}</p>
       <dl class="kv"><div><dt>Weeks</dt><dd>${stWeeks.length > 1 ? `Weeks ${stWeeks[0]}–${stWeeks.at(-1)}` : `Week ${stWeeks[0]}`}</dd></div>${st.facilitators ? `<div><dt>Facilitators</dt><dd>${esc(st.facilitators)}</dd></div>` : ""}</dl></div>`;
-  if (tab === "res") body = `<div class="card"><ul class="res">${(wk.resources || []).map((r) => `<li><span class="resbtn" aria-disabled="true">${LICON.file}<span>${esc(r[0])}</span><span class="tag">${r[1]}</span></span></li>`).join("")}</ul><p class="note" style="margin-top:.6rem">Your facilitators upload this week's files here.</p></div>`;
+  if (tab === "res") body = `<div class="card"><ul class="res">${(wk.resources || []).map((r) => `<li>${r[2] ? `<a class="resbtn" href="${esc(r[2])}" target="_blank" rel="noopener" download>${LICON.file}<span>${esc(r[0])}</span><span class="tag">${r[1]}</span></a>` : `<span class="resbtn" aria-disabled="true">${LICON.file}<span>${esc(r[0])}</span><span class="tag">${r[1]}</span></span>`}</li>`).join("")}</ul><p class="note" style="margin-top:.6rem">Your facilitators upload this week's files here.</p></div>`;
   return head(meta) + `<div class="wk-body">${body}</div>`;
 }
 function seqNav(wi, ii) {
@@ -1970,6 +1970,7 @@ function lsResultsPage() {
       ${P.feedback ? `<div class="card fb ok"><h3>Assessor feedback</h3><p>${esc(P.feedback)}</p></div>` : ""}</div>
     <div class="card"><h3>Grading scale</h3>${scaleTable()}</div></section>`);
 }
+const sampleLinks = (wi) => { const L = (LS.W[wi].resources || []).filter((r) => r[2]); return L.length ? `<div class="card samples"><h3>Files for this task</h3><ul class="res">${L.map((r) => `<li><a class="resbtn" href="${esc(r[2])}" target="_blank" rel="noopener" download>${LICON.file}<span>${esc(r[0])}</span><span class="tag">${r[1]}</span></a></li>`).join("")}</ul></div>` : ""; };
 function lsItemView(wi, ii) {
   const it = LS.W[wi].items[ii], r = row(it), dn = isDoneIt(it), un = unlockedW(wi), me = LS.C.me;
   const head = `<a class="back" href="#/learn/learning/${wi + 1}">← Week ${wi + 1}: ${esc(LS.W[wi].title)}</a><div><p class="eyebrow">${LKIND[it.type] || "Activity"}${it.mins ? " · " + it.mins + " min" : ""}${it.opt ? " · Optional" : ""}</p><h2 style="margin-top:.4rem">${esc(it.title)}</h2></div>`;
@@ -1995,7 +1996,7 @@ function lsItemView(wi, ii) {
   if (it.title === "Read the examination rules") return `<div class="view">${head}${examRules()}${btn("I've read the examination rules", "Read ✓ · Mark as not read")}${nav}</div>`;
   if (it.link) {
     const st = aStatus(it), canEdit = !r || r.status === "revise" || (r.status !== "graded" && !it.proj) || r.status === "submitted";
-    return `<div class="view">${head}<p style="max-width:64ch">${esc(it.detail || "")}</p>${deadlineLine(wi)}
+    return `<div class="view">${head}<p style="max-width:64ch">${esc(it.detail || "")}</p>${sampleLinks(wi)}${deadlineLine(wi)}
       ${r?.feedback ? `<div class="card fb ${r.status === "graded" ? "ok" : "bad"}"><div class="ch"><h3>${r.status === "graded" ? "Facilitator feedback" : "Revision requested"}</h3>${r.status === "graded" ? `<span class="score mono">${r.score}/100</span>` : ""}</div><p>${esc(r.feedback)}</p><p class="note">${esc(r.graded_by || "Your facilitator")}${r.cap && r.cap < 1 && r.status === "graded" ? ` · Marked ${r.grade}/100, capped at ${r.cap * 100}% for late submission` : ""}</p></div>` : ""}
       ${r?.status === "graded" ? `<p>Submitted link: <a class="mono" style="word-break:break-all" href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.link)}</a></p>` : `<form id="ls-link" data-k="${it.key}" class="form" novalidate>
         <div class="field"><label for="ls-url">Link to your work</label><input id="ls-url" inputmode="url" placeholder="https://" value="${esc(r?.link || "")}"></div>

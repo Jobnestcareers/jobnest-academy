@@ -1,0 +1,10 @@
+SAMPLE FILE · Jobnest Academy · fictional people and companies, for practice only.
+
+
+WEEK 6 TASK: LIVE CHAT SCRIPT
+
+Scenario: Mrs Amaka Udeh ordered a standing fan (order KH-20931) for delivery yesterday. The courier's system shows "failed delivery, customer unavailable", but she says she was home all day. She is upset because she is hosting guests tomorrow.
+What you can offer: rebook delivery for tomorrow 09:00-13:00, or a full refund. You can also offer free delivery on her next order.
+
+YOUR TASK
+Write the full chat from greeting to close: acknowledge, check details safely, offer options, confirm, and close cleanly. Share a link.

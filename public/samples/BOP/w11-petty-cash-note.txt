@@ -1,0 +1,9 @@
+SAMPLE FILE · Jobnest Academy · fictional people and companies, for practice only.
+
+
+WEEK 11 TASK: RECORDS AND PETTY CASH
+
+1. Set up a records folder structure for a small office (finance, HR, suppliers, contracts, operations) with a naming rule.
+2. Use w11-petty-cash.csv to build a petty cash log with a running balance.
+3. Cash counted in the box on 30 November: ₦14,800. Reconcile: does it match? Note anything missing (look at the receipts column).
+Share a link.

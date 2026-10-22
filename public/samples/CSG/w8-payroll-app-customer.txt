@@ -1,0 +1,13 @@
+SAMPLE FILE · Jobnest Academy · fictional people and companies, for practice only.
+
+
+WEEK 8 TASK: 30-DAY ONBOARDING PLAN
+
+Product: Paydesk, a fictional payroll app for Nigerian SMEs.
+New customer: Greenfield Schools Ltd, 3 schools, 140 staff, currently pays salaries from spreadsheets.
+Their goals: run their first payroll in Paydesk by the 25th of next month, file PAYE correctly, give staff digital payslips.
+Contacts: Mr Obinna (Bursar, main user), Mrs Folake (Proprietor, decision-maker).
+Risks: staff data is in 3 different spreadsheets; the Bursar is not confident with new software.
+
+YOUR TASK
+Design a 30-day onboarding plan: kickoff, data setup, training, a test payroll, go-live, and check-in points, with what success looks like at each step. Share a link.
