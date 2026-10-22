@@ -2027,11 +2027,11 @@ function guideView() {
   return `<p style="max-width:64ch">Here's everything you need to find your way around the Jobnest student portal.</p><div class="guide">${rows}</div>`;
 }
 const handbookView = () => `<div class="lesson-doc"><h3>1. Attendance</h3><p>Join every live session. If you can't, tell Student Success before the session and watch the recording within 48 hours.</p>
-  <h3>2. Deadlines</h3><p>Weekly work is due Friday at 17:00 for full marks. Until Sunday 23:59 you can still get up to 80%. After that, the maximum is 50%.</p>
-  <h3>3. Grading</h3><p>Assignments are graded out of 100 using a rubric. You'll get feedback within 5 working days and may be asked to revise.</p>
+  <h3>2. Deadlines</h3><p>Weekly tasks are due Friday at 17:00 for full marks. Until Sunday 23:59 you can still get up to 80%. After that, the maximum is 50%. Weekly assessments close when the examination week (Week 12) starts.</p>
+  <h3>3. Grading</h3><p>Your final score = (10 weekly assessments, 40 marks + two examinations in Week 12, 60 marks + practical project, 100 marks) ÷ 2. Distinction 80–100, Merit 60–79, Pass 50–59, Fail below 50. Assessments have one attempt and no resits. An examination resit is only possible when staff authorise it. Weekly tasks get feedback within 5 working days but don't count towards your final score.</p>
   <h3>4. Code of conduct</h3><p>Submit your own work, respect everyone in your cohort and represent Jobnest professionally at your internship. Breaking the Student Oath can lead to removal from the programme.</p>
   <h3>5. Getting help</h3><p>Use Help & Support in the portal, or message Student Success in your cohort community.</p>
-  <h3>6. Certificates</h3><p>You earn your certificate when every requirement is met. It appears in your profile.</p></div>`;
+  <h3>6. Certificates</h3><p>Your certificate is issued after your final result is published, and shows your classification (Distinction, Merit or Pass). It appears in your profile.</p></div>`;
 const communityView = () => `<div class="lesson-doc"><p>Your cohort community is where announcements, reminders and peer help happen.</p>
   <h3>How to join</h3><ol class="obj"><li>Open the invite link your cohort manager shares.</li><li>Use your real name and add your matric number to your profile.</li><li>Post your introduction.</li></ol>
   <h3>Introduction template</h3><div class="tpl"><pre>Hi everyone! I'm ${esc(LS.C.me.first_name)} from [city], on the ${esc(LS.C.me.track || "")} track.
