@@ -204,7 +204,7 @@ export function buildWeeks(track) {
   weeks.push(W(7, "Discovery Call, Job Search & Pitching", [T("Book your Discovery Call", "Your Discovery Call is a 40-minute 1-on-1 with a Career Coach after the course. Pick a time on this week's page."),
     T("Record your elevator pitch", "A 60-second video introducing yourself. Share the link.", true),
     T("Send 10 cold outreach messages", "Use the templates and log each one."),
-    T("Weekly job application tracker", "Log your applications and submit your tracker on Friday.", true),
+    T("Weekly job application tracker", "Log your applications and submit your tracker by Sunday at 18:00.", true),
     { ...T("Report your first interview invite", "Tell your coach so they can help you prepare."), opt: true },
     T("Have your Discovery Call", "Your coach reviews where you are now after the course: your results, CV and portfolio. You do a short mock interview and agree your next steps. Your coach marks this after the call."),
     T("Finalise your Job Search Action Plan", "Write up what you agreed in your Discovery Call: target roles, companies and weekly application goals.", true)],

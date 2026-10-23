@@ -781,7 +781,7 @@ async function tabStudent360(id) {
     <section class="sc-3">
       <div class="card"><span class="eyebrow">Engagement</span><h2 class="sc-h2">${risk ? "Needs a check-in" : "Doing fine"}</h2>
         <div class="s3-mini"><div><span class="eyebrow">Live classes</span><b class="mono">${s.attend.past ? `${s.attend.yes}/${s.attend.past}` : "—"}</b><span class="note">${att != null ? att + "% attended" : "none held yet"}</span></div>
-          <div><span class="eyebrow">Projects late</span><b class="mono">${s.ontime.late}/${s.ontime.n}</b><span class="note">submitted after Friday</span></div></div>
+          <div><span class="eyebrow">Projects late</span><b class="mono">${s.ontime.late}/${s.ontime.n}</b><span class="note">submitted after Sunday 18:00</span></div></div>
         <p class="s3-lbl">Weekly confidence check-in</p>${conf.length ? `<div class="s3-conf" role="img" aria-label="Confidence by week: ${conf.map((c) => c.conf).join(", ")}">${conf.map((c) => `<span><i class="${c.conf <= 2 ? "bad" : c.conf === 3 ? "now" : "ok"}" style="height:${c.conf * 20}%"></i><small>W${c.week}</small></span>`).join("")}</div>` : `<p class="note">No check-ins yet.</p>`}
         ${risk ? `<div class="sc-tags" style="margin-top:.6rem">${s.reasons.map((x) => `<span class="pill bad">${esc(x)}</span>`).join("")}</div>` : ""}</div>
       <div class="card"><span class="eyebrow">Admission</span><h2 class="sc-h2">${s.admission.score != null ? `Readiness ${s.admission.score}%` : "Admitted"}</h2>
@@ -913,7 +913,7 @@ async function tabToday() {
         <div class="card"><span class="eyebrow">Live classes</span><h2 class="sc-h2">${d.sessions.length ? `${sessT.length} today${d.sessions.length > sessT.length ? `, ${d.sessions.length - sessT.length} tomorrow` : ""}` : "None today or tomorrow"}</h2>
           ${d.sessions.length ? `<ul class="sc-act">${d.sessions.map((s) => `<li><span class="mono" style="width:56px;flex:none"><b>${fmt(s.at, { hour: "2-digit", minute: "2-digit", hour12: false })}</b><small class="note" style="display:block">${new Date(s.at).toDateString() === today ? "today" : "tomorrow"}</small></span><span><b>${esc(s.title)}</b><small class="note" style="display:block">${esc(s.track || "Everyone")}${s.host ? ` · ${esc(s.host)}` : ""} · ${s.minutes} min · ${s.joined}/${s.invited} joined</small></span>${s.link ? `<a class="btn sm ghost" href="${esc(s.link)}" target="_blank" rel="noopener">Open</a>` : `<span class="pill bad">No link</span>`}</li>`).join("")}</ul>` : ""}
           <a class="link sm" href="#/portal/sessions">All sessions and attendance</a></div>
-        <div class="card"><div class="sc-h"><div><span class="eyebrow">Due ${fmtDay(d.due_at)}, 17:00</span><h2>Week ${Math.max(C.week, 1)} project</h2></div><b class="mono">${dueIn}/${dueN}</b></div>
+        <div class="card"><div class="sc-h"><div><span class="eyebrow">Due ${fmtDay(d.due_at)}, 18:00</span><h2>Week ${Math.max(C.week, 1)} project</h2></div><b class="mono">${dueIn}/${dueN}</b></div>
           <div class="sc-seats">${d.due.map((x) => `<div><span>${esc(x.track)}</span>${meter(pct(x.in, x.n))}<b class="mono">${x.in}/${x.n}</b></div>`).join("")}</div>
           <div class="actions" style="margin-top:.8rem"><a class="btn sm" href="#/portal/news">Post a reminder</a></div></div>
       </div></section>
@@ -1028,7 +1028,7 @@ async function tabDesk() {
   if (!wait.some((x) => x.key + x.app === ui.deskSel)) ui.deskSel = wait[0] ? wait[0].key + wait[0].app : null;
   const cur = wait.find((x) => x.key + x.app === ui.deskSel), R = (ui.rub || {})[ui.deskSel] || {}, picked = Object.keys(R).length;
   const RB = rubFor(cur), isFinal = RB !== RUBRIC4, nRB = RB.length;
-  const raw = Object.values(R).reduce((a, b) => a + b, 0), capped = !isFinal && cur && cur.cap != null && cur.cap < 1 ? Math.round(raw * cur.cap) : raw;
+  const raw = Object.values(R).reduce((a, b) => a + b, 0), capped = raw;
   const msgs = (M || []).filter((m) => m.waiting).slice(0, 4);
   const days = (t) => Math.max(0, Math.floor((Date.now() - new Date(t)) / 864e5));
   shell("desk", `${wait.length} project${wait.length === 1 ? "" : "s"} to grade`, `${esc(h.track || "All tracks")} · ${h.students} students · Week ${Math.max(h.cohort.week, 1)}. Oldest first. Final projects count in the final result.`,
@@ -1582,13 +1582,14 @@ const MORE_PAGES = [["results", "Results", "Assessments, examinations, project a
 /* ---------- derived state ---------- */
 const lsStart = () => new Date(LS.L.start_date + "T00:00:00+01:00");
 const weekStartAt = (wi) => new Date(lsStart().getTime() + wi * 7 * DAY);
-const weekDue = (wi) => new Date(weekStartAt(wi).getTime() + 4 * DAY + 17 * 36e5);
-const graceDue = (wi) => new Date(weekStartAt(wi).getTime() + 6 * DAY + (23 * 60 + 59) * 6e4);
+// Weekly work is due Sunday at 18:00 WAT; each weekly assessment closes then too.
+const weekDue = (wi) => new Date(weekStartAt(wi).getTime() + 6 * DAY + 18 * 36e5);
 const fmtD = (d) => fmt(d, { weekday: "short", day: "numeric", month: "short" });
 const PASS = () => LS.L.pass_mark || 70;
 const row = (it) => LS.L.progress[it.key];
 const examOf = (it) => (LS.L.results || {})[it.paper] || null;
-const isDoneIt = (it) => { if (it.type === "exam") { const e = examOf(it); return !!e && ["Graded", "Missed"].includes(e.status); } const r = row(it); return !!r && r.status !== "revise"; };
+const quizMissed = (it) => it.type === "quiz" && !row(it) && ((LS.L.results || {}).assessments || []).some((x) => x.key === it.key && x.status === "Missed");
+const isDoneIt = (it) => { if (quizMissed(it)) return true; if (it.type === "exam") { const e = examOf(it); return !!e && ["Graded", "Missed"].includes(e.status); } const r = row(it); return !!r && r.status !== "revise"; };
 const quizCorrect = (r) => r ? (r.data?.correct ?? Math.round((r.score || 0) * 5 / 100)) : null;
 const marks1 = (n) => n == null ? "—" : (Math.round(n * 10) / 10).toFixed(1).replace(/\.0$/, "");
 function itemScoreIt(it) { const r = row(it); if (!r) return null; if (it.type === "quiz") return r.score ?? null; if (it.proj) return r.status === "graded" ? r.score : null; return null; }
@@ -1632,7 +1633,7 @@ function aStatus(it) {
 const STATUS_CLS = { "Not Started": "", "In Progress": "now", Submitted: "info", "Revision Required": "bad", Graded: "ok", Signed: "ok" };
 const pillS = (s) => `<span class="pill ${STATUS_CLS[s] || ""}">${s}</span>`;
 const lsAssignments = () => { const out = []; LS.W.forEach((wk, wi) => wk.items.forEach((it, ii) => { if ((it.type === "task" && it.link) || it.type === "logweek") out.push({ wi, ii, it, wk }); })); return out; };
-const deadlineLine = (wi) => `<div class="deadlines"><span><b>Full marks</b> until ${fmtD(weekDue(wi))}, 17:00</span><span><b>80% max</b> until ${fmtD(graceDue(wi))}, 23:59</span><span><b>50% max</b> after that</span></div>`;
+const deadlineLine = (wi) => `<div class="deadlines"><span><b>Due</b> ${fmtD(weekDue(wi))}, 18:00</span><span>Late work is still accepted and marked late</span></div>`;
 
 /* ---------- shell ---------- */
 const pageOpen = (k) => { const m = MORE_PAGES.find((x) => x[0] === k); return !m || m[3] == null || unlockedW(m[3]); };
@@ -1682,12 +1683,12 @@ function lsHome(cert) {
   lsShell("home", pageHead(`Week ${cur + 1} of ${LS.W.length} · Stage ${wk.stage + 1}: ${esc(COURSE_STAGES[wk.stage]?.title || "")} · ${esc(C.me.track || "")}`, `${greeting()}, ${esc(C.me.first_name)}`, esc(before && !weekDone(0) && !LS.cert && !Object.keys(LS.L.progress || {}).some((k) => (findItem(k)?.wi || 0) > 0) ? `The programme starts on ${fmtDateD(LS.L.start_date)}. You can start Week 1 now.` : encouragement(cur))) +
   `<section class="wrap home">${installCard()}${bal}${certCard}
     ${allWeeksDone() ? gradHero() : `<div class="card today" id="t-today"><div class="today-l">
-        ${cur === 0 ? "" : `<p class="cd-inline ${dl.c}">⏳ <b>${daysLeft} day${daysLeft === 1 ? "" : "s"} left</b> · due ${fmtD(weekDue(cur))}, 17:00</p>`}
+        ${cur === 0 ? "" : `<p class="cd-inline ${dl.c}">⏳ <b>${daysLeft} day${daysLeft === 1 ? "" : "s"} left</b> · due ${fmtD(weekDue(cur))}, 18:00</p>`}
         <p class="eyebrow">Today · Week ${cur + 1}: ${esc(wk.title)}</p>
         <h2>${nIt ? esc(nIt.title) : "You're all caught up"}</h2>
         <p class="note">${nIt ? `${LKIND[nIt.type] || "Activity"}${nIt.mins ? " · " + nIt.mins + " min" : ""} · ${nIt.opt ? "Optional" : "Mandatory"}` : "Open My Learning to look ahead"}</p>
         <div class="actions"><a class="btn gold" href="${nIt ? `#/learn/learning/${cur + 1}/${nIt.key}` : "#/learn/learning"}">Continue →</a></div></div>
-      <div class="countdown ${cur === 0 ? "" : dl.c}"><span class="eyebrow">Week due</span><b class="mono">${cur === 0 ? "—" : daysLeft}</b><span class="note">${cur === 0 ? "No deadline in Orientation" : daysLeft === 1 ? "day left" : "days left"}</span>${cur === 0 ? "" : `<span class="note">${fmtD(weekDue(cur))}, 17:00</span>`}</div></div>`}
+      <div class="countdown ${cur === 0 ? "" : dl.c}"><span class="eyebrow">Week due</span><b class="mono">${cur === 0 ? "—" : daysLeft}</b><span class="note">${cur === 0 ? "No deadline in Orientation" : daysLeft === 1 ? "day left" : "days left"}</span>${cur === 0 ? "" : `<span class="note">${fmtD(weekDue(cur))}, 18:00</span>`}</div></div>`}
     <div class="strip" id="t-strip">
       <a class="sti" href="#/learn/learning"><span class="eyebrow">This week</span><b class="mono">${p.d}/${p.n}</b><span class="note">required done</span></a>
       <a class="sti" href="#/learn/assignments"><span class="eyebrow">Due this week</span><b class="mono">${due.length}</b><span class="note">assignment${due.length === 1 ? "" : "s"}</span></a>
@@ -1777,7 +1778,7 @@ function lsWeekView(wi) {
   const stWeeks = LS.W.map((w, i) => (w.stage === wk.stage ? i + 1 : null)).filter(Boolean);
   const tabs = [["tasks", "Tasks", `${p.d}/${p.n}`], ["about", "About this week", ""], ["res", "Resources", String((wk.resources || []).length)]];
   const lockMsg = !un ? `<div class="gate">${LICON.lock}<span><b>Preview.</b> ${wi === 1 && !oathSigned() ? "Opens when you sign your Student Oath in Week 1." : !weekDone(wi - 1) ? `Opens when you finish Week ${wi}: ${esc(LS.W[wi - 1].title)}.` : `Opens on ${fmtD(new Date(weekStartAt(wi).getTime() - 2 * DAY))}.`}</span></div>` : "";
-  const meta = `<div class="wk-meta-row"><span>Due ${fmtD(weekDue(wi))}, 17:00</span>${sess ? `<span>Live: ${fmtD(sess.at)}, ${fmtTime(sess.at)}</span>` : ""}</div>
+  const meta = `<div class="wk-meta-row"><span>Due ${fmtD(weekDue(wi))}, 18:00</span>${sess ? `<span>Live: ${fmtD(sess.at)}, ${fmtTime(sess.at)}</span>` : ""}</div>
     ${un ? `<div class="bar" aria-hidden="true"><i style="width:${p.pct}%"></i></div>` : ""}
     <div class="wtabs" role="tablist">${tabs.map(([k, l, c]) => `<button role="tab" data-act="ls-wtab" data-k="${k}" aria-selected="${tab === k}">${l}${c ? ` <span class="mono">${c}</span>` : ""}</button>`).join("")}</div>`;
   let body = "";
@@ -1791,7 +1792,7 @@ function lsWeekView(wi) {
       <div><button class="btn sm" type="submit">${ck ? "Update check-in" : "Send check-in"}</button></div></form>` : ""}`; }
   if (tab === "about") body = `<div class="card about-card"><h3>By the end of this week you can</h3><ul class="obj">${(wk.objectives || []).map((o) => `<li>${esc(o)}</li>`).join("")}</ul>
       <h3>Deadlines</h3>${deadlineLine(wi)}
-      ${wk.stage >= 1 && wk.stage <= 2 ? `<h3>How this week counts</h3><p class="note">This week's assessment has 5 questions and <b>one attempt</b>. Each correct answer is worth 0.8 marks, so it adds up to 4 marks to your 40 assessment marks. Your week task gets feedback from your facilitator but doesn't count towards your final score.</p>` : wk.stage === 3 ? `<h3>How this week counts</h3><p class="note">The two examinations give up to 60 marks: (correct answers ÷ 70) × 60.</p>` : wk.stage === 4 ? `<h3>How this week counts</h3><p class="note">Your final project is graded out of 100 against the rubric. That score goes straight into your final result.</p>` : ""}
+      ${wk.stage >= 1 && wk.stage <= 2 ? `<h3>How this week counts</h3><p class="note">This week's assessment has 5 questions and <b>one attempt</b>. Each correct answer is worth 0.8 marks, so it adds up to 4 marks to your 40 assessment marks. It closes on Sunday at 18:00: if you miss it, it scores 0. Your week task gets feedback from your facilitator but doesn't count towards your final score.</p>` : wk.stage === 3 ? `<h3>How this week counts</h3><p class="note">The two examinations give up to 60 marks: (correct answers ÷ 70) × 60.</p>` : wk.stage === 4 ? `<h3>How this week counts</h3><p class="note">Your final project is graded out of 100 against the rubric. That score goes straight into your final result.</p>` : ""}
       ${sess ? `<h3>Live session</h3><ul class="sess-list">${sessionRow(sess)}</ul>` : ""}
       <h3>About Stage ${wk.stage + 1}: ${esc(st.title)}</h3><p>${esc(st.objective || "")}</p>
       <dl class="kv"><div><dt>Weeks</dt><dd>${stWeeks.length > 1 ? `Weeks ${stWeeks[0]}–${stWeeks.at(-1)}` : `Week ${stWeeks[0]}`}</dd></div>${st.facilitators ? `<div><dt>Facilitators</dt><dd>${esc(st.facilitators)}</dd></div>` : ""}</dl></div>`;
@@ -1837,8 +1838,9 @@ function quizBody(wi, it, r) {
       ${false ? `<div class="card retake"><h3>You've used your retake</h3><p class="note">Your week result uses your best score. If the week isn't passed, you can repeat the week from the week page.</p></div>` : ""}
       <h3 style="margin-top:1.2rem">Your answers</h3>${quizReview(d)}`;
   }
+  if (quizMissed(it)) return `<div class="result fail">This assessment closed on ${fmtD(weekDue(wi))} at 18:00 and wasn't taken, so it scores 0. There are no resits. You can carry on with the rest of the week.</div>`;
   return `<div class="card qstart"><h3>${retake ? "Your retake" : "Before you start"}</h3><ul class="reqs"><li>The assessment contains <b>${QUIZ_N} questions</b>.</li><li>You have <b>${QUIZ_MIN} minutes</b> to complete it once you start.</li><li>Answers are submitted automatically when the time runs out.</li>
-    <li><b>You have one attempt.</b> There are no resits, so finish this week's lessons first.</li><li>Each correct answer is worth 0.8 marks: up to 4 of your 40 assessment marks.</li><li>Assessments close when the examination week (Week 12) starts.</li></ul>
+    <li><b>You have one attempt.</b> There are no resits, so finish this week's lessons first.</li><li>Each correct answer is worth 0.8 marks: up to 4 of your 40 assessment marks.</li><li>This assessment closes on <b>${fmtD(weekDue(wi))} at 18:00</b>. If you don't take it by then, it scores 0.</li></ul>
     <div><button class="btn gold" data-act="ls-qstart" data-k="${it.key}">${retake ? "Start retake" : "Start assessment"}</button></div></div>`;
 }
 let QTIMER = null;
@@ -1957,7 +1959,7 @@ function lsResultsPage() {
       ${tile("Examinations", R.exam_score ?? "—", 60, R.exam_score != null ? "both papers sat" : "after both papers")}
       ${tile("Practical project", P.score ?? "—", 100, P.status || "")}</div>
     ${fin}
-    <div class="card"><div class="ch"><h3>Weekly assessments</h3><b class="mono">${marks1(R.assess_score ?? 0)}/40</b></div><p class="note">Ten assessments, 5 questions each, one attempt. Each correct answer is 0.8 marks. They close when the examination week starts${R.assess_close ? ` (${fmtDay(R.assess_close)})` : ""}.</p>
+    <div class="card"><div class="ch"><h3>Weekly assessments</h3><b class="mono">${marks1(R.assess_score ?? 0)}/40</b></div><p class="note">Ten assessments, 5 questions each, one attempt. Each correct answer is 0.8 marks. Each one closes on Sunday at 18:00 of its week, and a missed assessment scores 0.</p>
       <div class="tbl-wrap"><table class="tbl res-tbl cards"><thead><tr><th>Assessment</th><th>Week</th><th>Status</th><th class="mono">Correct</th><th class="mono">Marks</th></tr></thead><tbody>
       ${A.map((x, i) => `<tr><td data-label="Assessment">${esc(x.title)}</td><td data-label="Week" class="mono">${x.week}</td><td data-label="Status">${resPill(x.status)}</td><td data-label="Correct" class="mono">${x.correct != null ? x.correct + "/5" : "—"}</td><td data-label="Marks" class="mono">${x.marks != null ? marks1(x.marks) + "/4" : "—"}</td></tr>`).join("")}</tbody></table></div></div>
     <div class="card"><div class="ch"><h3>Examinations</h3><b class="mono">${R.exam_score ?? "—"}/60</b></div>
@@ -1997,11 +1999,11 @@ function lsItemView(wi, ii) {
   if (it.link) {
     const st = aStatus(it), canEdit = !r || r.status === "revise" || (r.status !== "graded" && !it.proj) || r.status === "submitted";
     return `<div class="view">${head}<p style="max-width:64ch">${esc(it.detail || "")}</p>${sampleLinks(wi)}${deadlineLine(wi)}
-      ${r?.feedback ? `<div class="card fb ${r.status === "graded" ? "ok" : "bad"}"><div class="ch"><h3>${r.status === "graded" ? "Facilitator feedback" : "Revision requested"}</h3>${r.status === "graded" ? `<span class="score mono">${r.score}/100</span>` : ""}</div><p>${esc(r.feedback)}</p><p class="note">${esc(r.graded_by || "Your facilitator")}${r.cap && r.cap < 1 && r.status === "graded" ? ` · Marked ${r.grade}/100, capped at ${r.cap * 100}% for late submission` : ""}</p></div>` : ""}
+      ${r?.feedback ? `<div class="card fb ${r.status === "graded" ? "ok" : "bad"}"><div class="ch"><h3>${r.status === "graded" ? "Facilitator feedback" : "Revision requested"}</h3>${r.status === "graded" ? `<span class="score mono">${r.score}/100</span>` : ""}</div><p>${esc(r.feedback)}</p><p class="note">${esc(r.graded_by || "Your facilitator")}${r.cap && r.cap < 1 ? " · submitted late" : ""}</p></div>` : ""}
       ${r?.status === "graded" ? `<p>Submitted link: <a class="mono" style="word-break:break-all" href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.link)}</a></p>` : `<form id="ls-link" data-k="${it.key}" class="form" novalidate>
         <div class="field"><label for="ls-url">Link to your work</label><input id="ls-url" inputmode="url" placeholder="https://" value="${esc(r?.link || "")}"></div>
         <p class="err" id="ls-err" role="alert"></p>
-        ${r && r.cap != null && r.cap < 1 ? `<p class="note">Submitted after the first deadline: maximum ${r.cap * 100}% for this assignment.</p>` : ""}
+        ${r && r.cap != null && r.cap < 1 ? `<p class="note">Submitted after the Sunday 18:00 deadline, so it's marked late.</p>` : ""}
         <div class="actions"><button class="btn" type="submit">${r ? (r.status === "revise" ? "Resubmit" : "Update link") : "Submit"}</button>${r && r.status !== "revise" ? `<button class="btn ghost" type="button" data-act="ls-unsubmit" data-k="${it.key}">Undo submission</button>` : ""}<a class="link" href="#/learn/assignments/${it.key}">See feedback & history</a></div></form>`}
       ${r ? `<p class="note">${pillS(st)} ${it.proj ? (r.status === "submitted" ? "Waiting for your facilitator to grade it. Feedback arrives within 5 working days." : "") : ""}</p>` : ""}${nav}</div>`;
   }
@@ -2028,7 +2030,7 @@ function guideView() {
   return `<p style="max-width:64ch">Here's everything you need to find your way around the Jobnest student portal.</p><div class="guide">${rows}</div>`;
 }
 const handbookView = () => `<div class="lesson-doc"><h3>1. Attendance</h3><p>Join every live session. If you can't, tell Student Success before the session and watch the recording within 48 hours.</p>
-  <h3>2. Deadlines</h3><p>Weekly tasks are due Friday at 17:00 for full marks. Until Sunday 23:59 you can still get up to 80%. After that, the maximum is 50%. Weekly assessments close when the examination week (Week 12) starts.</p>
+  <h3>2. Deadlines</h3><p>Each week's work is due on <b>Sunday at 18:00</b>. Use the Friday check-in to raise anything you're stuck on. Late tasks are still accepted and marked late. Each weekly assessment closes on Sunday at 18:00 of its week: if you miss it, it scores 0, because there are no resits. The final project is due on Sunday at 18:00 at the end of Week 14, and late projects lose the 20 timeliness marks in the rubric.</p>
   <h3>3. Grading</h3><p>Your final score = (10 weekly assessments, 40 marks + two examinations in Week 12, 60 marks + practical project, 100 marks) ÷ 2. Distinction 80–100, Merit 60–79, Pass 50–59, Fail below 50. Assessments have one attempt and no resits. An examination resit is only possible when staff authorise it. Weekly tasks get feedback within 5 working days but don't count towards your final score.</p>
   <h3>4. Code of conduct</h3><p>Submit your own work, respect everyone in your cohort and represent Jobnest professionally at your internship. Breaking the Student Oath can lead to removal from the programme.</p>
   <h3>5. Getting help</h3><p>Use Help & Support in the portal, or message Student Success in your cohort community.</p>
@@ -2043,7 +2045,7 @@ function lsBrief(wi) {
   return `<div class="view brief-doc"><a class="back" href="#/learn/learning/${wi + 1}">← Week ${wi + 1}: ${esc(LS.W[wi].title)}</a>
     <div><p class="eyebrow">Practical project brief</p><h2 style="margin-top:.4rem">Your practical project</h2><p class="note" style="font-size:.95rem;margin-top:.3rem">${esc(LS.C.me.track || "")} track · individual project · Weeks ${wi + 1}–${wi + 2} · graded out of 100</p></div>
     <h3>Your task</h3><p>${esc(it?.detail || "")}</p>
-    <h3>Timeline</h3><dl class="kv tl"><div><dt>Week ${wi + 1}</dt><dd>Project plan due ${fmtD(weekDue(wi))}, 17:00. Check in with your supervisor.</dd></div><div><dt>Week ${wi + 2}</dt><dd>Final project due ${fmtD(weekDue(wi + 1))}, 17:00. Self-review, then supervisor grading.</dd></div></dl>
+    <h3>Timeline</h3><dl class="kv tl"><div><dt>Week ${wi + 1}</dt><dd>Project plan due ${fmtD(weekDue(wi))}, 18:00. Check in with your supervisor.</dd></div><div><dt>Week ${wi + 2}</dt><dd>Final project due ${fmtD(weekDue(wi + 1))}, 18:00. Self-review, then supervisor grading.</dd></div></dl>
     <h3>How you'll be graded</h3><p class="note">Your supervisor scores your final project out of 100 with this rubric. The score goes straight into your final result: (assessments + examinations + project) ÷ 2.</p>${projRubricTable()}
     <h3>How to submit</h3><p>Put everything in one Google Drive or Notion folder, set sharing to “anyone with the link can view”, and paste the link into the Week ${wi + 2} task “Submit your final project”.</p></div>`;
 }
@@ -2054,7 +2056,7 @@ function logWeek(wi, it, r) {
     return `<div class="field"><label for="lb-${f.k}">${f.l}${req}</label><input id="lb-${f.k}" type="${f.t}" ${f.min != null ? `min="${f.min}" max="${f.max}"` : ""} ${ro2} placeholder="${esc(f.ph || "")}" value="${v}"></div>`; };
   const sections = LB_FIELDS.map((s) => `<div class="lb-sec"><h3>${s.sec}</h3>${s.sec === "Week details" ? `<div class="grid2">${s.fields.map(fld).join("")}</div>` : s.fields.map(fld).join("")}${s.sec === "Learning & reflection" && last ? fld(LB_FINAL) : ""}</div>`).join("");
   const rating = `<div class="field"><span class="lbl" id="rate-l">How would you rate this week? *</span><div class="rate" role="radiogroup" aria-labelledby="rate-l">${[["1", "Tough"], ["2", "Okay"], ["3", "Good"], ["4", "Great"], ["5", "Excellent"]].map(([n, t]) => `<label><input type="radio" name="lb-rate" value="${n}" ${e.rate === n ? "checked" : ""} ${ro ? "disabled" : ""}><span>${n} · ${t}</span></label>`).join("")}</div></div>`;
-  return `${r?.status === "revise" ? `<div class="card fb bad"><div class="ch"><h3>Changes requested</h3></div><p>${esc(r.feedback || "")}</p><p class="note">${esc(r.graded_by || "Your supervisor")} · update the entry below and resubmit.</p></div>` : ""}<div class="lb-due"><span class="eyebrow">Due</span><b>${fmtD(weekDue(wi))}, 17:00</b><span class="note">Internship week ${w} of 4 · fill this entry at the end of the week</span></div>
+  return `${r?.status === "revise" ? `<div class="card fb bad"><div class="ch"><h3>Changes requested</h3></div><p>${esc(r.feedback || "")}</p><p class="note">${esc(r.graded_by || "Your supervisor")} · update the entry below and resubmit.</p></div>` : ""}<div class="lb-due"><span class="eyebrow">Due</span><b>${fmtD(weekDue(wi))}, 18:00</b><span class="note">Internship week ${w} of 4 · fill this entry at the end of the week</span></div>
     <form class="lb-form" id="lb-form" data-k="${it.key}" data-last="${last ? 1 : 0}" novalidate>${sections}<div class="lb-sec">${rating}</div><p class="err" id="lb-err" role="alert"></p>
     ${ro ? (e.signed ? `<div class="signoff signed"><b>Signed by ${esc(e.signed_by || "your supervisor")}</b>${e.sup_comment ? `<p class="note">“${esc(e.sup_comment)}”</p>` : ""}<p class="note">${e.signed_at ? fmtDateD(String(e.signed_at).slice(0, 10)) : ""}</p></div>`
       : `<div class="signoff"><b>Submitted · waiting for sign-off</b><p class="note">Submitted on ${fmtDateD(String(r.at).slice(0, 10))}. ${LS.X.placement ? esc(LS.X.placement.sup_name) + " signs it from the secure link we send them." : "Your supervisor signs it from a secure link."}</p></div>`)
@@ -2075,14 +2077,14 @@ function projectView(wi, items) {
   const firstOpen = ms.findIndex((m) => !m.ok), p = weekProgress(wi), msgs = LS.X.messages || [];
   return `<div class="proj-hero"><p class="eyebrow">Practical project · ${ph + 1} of ${projW.length}</p><h2>${esc(LS.W[wi].title.replace("Project: ", ""))}</h2>
     <p class="ph-brief">${esc(brief)}</p>
-    <div class="ph-stats"><div><span>Final project due</span><b class="mono">${daysToFinal}<small> days</small></b><span>${fmtD(weekDue(finalWi))}, 17:00</span></div>
+    <div class="ph-stats"><div><span>Final project due</span><b class="mono">${daysToFinal}<small> days</small></b><span>${fmtD(weekDue(finalWi))}, 18:00</span></div>
       <div><span>This week</span><b class="mono">${p.d}<small>/${p.n}</small></b><span>tasks done</span></div>
       <div><span>Project score</span><b class="mono">${fr?.status === "graded" ? (fr.grade ?? fr.score) + "<small>/100</small>" : "—"}</b><span>${fr?.status === "graded" ? "graded by your supervisor" : fr ? "waiting for grading" : "after you submit"}</span></div></div>
     <ol class="ph-steps">${PROJ_PHASES.map((x, i) => `<li class="${weekDone(projW[i]) ? "done" : i === ph ? "cur" : ""}"><span class="mono">Week ${projW[i] + 1}</span><b>${x[0]}</b><span>${x[1]}</span></li>`).join("")}</ol>
     <div class="actions"><a class="btn gold sm" href="#/learn/learning/${projW[0] + 1}/brief">${LICON.file} Read the full brief & rubric</a><span class="ph-note">Individual project · you work on your own, with your supervisor's support</span></div></div>
   <div style="margin-top:1rem">${gateCard(wi)}</div>
   <div class="proj-grid"><div class="stack">
-    <div class="card"><div class="ch"><h3>This week's tasks</h3><span class="note">Due ${fmtD(weekDue(wi))}, 17:00</span></div><div class="items" id="tour-items" style="margin-top:.6rem">${items}</div></div>
+    <div class="card"><div class="ch"><h3>This week's tasks</h3><span class="note">Due ${fmtD(weekDue(wi))}, 18:00</span></div><div class="items" id="tour-items" style="margin-top:.6rem">${items}</div></div>
     <div class="card"><div class="ch"><h3>Project milestones</h3><span class="note">${ms.filter((m) => m.ok).length} of ${ms.length}</span></div>
       <ol class="mstones">${ms.map((m, i) => `<li class="${m.ok ? "done" : i === firstOpen ? "cur" : ""}"><span class="dot"></span><div><b>${esc(m.t)}</b><span class="note">Week ${m.w + 1}${m.ok ? " · done" : i === firstOpen ? " · up next" : ""}</span></div></li>`).join("")}</ol></div></div>
     <div class="stack"><div class="card supcard"><div class="sup-h"><span class="sup-av">${LICON.guide}</span><div><span class="eyebrow">Your project supervisor</span><b>${LS.sup?.name ? esc(LS.sup.name) : "Ask about your project"}</b><span class="note">${LS.sup?.name ? "Your track facilitator · replies" : "Replies"} within 1 working day</span></div></div>
@@ -2109,7 +2111,7 @@ function lsLogGuide(wi) {
   return `<div class="view guide-doc"><a class="back" href="#/learn/learning/${wi + 1}">← Week ${wi + 1}: ${esc(LS.W[wi].title)}</a>
     <div><p class="eyebrow">Internship · Weeks 15–18</p><h2 style="margin-top:.4rem">Logbook guide</h2></div>
     <p>Your logbook is the official record of your internship. Your supervisor signs every entry, and it becomes verified work experience for your CV and portfolio.</p>
-    <h3>When to fill it</h3><ul><li>Once a week, at the end of each internship week: 4 entries in total.</li><li>Submit by <b>Friday, 17:00</b>. Write notes during the week so Friday is quick.</li></ul>
+    <h3>When to fill it</h3><ul><li>Once a week, at the end of each internship week: 4 entries in total.</li><li>Submit by <b>Sunday, 18:00</b>. Write notes during the week so it's quick to fill in.</li></ul>
     <h3>What to write</h3><ul><li><b>Tasks:</b> list each task and what you delivered. Be specific.</li><li><b>Tools:</b> the software you used, e.g. Excel, Trello, Zendesk.</li><li><b>Skills:</b> what you learned or got better at.</li><li><b>Challenges:</b> one problem and how you solved it.</li><li><b>Next week:</b> two or three clear goals.</li></ul>
     <div class="ex"><div class="ex-bad"><span class="eyebrow">Weak entry</span><p>"Did some work on reports and attended meetings."</p></div>
       <div class="ex-good"><span class="eyebrow">Strong entry</span><p>"Cleaned the March sales export (2,400 rows) in Google Sheets, removed 130 duplicates and built a pivot table of sales by region. Presented the top 3 findings at Thursday's team stand-up."</p></div></div>
@@ -2335,11 +2337,11 @@ function lsAssignmentDetail(key) {
   lsShell("assignments", pageHead(`Week ${wi + 1} · ${esc(LS.W[wi].title)}`, esc(it.title)) + `<section class="wrap pagebody"><nav class="crumbs"><a class="link" href="#/learn/assignments">Assignments & Projects</a> / <span>${esc(it.title)}</span></nav>
   <div class="cols wide"><div class="stack">
     <div class="card"><div class="ch"><h3>Instructions</h3>${pillS(st)}</div><p>${esc(it.detail || "")}</p>${deadlineLine(wi)}<ul class="reqs"><li>Submit one link that anyone with the link can view (Google Drive, Notion, Canva, GitHub, etc.).</li><li>Feedback arrives within 5 working days.</li></ul></div>
-    ${r?.feedback ? `<div class="card fb ${r.status === "graded" ? "ok" : "bad"}"><div class="ch"><h3>${r.status === "graded" ? "Facilitator feedback" : "Revision requested"}</h3>${r.status === "graded" ? `<span class="score mono">${r.score}/100</span>` : ""}</div><p>${esc(r.feedback)}</p><p class="note">${esc(r.graded_by || "Your facilitator")}${r.cap && r.cap < 1 && r.status === "graded" ? ` · Marked ${r.grade}/100, capped at ${r.cap * 100}% for late submission` : ""}</p></div>` : ""}
+    ${r?.feedback ? `<div class="card fb ${r.status === "graded" ? "ok" : "bad"}"><div class="ch"><h3>${r.status === "graded" ? "Facilitator feedback" : "Revision requested"}</h3>${r.status === "graded" ? `<span class="score mono">${r.score}/100</span>` : ""}</div><p>${esc(r.feedback)}</p><p class="note">${esc(r.graded_by || "Your facilitator")}${r.cap && r.cap < 1 ? " · submitted late" : ""}</p></div>` : ""}
     <div class="card"><h3>${st === "Revision Required" ? "Resubmit your work" : "Your submission"}</h3>${!un ? `<p class="empty">This assignment opens in Week ${wi + 1}.</p>` : r?.status === "graded" ? `<p>Submitted link: <a class="mono" style="word-break:break-all" href="${esc(r.link)}" target="_blank" rel="noopener">${esc(r.link)}</a></p>`
       : `<form id="ls-link" data-k="${it.key}" class="form" style="margin-top:.8rem" novalidate><div class="field"><label for="ls-url">Link to your work *</label><input id="ls-url" inputmode="url" placeholder="https://" value="${esc(r?.link || "")}"></div><p class="err" id="ls-err" role="alert"></p>
         <div class="actions"><button class="btn" type="submit">${st === "Revision Required" ? "Resubmit" : r ? "Update link" : "Submit assignment"}</button></div></form>${r?.status === "submitted" ? `<p class="note" style="margin-top:.6rem">Waiting for your facilitator to grade it. Feedback arrives within 5 working days.</p>` : ""}`}</div></div>
-    <div class="stack"><div class="card"><h3>Details</h3><dl class="kv"><div><dt>Deadlines</dt><dd>Full marks: ${fmtD(weekDue(wi))}, 17:00<br>80% max: ${fmtD(graceDue(wi))}, 23:59</dd></div><div><dt>Stage</dt><dd>${esc(COURSE_STAGES[LS.W[wi].stage].title)}</dd></div><div><dt>In My Learning</dt><dd><a class="link" href="#/learn/learning/${wi + 1}/${it.key}">Week ${wi + 1} item</a></dd></div></dl></div>
+    <div class="stack"><div class="card"><h3>Details</h3><dl class="kv"><div><dt>Deadline</dt><dd>${fmtD(weekDue(wi))}, 18:00<br><span class="note">Late work is accepted and marked late</span></dd></div><div><dt>Stage</dt><dd>${esc(COURSE_STAGES[LS.W[wi].stage].title)}</dd></div><div><dt>In My Learning</dt><dd><a class="link" href="#/learn/learning/${wi + 1}/${it.key}">Week ${wi + 1} item</a></dd></div></dl></div>
       ${it.final ? `<div class="card"><h3>Project rubric</h3>${projRubricTable()}</div>` : it.proj ? `<div class="card"><h3>Feedback rubric</h3><p class="note">Week tasks get feedback but don't count towards your final score.</p><table class="tbl rub"><tbody>${RUBRIC.map((x) => `<tr><td><b>${x[0]}</b><span class="note">${x[1]}</span></td><td class="mono">${x[2]}</td></tr>`).join("")}<tr><td><b>Total</b></td><td class="mono">${total}</td></tr></tbody></table></div>` : ""}
       <div class="card"><h3>History</h3>${hist.length ? `<ul class="hist">${hist.map((h) => `<li><span class="mono note">${fmtAt(h.at)}</span><span>${esc(h.action)}${h.by ? ` · ${esc(h.by)}` : ""}</span></li>`).join("")}</ul>` : `<p class="empty">No activity yet.</p>`}</div></div></div></section>`);
 }
@@ -2388,7 +2390,7 @@ function lsHelpPage() {
     ["Why can't I open a lesson?", "Inside each week, items open in order. Finish the step before it first. Optional items never block you."],
     ["How is my final result worked out?", "Ten weekly assessments (40 marks), the two examinations in Week 12 (60 marks) and your practical project (100 marks). Final score = (assessments + examinations + project) ÷ 2. Distinction 80–100, Merit 60–79, Pass 50–59, Fail below 50. Scores are never rounded up."],
     ["Can I retake an assessment or examination?", "Weekly assessments have one attempt and no resits. If you miss an examination for a serious reason, speak to Student Success: a resit is only possible when staff authorise it, and it replaces your earlier score."],
-    ["What if I submit late?", "Work is due Friday at 17:00 for full marks. Until Sunday 23:59 the maximum is 80%. After that, it's 50%."],
+    ["What if I submit late?", "Weekly work is due Sunday at 18:00. Late tasks are still accepted and marked late. Weekly assessments close at Sunday 18:00 and score 0 if missed. A late final project loses the 20 timeliness marks in the rubric."],
     ["How do I join a live session?", "Open My Cohort or Home and tap Join. Joining through the portal records your attendance."],
     ["I forgot my password", "Use Forgot password on the sign-in page. We'll email you a link."]];
   const R = LS.support || [], pill = (st) => `<span class="pill ${st === "Resolved" ? "ok" : st === "In progress" ? "info" : "now"}">${st}</span>`;
@@ -2866,11 +2868,11 @@ async function tabGrading() {
   const canGrade = ["cohort_manager", "facilitator", "director", "super"].includes(ME.role);
   const row = (x) => { const i = d.work.indexOf(x), late = x.cap != null && x.cap < 1;
     return `<details class="arow noav" data-id="lg${i}" ${ui.open === "lg" + i ? "open" : ""}><summary><span class="an"><b>${esc(x.name)}</b><span class="note">${esc(x.matric)} · ${esc(x.track)} · Week ${x.week}: ${esc(x.title)}</span></span>
-      <span class="anext">${x.status === "submitted" ? `Sent ${ago(x.at)}${late ? ` · late, max ${x.cap * 100}%` : ""}` : x.status === "graded" ? `${x.score}%${x.graded_by ? " · " + esc(x.graded_by) : ""}` : "Waiting for resubmission"}</span>
+      <span class="anext">${x.status === "submitted" ? `Sent ${ago(x.at)}${late ? " · late" : ""}` : x.status === "graded" ? `${x.score}%${x.graded_by ? " · " + esc(x.graded_by) : ""}` : "Waiting for resubmission"}</span>
       ${x.status === "submitted" ? `<span class="pill now">To grade</span>` : x.status === "graded" ? `<span class="pill ok">Graded</span>` : `<span class="pill bad">Revise</span>`}</summary>
     <div class="abody"><p><a class="btn sm ghost" href="${esc(x.link)}" target="_blank" rel="noopener">Open their work ↗</a></p>${x.feedback && x.status !== "submitted" ? `<p class="note"><b>Feedback:</b> ${lines(x.feedback)}</p>` : ""}
       ${canGrade && x.status === "submitted" ? `<form class="form lgrade-form" data-i="${i}" novalidate><div class="rate"><label><input type="radio" name="lg-${i}" value="graded" checked><span>Grade it</span></label><label><input type="radio" name="lg-${i}" value="revise"><span>Ask for changes</span></label></div>
-        <div class="grid2"><div class="field"><label for="lgg-${i}">Grade out of 100</label><input id="lgg-${i}" placeholder="0 to 100" type="number" min="0" max="100" inputmode="numeric">${late ? `<span class="note">Late: their score is capped at ${x.cap * 100}% of this.</span>` : ""}</div></div>
+        <div class="grid2"><div class="field"><label for="lgg-${i}">Grade out of 100</label><input id="lgg-${i}" placeholder="0 to 100" type="number" min="0" max="100" inputmode="numeric">${late ? `<span class="note">Submitted after the Sunday 18:00 deadline. Grade it as normal.</span>` : ""}</div></div>
         <div class="field"><label for="lgf-${i}">Feedback (required when asking for changes)</label><textarea id="lgf-${i}" placeholder="What was good, and what to improve" rows="2"></textarea></div>
         <p class="note">Rubric: meets the brief 30 · quality & accuracy 30 · clarity & presentation 20 · timeliness 20. Students need ${70}% averaged with the week's quiz to move on.</p>
         <div class="actions"><button class="btn sm" type="submit">Send result</button></div></form>` : ""}</div></details>`; };

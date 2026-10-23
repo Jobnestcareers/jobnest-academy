@@ -51,10 +51,18 @@ for k in w2-4 w3-3 w4-2 w5-2; do take $BEN PTA $k $BID 3; done
 check "ben 4 taken, 6 pending" "$($P -c "select concat(r->>'assess_taken','/',r->>'assess_pending') from (select private.result(a) r from applications a where id='$BID') t")" "4/6"
 check "ben pending result" "$($P -c "select private.result(a)->>'status' from applications a where id='$BID'")" "Pending"
 
+echo "--- weekly deadline: Sunday 18:00 (update 29)"
+check "week 2 due day 7 of the week, 18:00 WAT" "$($P -c "select to_char(private.week_due(c, 2) at time zone 'Africa/Lagos', 'HH24:MI') || ' +' || (private.week_due(c, 2) at time zone 'Africa/Lagos')::date - c.start_date from cohorts c where id=$CID")" "18:00 +13"
+$P -c "update cohorts set start_date = current_date - 50 where id = $CID"   # now in week 8: weeks 6 and 7 have closed
+check "ben: weeks 6-7 missed, 8-11 pending" "$($P -c "select concat(r->>'assess_missed','/',r->>'assess_pending') from (select private.result(a) r from applications a where id='$BID') t")" "2/4"
+check "closed assessment can't start" "$(as $BEN "select learn_quiz_start('w6-2')" 2>&1 | grep -o 'closed on Sunday at 18:00')" "closed on Sunday at 18:00"
+check "missed assessment doesn't block its week" "$($P -c "select count(*) from course_items i, applications a where a.id='$BID' and i.track_code='PTA' and i.week=6 and i.key<>'w6-2' and private.seq_block(a, i) = (select title from course_items where track_code='PTA' and key='w6-2')")" "0"
+check "late task keeps full grade" "$($P -c "select private.learn_cap(c, 1, now()) from cohorts c where id=$CID")" "0.5"
+
 echo "--- examinations"
 $P -c "update cohorts set start_date = current_date - 77, exam_week_start = current_date"   # today is the examination week's 'Monday'
 check "ben's missing assessments now missed" "$($P -c "select concat(r->>'assess_missed','/',r->>'assess_pending') from (select private.result(a) r from applications a where id='$BID') t")" "6/0"
-check "assessment closed" "$(as $BEN "select learn_quiz_start('w6-2')" 2>&1 | grep -o 'closed when the examination week started')" "closed when the examination week started"
+check "assessment closed" "$(as $BEN "select learn_quiz_start('w6-2')" 2>&1 | grep -o 'closed on Sunday at 18:00')" "closed on Sunday at 18:00"
 check "timetable unpublished" "$(as $ADA "select learn_exam_start('fund')" 2>&1 | grep -o "hasn't been published")" "hasn't been published"
 check "only BOP may not move off Wednesday" "$(as cm@test.ng "select acad_exam_settings('{\"schedule\":[{\"track\":\"BOP\",\"fund_day\":1,\"core_day\":4}]}')" 2>&1 | grep -o 'Business Operations sits.*Wednesday')" "Business Operations sits its Core Skill Learning Examination on Wednesday"
 check "fund day must be Mon/Tue" "$(as cm@test.ng "select acad_exam_settings('{\"schedule\":[{\"track\":\"PTA\",\"fund_day\":3,\"core_day\":4}]}')" 2>&1 | grep -o 'Monday or Tuesday')" "Monday or Tuesday"
