@@ -8,6 +8,7 @@ FAIL=0; check() { if [ "$2" == "$3" ]; then echo "ok   $1: $2"; else echo "FAIL 
 
 $P -c "update applications set track_code='BOP' where id='$AID'; update applications set track_code='PTA' where id='$BID'"
 $P -c "update cohorts set start_date = current_date - 10"
+$P -c "delete from sessions"   # live classes are tested in dev/test_live.sh; none held here = full attendance (10)
 $P -c "update applications set fee_due_override = current_date + 365 where id in ('$AID','$BID')"
 $P -c "update app_settings set value='00:00' where key='exam_open'; update app_settings set value='23:59' where key='exam_close'"
 $P -c "insert into app_settings(key,value) values ('unlock_weeks','off'),('week_dates','on') on conflict (key) do update set value=excluded.value"
@@ -40,13 +41,13 @@ echo "--- weekly assessments"
 lessons_done $ADA BOP w2-4
 N=$(as $ADA "select jsonb_array_length(learn_quiz_start('w2-4')->'qs')" | tail -1); check "5 questions" "$N" "5"
 A=$(answers $AID w2-4 4); as $ADA "select learn_quiz('w2-4', '$A')" >/dev/null
-check "4 of 5 = 3.2 marks" "$($P -c "select (private.result(a)->'assessments'->0->>'marks') from applications a where id='$AID'")" "3.2"
+check "4 of 5 = 2.4 marks" "$($P -c "select (private.result(a)->'assessments'->0->>'marks') from applications a where id='$AID'")" "2.4"
 check "second attempt blocked" "$(as $ADA "select learn_quiz_start('w2-4')" 2>&1 | grep -o 'one attempt')" "one attempt"
 check "student retry blocked" "$(as $ADA "select learn_quiz_retry('w2-4')" 2>&1 | grep -o 'no resits')" "no resits"
 check "staff retake blocked" "$(as cm@test.ng "select acad_grant_retake('$AID', 2)" 2>&1 | grep -o 'no resits')" "no resits"
 check "repeat week blocked" "$(as $ADA "select learn_repeat(2)" 2>&1 | grep -o "can't be repeated")" "can't be repeated"
 for k in w3-3 w4-2 w5-2 w6-2 w7-2 w8-2 w9-2 w10-2 w11-2; do take $ADA BOP $k $AID 5; done
-check "ada assessments 4+9x5 correct = 39.2/40" "$($P -c "select private.result(a)->>'assess_score' from applications a where id='$AID'")" "39.2"
+check "ada assessments 4+9x5 correct = 29.4/30" "$($P -c "select private.result(a)->>'assess_score' from applications a where id='$AID'")" "29.4"
 for k in w2-4 w3-3 w4-2 w5-2; do take $BEN PTA $k $BID 3; done
 check "ben 4 taken, 6 pending" "$($P -c "select concat(r->>'assess_taken','/',r->>'assess_pending') from (select private.result(a) r from applications a where id='$BID') t")" "4/6"
 check "ben pending result" "$($P -c "select private.result(a)->>'status' from applications a where id='$BID'")" "Pending"
@@ -111,14 +112,14 @@ check "pending until project graded" "$($P -c "select private.result(a)->>'statu
 check "facilitator from PTA can't grade BOP" "$(as pt@test.ng "select acad_learn_grade_parts('$AID','$PK','graded','{\"a\":50}','x')" 2>&1 | grep -o "can't grade")" "can't grade"
 as fola@test.ng "select acad_learn_grade_parts('$AID','$PK','graded','{\"Understanding of the brief\":12,\"Quality and accuracy\":20,\"Track skills\":16,\"Problem-solving\":12,\"Presentation\":12,\"Planning and self-review\":8}','Strong work')" >/dev/null
 check "project 80/100 (late cap not applied)" "$($P -c "select private.result(a)->'project'->>'score' from applications a where id='$AID'")" "80"
-check "ada final (39.2+48+80)/2 = 83.6 Distinction" "$($P -c "select concat(r->>'final',' ',r->>'grade',' ',r->>'class',' ',r->>'status') from (select private.result(a) r from applications a where id='$AID') t")" "83.6 A Distinction Complete"
+check "ada final (10+29.4+48+80)/2 = 83.7 Distinction" "$($P -c "select concat(r->>'final',' ',r->>'grade',' ',r->>'class',' ',r->>'status') from (select private.result(a) r from applications a where id='$AID') t")" "83.7 A Distinction Complete"
 check "student can't see final before publish" "$(as $ADA "select coalesce(learn_results()->>'final','hidden') || ' ' || (learn_results()->>'exam_score')" | tail -1)" "hidden 48.00"
 check "pta facilitator sees only PTA" "$(as pt@test.ng "select jsonb_path_query_array(acad_results()->'students','\$[*].matric')" | tail -1)" '["GEP/27A/002"]'
 check "facilitator can't correct" "$(as pt@test.ng "select acad_score_correct('$BID','exam-fund',20,'x')" 2>&1 | grep -o 'Your role')" "Your role"
 check "correction needs reason" "$(as cm@test.ng "select acad_score_correct('$AID','project',75,'')" 2>&1 | grep -o 'Give a reason')" "Give a reason"
 check "correction range" "$(as cm@test.ng "select acad_score_correct('$AID','w5-2',6,'typo')" 2>&1 | grep -o 'from 0 to 5')" "from 0 to 5"
 as cm@test.ng "select acad_score_correct('$AID','w2-4',5,'Question 3 had two correct options')" >/dev/null
-check "recalculated: assessments capped at 40" "$($P -c "select concat(r->>'assess_score',' ',r->>'final') from (select private.result(a) r from applications a where id='$AID') t")" "40.0 84.0"
+check "recalculated: assessments capped at 30" "$($P -c "select concat(r->>'assess_score',' ',r->>'final') from (select private.result(a) r from applications a where id='$AID') t")" "30.0 84.0"
 check "cm can't publish" "$(as cm@test.ng "select acad_results_publish($CID, true)" 2>&1 | grep -o 'Your role')" "Your role"
 check "certificate blocked before publish" "$(as dir@test.ng "select acad_issue_certificate('$AID')" 2>&1 | grep -o 'Publish this cohort')" "Publish this cohort"
 as dir@test.ng "select acad_results_publish($CID, true)" >/dev/null
@@ -131,18 +132,18 @@ check "change log kept" "$($P -c "select count(*) from score_changes where appli
 check "certificate for ben blocked (pending)" "$(as dir@test.ng "select acad_issue_certificate('$BID')" 2>&1 | grep -o 'still Pending')" "still Pending"
 check "exception needs director" "$(as cm@test.ng "select acad_result_exception('$BID',true,'x')" 2>&1 | grep -o 'Your role')" "Your role"
 as dir@test.ng "select acad_result_exception('$BID',true,'Withdrew from project for medical reasons, approved by panel')" >/dev/null
-check "ben with exception: missing count as zero" "$($P -c "select concat(r->>'status',' ',r->>'final',' ',r->>'class') from (select private.result(a) r from applications a where id='$BID') t")" "Complete 11.2 Fail"
+check "ben with exception: missing count as zero" "$($P -c "select concat(r->>'status',' ',r->>'final',' ',r->>'class') from (select private.result(a) r from applications a where id='$BID') t")" "Complete 15.0 Fail"
 check "fail gets no certificate" "$(as dir@test.ng "select acad_issue_certificate('$BID')" 2>&1 | grep -o "doesn't receive a certificate")" "doesn't receive a certificate"
 CERT=$(as dir@test.ng "select acad_issue_certificate('$AID')->>'class'" | tail -1)
 check "certificate class" "$CERT" "Merit"
 check "certificate view shows class" "$($P -c "select certificate_view(cert_id)->>'class' from applications where id='$AID'")" "Merit"
 
-echo "--- policy example: (32 + 48 + 80) / 2 = 80, Distinction"
+echo "--- policy example: (10 + 24 + 48 + 80) / 2 = 81, Distinction"
 $P -c "delete from score_overrides where application_id='$AID'"
 $P -c "insert into score_overrides(application_id, component, value, reason, by_name) select '$AID', key, 4, 'policy example', 'test' from course_items where track_code='BOP' and type='quiz'"
 $P -c "insert into score_overrides(application_id, component, value, reason, by_name) values ('$AID','exam-fund',26,'policy example','test'),('$AID','exam-core',30,'policy example','test'),('$AID','project',80,'policy example','test')"
-check "32 + 48 + 80" "$($P -c "select concat(r->>'assess_score',' + ',r->>'exam_score',' + ',r->'project'->>'score',' = ',r->>'final',' ',r->>'grade',' ',r->>'class') from (select private.result(a) r from applications a where id='$AID') t")" "32.0 + 48.00 + 80 = 80.0 A Distinction"
-$P -c "update score_overrides set value = 79 where application_id='$AID' and component='project'"
+check "10 + 24 + 48 + 80" "$($P -c "select concat(r->'attendance'->>'score',' + ',r->>'assess_score',' + ',r->>'exam_score',' + ',r->'project'->>'score',' = ',r->>'final',' ',r->>'grade',' ',r->>'class') from (select private.result(a) r from applications a where id='$AID') t")" "10.0 + 24.0 + 48.00 + 80 = 81.0 A Distinction"
+$P -c "update score_overrides set value = 77 where application_id='$AID' and component='project'"
 check "79.5 stays Merit (no rounding up)" "$($P -c "select concat(r->>'final',' ',r->>'class') from (select private.result(a) r from applications a where id='$AID') t")" "79.5 Merit"
 echo "--- audit"
 check "audit lines" "$($P -c "select count(*) >= 6 from audit_log where text ~ '(corrected|resit|exception|published results|issued certificate)'")" "t"
