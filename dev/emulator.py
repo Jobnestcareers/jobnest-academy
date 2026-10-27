@@ -9,6 +9,7 @@ PSQL = ["psql", "-h", "/var/tmp/jnpg", "-p", "5433", "-U", "postgres", "-d", "jn
 USERS = {}  # email -> password
 IDS = {}  # admin-created user id -> email
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8787
+STORE = pathlib.Path("/var/tmp/jn_storage")
 
 def lit(v):
     return "NULL" if v is None else "'" + str(v).replace("'", "''") + "'"
@@ -50,6 +51,12 @@ class H(SimpleHTTPRequestHandler):
             q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query); page = int(q.get("page", ["1"])[0])
             allu = [{"id": i, "email": e} for i, e in IDS.items()]
             return self.send_json(200, {"users": allu[(page - 1) * 200: page * 200]})
+        if self.path.startswith("/storage/v1/object/public/"):
+            rel = urllib.parse.unquote(urllib.parse.urlparse(self.path).path[len("/storage/v1/object/public/"):])
+            f = STORE / rel
+            if not f.is_file(): return self.send_json(404, {"message": "Object not found"})
+            ty = (STORE / (rel + ".type")).read_text() if (STORE / (rel + ".type")).exists() else "application/octet-stream"
+            b = f.read_bytes(); self.send_response(200); self.send_header("Content-Type", ty); self.send_header("Content-Length", str(len(b))); self.end_headers(); self.wfile.write(b); return
         if self.path.startswith("/assets/config.js"):
             b = f'export const SUPABASE_URL = "http://localhost:{PORT}";\nexport const SUPABASE_ANON_KEY = "anon-key";\n'.encode()
             self.send_response(200); self.send_header("Content-Type", "text/javascript"); self.end_headers(); self.wfile.write(b); return
@@ -68,6 +75,15 @@ class H(SimpleHTTPRequestHandler):
     def do_PUT(self): self.do_POST()
     def do_POST(self):
         if self.path.startswith("/.netlify/functions/"): return self.proxy()
+        if self.path.startswith("/storage/v1/object/"):
+            # Supabase Storage stand-in: signed-in users upload to /var/tmp/jn_storage/<bucket>/<path>.
+            n = int(self.headers.get("Content-Length") or 0); data = self.rfile.read(n) if n else b""
+            if self.claims()[0] != "authenticated": return self.send_json(401, {"message": "new row violates row-level security policy"})
+            if n > 20 * 1024 * 1024: return self.send_json(413, {"message": "The object exceeded the maximum allowed size"})
+            rel = urllib.parse.unquote(urllib.parse.urlparse(self.path).path[len("/storage/v1/object/"):])
+            dest = STORE / rel; dest.parent.mkdir(parents=True, exist_ok=True); dest.write_bytes(data)
+            (STORE / (rel + ".type")).write_text(self.headers.get("Content-Type") or "application/octet-stream")
+            return self.send_json(200, {"Key": rel})
         u = urllib.parse.urlparse(self.path); q = urllib.parse.parse_qs(u.query); b = self.body() or {}
         if u.path.startswith("/rest/v1/rpc/"):
             fn = u.path.rsplit("/", 1)[1]

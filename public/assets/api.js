@@ -56,6 +56,26 @@ export async function rpc(fn, args = {}) {
   return call(`/rest/v1/rpc/${fn}`, { body: args, token: s?.access_token });
 }
 
+// Upload a slide or resource to the public "class-files" bucket (staff only, 20 MB max).
+export async function uploadFile(file, folder = "classes") {
+  if (!file) throw new Error("Choose a file.");
+  if (file.size > 20 * 1024 * 1024) throw new Error("That file is over 20 MB. Share a link to it instead.");
+  const s = await fresh();
+  const safe = (file.name || "file").replace(/[^\w.\-]+/g, "-").replace(/-+/g, "-").slice(-80);
+  const path = `${folder}/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}-${safe}`;
+  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/class-files/${path}`, {
+    method: "POST",
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${s?.access_token || SUPABASE_ANON_KEY}`, "Content-Type": file.type || "application/octet-stream", "x-upsert": "false" },
+    body: file,
+  });
+  if (!res.ok) {
+    let m = ""; try { const d = await res.json(); m = d.message || d.error || ""; } catch { /* not json */ }
+    throw new Error(/row-level|unauthori/i.test(m) ? "Only staff can upload files. Sign in again and retry." : m || "The upload didn't work. Try again, or share a link instead.");
+  }
+  const ext = (safe.match(/\.([a-z0-9]{1,6})$/i) || [, "FILE"])[1].toUpperCase();
+  return { name: (file.name || safe).replace(/\.[a-z0-9]{1,6}$/i, ""), url: `${SUPABASE_URL}/storage/v1/object/public/class-files/${path}`, kind: ext, size: file.size };
+}
+
 export const auth = {
   get session() { return session; },
   async signIn(email, password) {
