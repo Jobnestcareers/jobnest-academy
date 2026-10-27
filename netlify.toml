@@ -18,6 +18,11 @@
   [headers.values]
     Cache-Control = "public, max-age=0, must-revalidate"
 
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache"
+
 # Clean addresses: every page is served by the app.
 [[redirects]]
   from = "/*"
