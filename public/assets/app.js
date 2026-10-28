@@ -1577,7 +1577,7 @@ const LB_FIELDS = [
     { k: "next", l: "What are your goals for next week?", t: "area", req: 1 }] },
 ];
 const LB_FINAL = { k: "achievement", l: "What was your biggest achievement during this internship?", t: "area", req: 1 };
-const MORE_PAGES = [["results", "Results", "Assessments, examinations, project and final grade"], ["assignments", "Assignments & Projects", "Submissions, grades and feedback"], ["cohort", "My Cohort", "Pod, live sessions, announcements, discussion"],
+const MORE_PAGES = [["results", "Results", "Assessments, examinations, project and final grade"], ["assignments", "Assignments & Projects", "Submissions, grades and feedback"], ["timetable", "Timetable", "Every live class, week by week"], ["cohort", "My Cohort", "Pod, live sessions, announcements, discussion"],
   ["career", "My Career", "Goals, skills, readiness, interview prep", 18], ["opps", "Opportunities", "Jobs, internships and applications", 19],
   ["profile", "Profile & Achievements", "Student ID, certificate, badges"], ["graduate", "Graduation & next steps", "Certificate, your job news, alumni check-ins"], ["help", "Help & Support", "FAQs and how to get help"]];
 
@@ -1715,6 +1715,61 @@ async function lsPracticePage(key) {
       ${P.checked ? `<div class="result ${ok >= Math.ceil(P.qs.length * 0.6) ? "pass" : "fail"}">You got ${ok} of ${P.qs.length} right.</div><div><button class="btn ghost" type="button" data-act="pr-again">Try again</button></div>` : `<div><button class="btn" type="submit">Check my answers</button></div>`}</form>`
       : `<div class="card"><p class="note">Your facilitator hasn't added practice questions for this week yet.</p></div>`}</section>`);
 }
+/* ---------- timetable (learner) ---------- */
+// The programme week a date falls in (1-based), from the cohort start date.
+const dateWeek = (d = Date.now()) => Math.floor((new Date(d).getTime() - lsStart().getTime()) / (7 * DAY)) + 1;
+const ttSessions = () => (LS.C.sessions || []).slice().sort((a, b) => clsStart(a) - clsStart(b));
+const ttKind = (s) => s.kind === "class" ? "" : ({ guest: "Guest session · optional", clinic: "Clinic · optional", orientation: "Orientation", other: "Optional" })[s.kind] || "";
+function ttRow(s, compact) {
+  const st = classState(s), at = classAtt(s), d = new Date(s.starts_at), end = new Date(clsEnd(s));
+  const right = st === "soon" || st === "live" ? `<span class="btn gold sm">${st === "live" ? "Live · Join" : "Join"}</span>`
+    : st === "before" ? (compact ? "" : `<span class="note">Opens ${fmtTime(new Date(clsStart(s) - CLASS_EARLY))}</span>`)
+    : `${at ? `<span class="pill ${at[1]}">${at[0]}</span>` : ""}${st === "recording" ? `<span class="lc-rec">Recording</span>` : ""}`;
+  return `<a class="tt-row st-${st} ${s.kind !== "class" ? "opt" : ""}" href="#/learn/class/${s.id}"><span class="tt-time mono">${fmtTime(d)}<small>–${fmtTime(end)}</small></span>
+    <span class="tt-t"><b>${esc(s.title)}</b><small>${[ttKind(s), s.host ? esc(s.host) : ""].filter(Boolean).join(" · ")}</small></span><span class="tt-r">${right}</span></a>`;
+}
+// One week as days: today highlighted, days without classes folded on phones.
+function ttWeek(w, compact) {
+  const start = new Date(lsStart().getTime() + (w - 1) * 7 * DAY), L = ttSessions().filter((s) => s.week === w), today = fmt(new Date(), { year: "numeric", month: "2-digit", day: "2-digit" });
+  const days = Array.from({ length: 7 }, (_, i) => new Date(start.getTime() + i * DAY + 12 * 36e5));
+  return `<div class="tt-days">${days.map((day) => { const k = fmt(day, { year: "numeric", month: "2-digit", day: "2-digit" }), mine = L.filter((s) => fmt(new Date(s.starts_at), { year: "numeric", month: "2-digit", day: "2-digit" }) === k);
+    return `<div class="tt-day ${k === today ? "tt-today" : day.getTime() < Date.now() ? "past" : ""} ${mine.length ? "" : "free"}"><span class="tt-dh"><b>${fmt(day, { weekday: "short" })}</b><span>${fmt(day, { day: "numeric", month: "short" })}</span>${k === today ? `<i>Today</i>` : ""}</span>
+      <div class="tt-items">${mine.length ? mine.map((s) => ttRow(s, compact)).join("") : `<span class="tt-none">No class</span>`}</div></div>`; }).join("")}</div>`;
+}
+function icsText(list) {
+  const esc2 = (t) => String(t || "").replace(/\\/g, "\\\\").replace(/([,;])/g, "\\$1").replace(/\n/g, "\\n");
+  const stamp = gcalStamp(new Date());
+  const ev = list.map((s) => ["BEGIN:VEVENT", `UID:jn-class-${s.id}@academy.jobnestcareers.com`, `DTSTAMP:${stamp}`, `DTSTART:${gcalStamp(s.starts_at)}`, `DTEND:${gcalStamp(clsEnd(s))}`,
+    `SUMMARY:${esc2("Jobnest Academy: " + s.title)}`, `DESCRIPTION:${esc2(`${s.kind === "class" ? "Live class" : "Session"}${s.host ? " with " + s.host : ""}. Join from the student portal (opens 20 minutes before): ${location.origin}/learn/class/${s.id}`)}`,
+    `URL:${location.origin}/learn/class/${s.id}`, "BEGIN:VALARM", "TRIGGER:-PT30M", "ACTION:DISPLAY", "DESCRIPTION:Live class in 30 minutes", "END:VALARM", "END:VEVENT"].join("\r\n"));
+  return ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Jobnest Academy//Timetable//EN", "CALSCALE:GREGORIAN", "X-WR-CALNAME:Jobnest Academy classes", ...ev, "END:VCALENDAR"].join("\r\n");
+}
+function icsDownload() {
+  const up = ttSessions().filter((s) => clsEnd(s) > Date.now());
+  if (!up.length) return toast("No upcoming classes to add yet");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([icsText(up)], { type: "text/calendar" })); a.download = "jobnest-academy-timetable.ics";
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`${up.length} class${up.length === 1 ? "" : "es"} saved. Open the file to add them to your calendar.`);
+}
+function homeTimetable() {
+  const w = Math.min(Math.max(dateWeek(), 1), LS.W.length), L = ttSessions().filter((s) => s.week === w);
+  const next = ttSessions().find((s) => clsEnd(s) > Date.now());
+  const nextLine = next ? (() => { const st = classState(next); return `<a class="tt-next ${st}" href="#/learn/class/${next.id}"><span class="eyebrow">${st === "live" ? "Live now" : st === "soon" ? "Starting soon" : "Next class"}</span><b>${esc(next.title)}</b><span class="note">${fmtD(new Date(next.starts_at))}, ${fmtTime(new Date(next.starts_at))} WAT${st === "before" ? ` · in ${timeLeft(clsStart(next) - Date.now())}` : ""}</span>${st === "soon" || st === "live" ? `<span class="btn gold sm">Join class</span>` : ""}</a>`; })() : "";
+  return `<div class="card tt-card" id="t-timetable"><div class="ch"><h3>This week's timetable <span class="note">Week ${w}</span></h3><span class="tt-acts"><button type="button" class="link" data-act="tt-ics">Add to my calendar</button><a class="link" href="#/learn/timetable">Full timetable →</a></span></div>
+    ${nextLine}${L.length ? ttWeek(w, true) : `<p class="empty">${next ? "No live classes this week." : "Your facilitators haven't published this week's classes yet. They'll appear here."}</p>`}</div>`;
+}
+function lsTimetablePage() {
+  const all = ttSessions(), cur = Math.min(Math.max(dateWeek(), 1), LS.W.length);
+  const weeks = [...new Set(all.map((s) => s.week))].filter((w) => w >= 1).sort((a, b) => a - b);
+  const show = ui.ttAll ? weeks : weeks.filter((w) => w >= cur);
+  const held = all.filter((s) => s.kind === "class" && clsEnd(s) <= Date.now()), up = all.filter((s) => clsEnd(s) > Date.now());
+  lsShell("timetable", pageHead("Timetable", "Live classes", "Every live class, week by week. Times are West Africa Time (WAT). Join from the class screen; it opens 20 minutes before.") + `<section class="wrap pagebody tt-page">
+    <div class="card tt-top"><div><b>${up.length}</b> upcoming class${up.length === 1 ? "" : "es"} · <b>${held.length}</b> held so far</div>
+      <div class="actions"><button type="button" class="btn sm" data-act="tt-ics">Add all to my calendar</button><button type="button" class="btn sm ghost" data-act="tt-toggle">${ui.ttAll ? "Hide past weeks" : "Show past weeks"}</button></div>
+      <p class="note">The calendar file works with Google Calendar, Outlook and iPhone. If a class time changes, add the file again to update it.</p></div>
+    ${show.length ? show.map((w) => `<div class="card tt-wk ${w === cur ? "now" : ""}"><div class="ch"><h3>Week ${w}${LS.W[w - 1] ? `: ${esc(LS.W[w - 1].title)}` : ""}</h3>${w === cur ? `<span class="pill now">This week</span>` : ""}</div>${ttWeek(w, false)}</div>`).join("")
+      : `<div class="card"><p class="empty">${all.length ? "No more classes scheduled. Show past weeks to see recordings." : "Your facilitators haven't published the timetable yet. Classes will appear here as soon as they do."}</p></div>`}</section>`);
+}
 function dueLabel(d) { const days = Math.ceil((d - Date.now()) / DAY); return days < 0 ? { t: "Overdue", c: "bad" } : days === 0 ? { t: "Due today", c: "warn" } : days <= 3 ? { t: `Due in ${days} day${days > 1 ? "s" : ""}`, c: "warn" } : { t: "Due " + fmtD(d), c: "" }; }
 const greeting = () => { const h = Number(fmt(new Date(), { hour: "numeric", hour12: false })); return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"; };
 function itemSub(it) {
@@ -1773,7 +1828,6 @@ function lsHome(cert) {
   const nIt = ni >= 0 ? wk.items[ni] : null, dl = dueLabel(weekDue(cur)), daysLeft = Math.max(0, Math.ceil((weekDue(cur) - Date.now()) / DAY));
   const due = lsAssignments().filter((a) => a.wi === cur && !a.it.opt && ["Not Started", "Revision Required"].includes(aStatus(a.it)));
   const sc = weekScore(cur), avg = avgScore();
-  const sess = lsSessions().filter((s) => s.at.getTime() + s.minutes * 6e4 >= Date.now())[0];
   const ann = (C.news || [])[0], before = Date.now() < lsStart().getTime();
   const bal = LS.fee ? `<div class="notice bal bad"><span><b>Your learning is paused.</b> Your second instalment of <b>${naira(LS.fee.balance)}</b> was due on ${fmtDateD(LS.fee.due_date)}. Pay the balance to open your lessons again.</span><a class="btn sm gold" href="#/a/${esc(LS.fee.ref)}/${esc(LS.fee.token)}/pay">Pay now</a></div>`
     : C.me.balance > 0 ? `<div class="notice bal"><span>Your second instalment of <b>${naira(C.me.balance)}</b> is due by ${fmtDateD(C.me.due_date)}.</span><a class="btn sm gold" href="#/a/${esc(C.me.ref)}/${esc(C.me.token)}/pay">Pay now</a></div>` : "";
@@ -1793,11 +1847,11 @@ function lsHome(cert) {
       <a class="sti" href="#/learn/results"><span class="eyebrow">Attendance</span><b class="mono">${marks1(LS.L.results?.attendance?.score ?? 10)}<small>/10</small></b><span class="note">${LS.L.results?.attendance?.held ? `${LS.L.results.attendance.held} live class${LS.L.results.attendance.held === 1 ? "" : "es"} so far` : "no classes yet"}</span></a>
       <a class="sti" href="#/learn/results"><span class="eyebrow">Assessments</span><b class="mono">${marks1(LS.L.results?.assess_score ?? 0)}<small>/30</small></b><span class="note">${LS.L.results?.assess_taken || 0} of 10 taken</span></a>
       <a class="sti" href="#/learn/results"><span class="eyebrow">Final result</span><b class="mono">${LS.L.results?.class ? esc(LS.L.results.class) : "—"}</b><span class="note">${LS.L.results?.class ? `${LS.L.results.final}/100` : LS.L.results?.status === "Complete" ? "waiting to be published" : "pending"}</span></a></div>
+    ${homeTimetable()}
     <div class="cols">
       <div class="card"><div class="ch"><h3>This week's checklist</h3><span class="note">${p.d} of ${p.n} required</span></div><div class="bar"><i style="width:${p.pct}%"></i></div>
         <ul class="checklist">${wk.items.map((it) => { const dn = isDoneIt(it); return `<li><a class="cl ${dn ? "done" : ""}" href="#/learn/learning/${cur + 1}/${it.key}"><span class="box">${dn ? LICON.done.replace(/20/g, "14") : ""}</span><span class="t">${esc(it.title)}</span>${it.opt ? `<span class="req opt">Optional</span>` : ""}</a></li>`; }).join("")}</ul></div>
       <div class="stack">
-        <div class="card"><div class="ch"><h3>Next live session</h3><a class="link" href="#/learn/cohort">Full schedule</a></div>${sess ? `<ul class="sess-list">${sessionRow(sess)}</ul>` : `<p class="empty">No upcoming sessions.</p>`}</div>
         ${LS.pod ? `<div class="card"><div class="ch"><h3>Your pod</h3><a class="link" href="#/learn/cohort">See pod</a></div><div class="pod">${LS.pod.members.map((m) => `<span class="pm ${m.me ? "me" : ""}"><span class="pa">${esc(m.initials)}</span></span>`).join("")}</div><p class="note">${esc(LS.pod.name)}${LS.pod.meet ? ` · check-in ${esc(LS.pod.meet)}` : ""}</p></div>` : ""}
         <div class="card"><div class="ch"><h3>Latest announcement</h3><a class="link" href="#/learn/cohort">All</a></div>${ann ? `<div class="ann" style="border:0;padding:0"><b>${esc(ann.title)}</b><p class="note">${lines(ann.body).slice(0, 400)}</p><small class="note">${fmtAt(ann.at)}</small></div>` : `<p class="empty">No announcements yet.</p>`}</div>
       </div></div></section>`);
@@ -2701,6 +2755,7 @@ async function lsRender(p1, p2, p3) {
   else if (page === "assignments") lsAssignmentsPage(p2 || null);
   else if (page === "results") lsResultsPage();
   else if (page === "class") lsClassPage(p2);
+  else if (page === "timetable") lsTimetablePage();
   else if (page === "practice") await lsPracticePage(p2);
   else if (["cohort", "sessions", "news"].includes(page)) { LS.disc = await rpc("disc_list2", { p_channel: "cohort" }).catch(() => []); lsCohortPage(); }
   else if (page === "profile") { LS.profile = await rpc("profile_get").catch(() => ({})); if (LS.X.eval && LS.icert === undefined) LS.icert = await rpc("certificate_view", { p_cert: internCertId() }).catch(() => null); lsProfilePage(cert); }
@@ -3325,6 +3380,8 @@ document.addEventListener("click", async (e) => {
   if (a === "opp-edit") { ui.oppEdit = k === "new" ? "new" : +k; return route(); }
   if (a === "ls-more") { ui.lsMore = !ui.lsMore; return lsRender(); }
   if (a === "ls-wtab") { ui.wtab = k; return lsRender(); }
+  if (a === "tt-ics") return icsDownload();
+  if (a === "tt-toggle") { ui.ttAll = !ui.ttAll; return lsRender(); }
   if (a === "cu-start") { try { const d = await busy(t, () => rpc("learn_catchup_start", { p_session: +k })); if (d.done) { await refreshSessions(); return lsRender(); } ui.cu = { id: +k, ...d }; lsRender(); } catch { /* shown */ } return; }
   if (a === "pr-again") { if (ui.pr) { ui.pr.checked = false; ui.pr.picks = {}; ui.pr.qs.sort(() => Math.random() - 0.5); } return lsRender(); }
   if (a === "ls-asf") { ui.asf = k; return lsRender(); }
